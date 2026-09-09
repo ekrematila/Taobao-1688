@@ -286,10 +286,10 @@ export default function DeliveryStudio({
         brand: channel === "etsy" ? brand : undefined,
         // length is AUTO-sized from the product; htmlBudget scales it + the token cost
         htmlBudget: channel === "shopify" ? htmlBudget : undefined,
-        // "Diğer HTML düzenler" — explicit line/char length target (pins the auto
-        // size); "Alt alta görsel" stays fully auto-sized.
-        htmlLengthBand: channel === "shopify" && !isSelfContainedLayout(layout) ? htmlBand : undefined,
-        htmlLengthUnit: channel === "shopify" && !isSelfContainedLayout(layout) ? htmlUnit : undefined,
+        // explicit line/char length target — pins the auto size. Applies to BOTH
+        // "Diğer HTML düzenler" and "Alt alta görsel".
+        htmlLengthBand: channel === "shopify" ? htmlBand : undefined,
+        htmlLengthUnit: channel === "shopify" ? htmlUnit : undefined,
         // optional 2nd-pass model just for the HTML description
         descModel: channel === "shopify" && descModel && descModel !== model ? descModel : undefined,
         descStyle,
@@ -862,7 +862,7 @@ export default function DeliveryStudio({
             )}
           </div>
 
-          {channel === "shopify" && !isSelfContainedLayout(layout) && (
+          {channel === "shopify" && (
             <label className="field" style={{ width: 260 }}>
               <span className="row" style={{ gap: 6, alignItems: "center", justifyContent: "space-between" }}>
                 {t("delivery.htmlBand")}
@@ -1152,7 +1152,7 @@ export default function DeliveryStudio({
                 listing={draft.listing}
                 product={draft.product}
                 channel={channel}
-                htmlBand={isSelfContainedLayout(layout) ? "" : htmlBand}
+                htmlBand={htmlBand}
                 htmlUnit={htmlUnit}
                 onSave={async (fields) => {
                   await api.patchDraft(draft.id, { listing: { ...draft.listing!, fields } });

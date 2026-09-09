@@ -75,15 +75,15 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
     .join(" ");
 }
 
-/** Shopify HTML-description build rule — "Alt alta görsel" (.bm v2). */
+/** Shopify HTML-description build rule — "Alt alta görsel" (.bm v3). */
 const SHOPIFY_DESC_RULE_STACKED = [
-  "AÇIKLAMA DÜZENİ (Alt alta görsel) — `description` ALANI, sana verilen `.bm` örneğinin (v2) BİREBİR YAPISINI izleyen TAM BİR HTML BELGESİ OLACAK. ASLA düz/sade metin verme.",
-  '1) `<style>…</style>` bloğu: örnekteki TÜM `.bm*` seçicileri, animasyonlar (`@keyframes bmFloat/bmPop/bmAtcGlow`), `.bm-reveal`, `.bm-stage`, `.bm-zoomtag`, `.bm-lightbox`, `.bm-faq`, `.bm-cta`, `prefers-reduced-motion` ve mobil `@media` kuralları AYNEN kalsın. SADECE şunları ürünün BASKIN RENGİNE/temasına göre değiştir: `--blue --blue2 --lav --sky --line --line2` renk değişkenleri, `.bm-hero`/`.bm-bar`/`.bm-cta` gradyanları, `.bm-hero h2`/`.bm-*` metin renkleri, ve `.bm-hero::before/::after` içindeki `content:"EMOJI"` glifi (tema emojisi).',
+  "AÇIKLAMA DÜZENİ (Alt alta görsel) — `description` ALANI, sana verilen `.bm` örneğinin (v3) BİREBİR YAPISINI izleyen TAM BİR HTML BELGESİ OLACAK. ASLA düz/sade metin verme.",
+  '1) `<style>…</style>` bloğu: örnekteki TÜM `.bm*` seçicileri, animasyonlar (`@keyframes bmFloat/bmPop/bmFade/bmAtcGlow`), jitter-önleyici teknik (`backface-visibility`, tam-piksel `translateY`, metinde `scale/skew` YOK), `.bm-reveal`, `.bm-stage`, `.bm-zoomtag`, `.bm-lightbox`, `.bm-trivia`, `.bm-layouts`, `.bm-compare`, `.bm-trust`, `.bm-faq`, `.bm-cta`, `prefers-reduced-motion` ve mobil `@media` kuralları AYNEN kalsın. SADECE renk/tema değişecek: `--ink --soft --gold --gold2 --lav --sky --milk --line --line2` değişkenlerini ürünün BASKIN RENGİNE göre yeniden ata (kırmızı ürün → kırmızı/scarlet, nane → yeşil, lavanta → mor…), `.bm-hero`/`.bm-bar`/`.bm-cta` gradyanları ve tüm sabit hex renkleri (ör. `#7a5a12`) o palete uydur, `.bm-hero::before/::after` `content:"EMOJI"` glifini tema emojisiyle değiştir.',
   '2) `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>` satırını `</style>`\'dan hemen sonra koy.',
-  '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner>` `<div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 4-6 emoji\'li `<span>` rozet).',
-  '4) `.bm-grid>.bm-c2>.bm-inner>` `<div class="bm-info bm-reveal">`: `<p class="bm-lede">` güçlü 2-3 cümle (anahtarlar `<strong>`); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Specifications</h3>`+`<div class="bm-spec">` 6-9 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>` (GERÇEK veriler); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 3-4 `<div class="bm-faq-item">` (ilki `is-open`) → `<button type="button" class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>CEVAP</p></div>`; `<div class="bm-note"><b>📦 In the box:</b> … <br><b>💡 Before you order:</b> … <br><b>🧼 Care:</b> …</div>`; `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc>🛒 Add to Cart</button></div>`.',
-  '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer ve `.bm-lightbox` düğümü + çalışan `<script>`\'i ekler.',
-  "TÜM emojiler/renkler/rozetler/highlight ikonları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve yapıyı DEĞİŞTİRME. Örnekteki 'Blueberry Milk' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz. Yukarıdaki OTOMATİK BOYUT hedefine uy (görsel/detay çoksa daha derin, azsa daha kısa); dolgu YOK.",
+  '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner> <div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 5-7 emoji\'li `<span>` rozet).',
+  '4) `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 2-3 cümle (anahtarlar `<strong>`); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi (`<strong>` vurgulu); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Compatible Layouts</h3>`+`<div class="bm-layouts">` ürüne uyan boyut/tuş-sayısı `<span>` çipleri + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` 6-9 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>` (GERÇEK veriler); `<h3>Why PBT Over ABS</h3>` (veya ürüne uygun bir "neden bu / X vs Y" başlığı)+`<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 4-5 `<div class="bm-faq-item">` (ilki `is-open`) → `<button type="button" class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>CEVAP</p></div>`; `<div class="bm-note"><b>📦 In the box:</b> … <br><b>💡 Before you order:</b> … <br><b>🧼 Care:</b> …</div>`; `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc>🛒 Add to Cart</button></div>`; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
+  '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer, `.bm-lightbox` düğümünü + çalışan `<script>`\'i ekler.',
+  "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz. Yukarıdaki UZUNLUK HEDEFİNE uy (bu hedef `<style>` + CSS + şablon + metin dahil TÜM HTML'i sayar; görsel/detay çoksa FAQ/spec/highlight/rozet sayısını artırıp hedefe yaklaş); dolgu/tekrar YOK.",
 ].join(" ");
 
 export function activeModel(): string {
@@ -517,23 +517,25 @@ export async function generateListing(
     const srcLen = (product.descHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
     const detailScore = descImgN + specN + Math.round(Math.min(srcLen, 12000) / 1200) + Math.min(variantN, 12);
 
+    // For the fixed ".bm" stacked layout the operator counts the WHOLE HTML
+    // (CSS + template + copy ≈ 29–30k), so its band/auto target is a TOTAL size;
+    // for "Diğer" the target is the visible text body only (CSS excluded).
+    const bandIsTotal = isSelfContainedLayout(input.descriptionLayout);
+
     let autoChars =
       8500 + descImgN * 1450 + specN * 340 + Math.min(variantN, 20) * 180 + Math.min(srcLen, 10000) * 0.55;
     autoChars = Math.max(7000, Math.min(44000, autoChars));
+    if (bandIsTotal) autoChars = 29000; // sensible default for the fixed .bm block
 
-    // explicit operator band (only for "Diğer HTML düzenler") overrides the auto size
-    if (
-      !isSelfContainedLayout(input.descriptionLayout) &&
-      input.htmlLengthBand &&
-      /^\d+-\d+$/.test(input.htmlLengthBand)
-    ) {
+    // explicit operator line/char band overrides the auto size — for BOTH layouts
+    if (input.htmlLengthBand && /^\d+-\d+$/.test(input.htmlLengthBand)) {
       const [lo, hi] = input.htmlLengthBand.split("-").map(Number);
       const mid = (lo + hi) / 2;
       autoChars = input.htmlLengthUnit === "char" ? mid : mid * CHARS_PER_LINE;
     }
 
     const factor = htmlBudgetFactor(input.htmlBudget);
-    const targetChars = Math.round(Math.max(4000, Math.min(46000, autoChars * factor)));
+    const targetChars = Math.round(Math.max(4000, Math.min(62000, autoChars * factor)));
     const targetLines = Math.round(targetChars / CHARS_PER_LINE);
     const sections = Math.max(3, Math.min(14, Math.round(targetChars / 3400)));
     const density = detailScore >= 22 ? "ÇOK YÜKSEK" : detailScore >= 12 ? "YÜKSEK" : detailScore >= 6 ? "ORTA" : "DÜŞÜK";
@@ -542,21 +544,28 @@ export async function generateListing(
         ? ` EKONOMİK MOD (%${Math.round((1 - factor) * 100)} daha az): özü ve gerçek bilgiyi koru, süslemeyi/tekrarı/dolayı anlatımı kes; bölümleri kısalt ama atma.`
         : "";
 
-    htmlLenLine =
-      `HTML AÇIKLAMA — OTOMATİK BOYUT: bu üründe ${descImgN} açıklama görseli, ${specN} özellik` +
-      (variantN ? `, ${variantN} varyant` : "") +
-      ` var → detay yoğunluğu ${density}. ` +
-      `Bir insan gibi düşün: görsel ve detay çoksa açıklama daha derin ve bölümlü olmalı; azsa kısa ve öz olmalı. ` +
-      `Buna göre görünen metin gövdesi (etiketler hariç) YAKLAŞIK ${targetChars.toLocaleString("tr-TR")} karakter ` +
-      `(~${targetLines} satır), ~${sections} bölüm olsun — hedef bu, dolgu yok, her bölüm gerçek yeni bilgi versin.` +
-      budgetNote +
-      ` Stil/şablon/CSS bu sayıya dahil değildir.`;
+    htmlLenLine = bandIsTotal
+      ? `HTML AÇIKLAMA — UZUNLUK HEDEFİ: TÜM HTML (\`<style>\` + CSS + şablon + tüm görünür metin, boşluklar ve semboller dahil) YAKLAŞIK ${targetChars.toLocaleString("tr-TR")} karakter olsun. ` +
+        `Bu üründe ${descImgN} açıklama görseli, ${specN} özellik${variantN ? `, ${variantN} varyant` : ""} var → detay yoğunluğu ${density}; görsel/detay çoksa FAQ, spec satırları, highlight ve rozet sayısını artırıp bu hedefe yaklaş, azsa kıs. .bm iskeletini, sınıfları ve bölüm setini KORU; dolgu/tekrar YOK.` +
+        budgetNote
+      : `HTML AÇIKLAMA — OTOMATİK BOYUT: bu üründe ${descImgN} açıklama görseli, ${specN} özellik` +
+        (variantN ? `, ${variantN} varyant` : "") +
+        ` var → detay yoğunluğu ${density}. ` +
+        `Bir insan gibi düşün: görsel ve detay çoksa açıklama daha derin ve bölümlü olmalı; azsa kısa ve öz olmalı. ` +
+        `Buna göre görünen metin gövdesi (etiketler hariç) YAKLAŞIK ${targetChars.toLocaleString("tr-TR")} karakter ` +
+        `(~${targetLines} satır), ~${sections} bölüm olsun — hedef bu, dolgu yok, her bölüm gerçek yeni bilgi versin.` +
+        budgetNote +
+        ` Stil/şablon/CSS bu sayıya dahil değildir.`;
 
     // token budget scales with the target so cheap modes really are cheaper
     // floor raised to 12k: even the leanest budget still needs room for the full
     // required HTML+CSS scaffold (hero/features/specs/FAQ/CTA or the .bm card) on
     // top of the actual copy, plus whatever the model spends on thinking.
-    descMaxTokens = Math.round(Math.max(12000, Math.min(64000, targetChars / 3.1 + 6000)));
+    // bandIsTotal → targetChars is the whole HTML the model must emit, so give it
+    // more headroom (output tokens + thinking) than the "visible body only" case.
+    descMaxTokens = bandIsTotal
+      ? Math.round(Math.max(16000, Math.min(64000, targetChars / 2.6 + 8000)))
+      : Math.round(Math.max(12000, Math.min(64000, targetChars / 3.1 + 6000)));
   }
   const brandLine = input.brand?.trim()
     ? `MARKA: "${input.brand.trim()}" — Etsy başlığının EN SONUNA " – ${input.brand.trim()}®" ekle (bir kez).`
