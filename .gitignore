@@ -1,0 +1,18 @@
+node_modules/
+dist/
+
+# secrets / env — keep only the example
+.env
+.env.*
+!.env.example
+
+# local data — sqlite db + uploaded media
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/media/
+
+# logs & os cruft
+*.log
+.DS_Store
+Thumbs.db
