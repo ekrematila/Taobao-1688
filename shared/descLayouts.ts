@@ -299,11 +299,17 @@ const PD_SCRIPT =
  *  FAQ collapse, and a subtle glow tinted by the model's own `--pd-accent` (a
  *  plain grey glow if the model didn't set one) so it reads as "this product's
  *  color", never a generic purple. */
-const PD_STYLE_FALLBACK =
-  `<style>.pd-faq-a{overflow:hidden;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1),opacity .3s ease}` +
-  `.pd-faq-item.pd-open .pd-faq-a{max-height:640px}` +
-  `.pd-atc-glow{box-shadow:0 0 0 3px rgba(120,120,120,.16),0 0 20px 2px rgba(120,120,120,.26);transition:box-shadow .5s ease,transform .3s ease;transform:scale(1.015)}` +
-  `@supports (color:color-mix(in srgb,red,blue)){.pd-atc-glow{box-shadow:0 0 0 3px color-mix(in srgb,var(--pd-accent,#8a8a8a) 22%,transparent),0 0 20px 2px color-mix(in srgb,var(--pd-accent,#8a8a8a) 34%,transparent)}}` +
+/** The system's FAQ + Add-to-Cart-glow GUARANTEE — always injected for both the
+ *  `.bm` and `.pd-*` layouts. `!important` on the open state + glow so a broken
+ *  model rule (e.g. `.x.pd-open.pd-faq-a` missing the descendant space, or a
+ *  `transition:max-height.45s` typo) cannot stop the accordion opening. Covers
+ *  both toggle-class conventions: `.pd-open` (pd-*) and `.is-open` (.bm). */
+const FAQ_CTA_GUARANTEE =
+  `<style>.pd-faq-a,.bm-faq-a{overflow:hidden!important;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1)}` +
+  `.pd-faq-item.pd-open .pd-faq-a,.pd-faq-item.pd-open>.pd-faq-a,.bm-faq-item.is-open .bm-faq-a,.bm-faq-item.is-open>.bm-faq-a{max-height:1400px!important}` +
+  `.pd-atc-glow,.bm-atc-glow{transition:box-shadow .5s ease,transform .3s ease!important;transform:scale(1.015)!important;box-shadow:0 0 0 3px rgba(120,120,120,.16),0 0 20px 2px rgba(120,120,120,.28)!important}` +
+  `@supports (color:color-mix(in srgb,red,blue)){.pd-atc-glow{box-shadow:0 0 0 3px color-mix(in srgb,var(--pd-accent,#8a8a8a) 22%,transparent),0 0 20px 2px color-mix(in srgb,var(--pd-accent,#8a8a8a) 34%,transparent)!important}` +
+  `.bm-atc-glow{box-shadow:0 0 0 3px color-mix(in srgb,var(--acc,#8a8a8a) 22%,transparent),0 0 20px 2px color-mix(in srgb,var(--acc,#8a8a8a) 34%,transparent)!important}}` +
   `</style>`;
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
@@ -326,7 +332,7 @@ function ensureBmScaffold(html: string): string {
     if (last >= 0) out = out.slice(0, last) + BM_LIGHTBOX + out.slice(last);
     else out += BM_LIGHTBOX;
   }
-  return out + BM_SCRIPT;
+  return out + FAQ_CTA_GUARANTEE + BM_SCRIPT;
 }
 
 /**
@@ -346,10 +352,11 @@ function ensurePdScaffold(html: string): string {
   out = out.replace(/<a\b([^>]*\bdata-pd-goto-atc\b[^>]*)>/gi, (_m, attrs) =>
     `<a${attrs.replace(/\s+href\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")}>`,
   );
-  if (!/\.pd-faq-a\{/i.test(out) || !/\.pd-atc-glow\{/i.test(out)) {
-    out = /<style[^>]*>/i.test(out) ? out.replace(/<style[^>]*>/i, (m) => m + PD_STYLE_FALLBACK) : PD_STYLE_FALLBACK + out;
-  }
-  return out + PD_SCRIPT;
+  // FAQ_CTA_GUARANTEE is its own `<style>` element — append it as a SIBLING at the
+  // end (its `!important` rules win regardless of position); never nest it inside
+  // the model's `<style>` (that produces `<style><style>` and the browser prints
+  // the CSS as text).
+  return out + FAQ_CTA_GUARANTEE + PD_SCRIPT;
 }
 
 /**
