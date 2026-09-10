@@ -314,8 +314,32 @@ ${FIND_ATC_FN}
     }, 90);
     setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
   }
+  /* FAQ: smooth height open/close + single-open accordion. Falls back to the
+     native <details name> behaviour (still single-open) if this never runs. */
+  function closeFaq(item){
+    var b = item.querySelector('.bm-faq-a'); if(!b) return;
+    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.height = '0px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); item.removeAttribute('open'); b.style.height = ''; }, {once:true});
+  }
+  function openFaq(item){
+    var group = item.closest('.bm-faq') || document;
+    group.querySelectorAll('.bm-faq-item[open]').forEach(function(o){ if(o !== item) closeFaq(o); });
+    item.setAttribute('open', '');
+    var b = item.querySelector('.bm-faq-a'); if(!b) return;
+    b.style.height = '0px'; void b.offsetHeight;
+    b.style.height = b.scrollHeight + 'px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); b.style.height = 'auto'; }, {once:true});
+  }
   document.addEventListener('click', function(e){
     var t = e.target;
+    var q = t.closest && t.closest('.bm .bm-faq-q');
+    if(q){
+      var item = q.closest('.bm-faq-item'); if(!item) return;
+      e.preventDefault();
+      if(item.hasAttribute('open')) closeFaq(item); else openFaq(item);
+      return;
+    }
     var z = t.closest && t.closest('.bm [data-bm-zoom]');
     if(z){
       var im = z.tagName === 'IMG' ? z : z.querySelector('img');
@@ -431,9 +455,29 @@ ${FIND_ATC_FN}
     }, 90);
     setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
   }
+  function closeFaq(item){
+    var b = item.querySelector('.pd-faq-a'); if(!b){ item.removeAttribute('open'); item.classList.remove('pd-open'); return; }
+    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); item.removeAttribute('open'); item.classList.remove('pd-open'); b.style.height = ''; }, {once:true});
+  }
+  function openFaq(item){
+    var group = item.closest('.pd-ck__faq') || item.parentElement || document;
+    group.querySelectorAll('.pd-faq-item[open], .pd-faq-item.pd-open').forEach(function(o){ if(o !== item) closeFaq(o); });
+    item.setAttribute('open', ''); item.classList.add('pd-open');
+    var b = item.querySelector('.pd-faq-a'); if(!b) return;
+    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
+    b.style.height = b.scrollHeight + 'px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); b.style.height = 'auto'; b.style.overflow = ''; }, {once:true});
+  }
   document.addEventListener('click', function(e){
-    var q = e.target && e.target.closest && e.target.closest('div.pd-faq-q');
-    if(q){ var it = q.closest('.pd-faq-item'); if(it) it.classList.toggle('pd-open'); return; }
+    var q = e.target && e.target.closest && e.target.closest('.pd-faq-q');
+    if(q){
+      var it = q.closest('.pd-faq-item'); if(!it) return;
+      e.preventDefault();
+      if(it.hasAttribute('open') || it.classList.contains('pd-open')) closeFaq(it); else openFaq(it);
+      return;
+    }
     var btn = e.target && e.target.closest && e.target.closest('[data-pd-goto-atc]');
     if(!btn) return;
     e.preventDefault();
@@ -479,22 +523,32 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //     it) show the answer rather than trapping it closed forever.
   `div.bm-faq-item .bm-faq-a,div.pd-faq-item .pd-faq-a{overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}` +
   `div.bm-faq-item.is-open>.bm-faq-a,div.pd-faq-item.pd-open>.pd-faq-a{max-height:1400px!important}` +
-  // 3) Add-to-Cart glow — TWO pulses, 2.6s total (peaks at 25% & 75%). This is an
-  //    ANIMATION, never a static box-shadow: a static `box-shadow !important` here
-  //    would override the keyframe and kill the pulse entirely (the old bug).
-  `@keyframes tpsAtcGlow{` +
-  `0%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
-  `25%{box-shadow:0 0 0 4px rgba(90,110,230,.24),0 0 26px 6px rgba(90,110,230,.45);transform:scale(1.02)}` +
-  `50%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
-  `75%{box-shadow:0 0 0 4px rgba(90,110,230,.24),0 0 26px 6px rgba(90,110,230,.45);transform:scale(1.02)}` +
-  `100%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}}` +
-  `.pd-atc-glow,.bm-atc-glow{animation:tpsAtcGlow 2.6s ease-in-out 1!important;border-radius:8px}` +
+  // 3) Add-to-Cart glow — TWO pulses, 2.6s total (peaks at 25% & 75%). ONLY box-shadow
+  //    + a tiny scale(): it must NEVER touch the store button's border-radius / padding
+  //    / size / font / background, and the class is removed from the DOM after 2.6s so
+  //    the button returns pixel-for-pixel to its pre-click look.
+  `@keyframes bmAtcGlow{` +
+  `0%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
+  `25%{box-shadow:0 0 0 4px rgba(63,140,217,.24),0 0 26px 6px rgba(63,140,217,.45);transform:scale(1.02)}` +
+  `50%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
+  `75%{box-shadow:0 0 0 4px rgba(63,140,217,.24),0 0 26px 6px rgba(63,140,217,.45);transform:scale(1.02)}` +
+  `100%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}}` +
+  `.pd-atc-glow,.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}` +
   `@media (prefers-reduced-motion:reduce){.pd-atc-glow,.bm-atc-glow{animation-duration:.01ms!important}}` +
   // 4) spec rows: force the clean two-column look + a real gap even if the model's
   //    nesting is off (the "MaterialPBT plastic" no-separator bug).
   `.bm-spec .bm-r,.bm-spec>div:not(.bm-sub){display:flex!important;flex-wrap:wrap;justify-content:space-between!important;gap:6px 18px!important;align-items:baseline;padding:10px 14px}` +
   `.bm-spec .bm-k{flex:0 0 auto;max-width:44%;font-weight:500}` +
   `.bm-spec .bm-v{flex:1 1 auto;text-align:right;font-weight:600}` +
+  // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
+  `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
+  `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
+  `.bm .bm-c2{grid-column:2!important;grid-row:1!important}` +
+  `@media (max-width:899px){` +
+  `.bm .bm-grid{grid-template-columns:1fr!important}` +
+  `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +   // images first on mobile
+  `.bm .bm-c2{grid-column:1!important;grid-row:2!important}` +
+  `}` +
   `</style>`,
 );
 

@@ -40,7 +40,8 @@ test("both examples use a native <details> FAQ and an inline-onclick CTA (surviv
   ] as const) {
     const out = renderDescriptionHtml(layout, ex, imgs);
     assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"/g) || []).length, 6);
-    assert.equal((out.match(/faq-item" open>/g) || []).length, 1, "first FAQ item open");
+    assert.equal((out.match(/faq-item"[^>]* open>/g) || []).length, 1, "first FAQ item open");
+    assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"[^>]*name="(?:bm|pd)-faq"/g) || []).length, 6, "details use name= for native single-open");
     assert.ok(/data-(?:bm|pd)-goto-atc onclick="/.test(out), "CTA carries an inline onclick fallback");
     assert.ok(!/<button[^>]*class="[^"]*faq-q/.test(out), "no legacy <button> FAQ toggle");
   }
@@ -79,6 +80,26 @@ test("the readable render keeps the CSS/JS parseable and the import render is on
       assert.doesNotThrow(() => new Function(js), "embedded script parses");
     }
   }
+});
+
+test("v4 layout + glow + palette + Enter-word rules hold in the .bm render", () => {
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const flat = out.replace(/\s+/g, "");
+  // desktop: images left / text right; mobile: images first
+  assert.ok(/\.bm\.bm-media\{grid-column:1!important/.test(flat), "media locked to column 1");
+  assert.ok(/\.bm\.bm-c2\{grid-column:2!important/.test(flat), "text locked to column 2");
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm\.bm-media\{grid-column:1!important;grid-row:1!important/.test(flat), "mobile: images first");
+  // glow: box-shadow + scale only, never a shape property
+  assert.ok(!/\.(?:bm|pd)-atc-glow\{[^}]*(?:border-radius|padding|width|height|font-size|background)/.test(flat), "glow never changes the button shape");
+  assert.ok(/@keyframes\s+bmAtcGlow/.test(out) && !out.includes("tpsAtcGlow"), "single glow keyframe");
+  // palette: no leftover amber literals, accent var is present
+  assert.ok(!/#7a5a12|#c98a1f|#fff3d6|rgba\(201,138,31/.test(out), "no hardcoded amber theme left");
+  // no 'Enter key' / 'Enter keycap' / bare ' Enter '
+  assert.ok(!/Enter key|Enter keycap| Enter /.test(out), "no 'Enter' wording");
+  // real keyboard examples per size
+  assert.equal((out.match(/class="bm-eg"/g) || []).length, 6, "3-keyboard examples for each of 6 sizes");
+  // FAQ single-open + JS height animation
+  assert.ok(out.includes("function openFaq") && out.includes("function closeFaq"), "FAQ height animation script");
 });
 
 test("no country-flag emoji and no literal 'ISO Enter' phrase in the examples", () => {

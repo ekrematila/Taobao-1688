@@ -144,15 +144,24 @@ XDA Profile, DSA Profile, SA Profile, ASA Profile, KAT Profile, XVX Profile
  * inline onclick so it works even with every <script> removed.
  */
 export const STACKED_DESC_EXAMPLE = `<style>
-/* ===== Stacked-image product description v3 — RE-THEME the palette per product
-   (a red product → red/scarlet vars, a mint product → green vars, …). Keep every
-   .bm* class name, every animation, the jitter-free hover technique, and this
-   section set. Target ~29,000–30,000 characters incl. spaces & symbols (the
-   operator's length band overrides this when set). ===== */
+/* ===== Stacked-image product description v3 — RE-THEME by editing ONLY the vars
+   in the .bm{} block below (a red product → red vars, a mint product → green
+   vars…). EVERY colour elsewhere is var(--…); do NOT hardcode a hex outside this
+   block, and never use an orange/coral tone unless the product itself is orange.
+   Keep every .bm* class name, every animation, the jitter-free hover technique,
+   the section set, and the desktop layout (images LEFT, text RIGHT). Target
+   ~29,000–30,000 characters incl. spaces & symbols (the operator's length band
+   overrides this when set). ===== */
 .bm{
-  --ink:#4a3820; --soft:#8a7355; --gold:#c98a1f; --gold2:#f0c674;
-  --lav:#fff8e6; --sky:#fff3d6; --milk:#fffefb; --line:rgba(201,138,31,.18);
-  --line2:rgba(201,138,31,.32);
+  --ink:#1f3350;            /* base text */
+  --head:#1f3350;           /* headings & bold text */
+  --body:#3a4f6b;           /* long-form body text */
+  --soft:#5a708c;           /* muted / secondary text */
+  --gold:#3f8cd9;           /* the ONE accent colour — swap this per product */
+  --gold2:#8fc3ee;          /* lighter accent (borders on hover, gradients) */
+  --acc-rgb:63,140,217;     /* accent as R,G,B for rgba() shadows/glows */
+  --lav:#eef6fc; --sky:#e6f2fb; --milk:#fbfdff;
+  --line:rgba(63,140,217,.18); --line2:rgba(63,140,217,.34);
   --top:20px;            /* sticky offset — raise to ~90px if your theme has a fixed header */
   --r:16px;
   font-family:"Trebuchet MS",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,
@@ -188,7 +197,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
   position:relative; overflow:hidden;
   text-align:center; padding:34px 20px 26px; margin:0 0 16px;
   border:1px solid var(--line); border-radius:var(--r);
-  background:linear-gradient(165deg,#fff3d6 0%,#fffaf0 55%,#fffefb 100%);
+  background:linear-gradient(165deg,var(--sky) 0%,var(--lav) 55%,var(--milk) 100%);
 }
 .bm-hero::before,.bm-hero::after{
   content:"🐰"; position:absolute; font-size:46px; opacity:.16; pointer-events:none;
@@ -202,17 +211,18 @@ export const STACKED_DESC_EXAMPLE = `<style>
   color:var(--gold); background:#fff; border:1px solid var(--line);
   padding:5px 12px; border-radius:99px; margin-bottom:12px; animation:bmPop .5s ease both;
 }
-.bm-hero h2{margin:0 0 8px; font-size:27px; line-height:1.25; color:#7a5a12; font-weight:700; position:relative}
+.bm-hero h2{margin:0 0 8px; font-size:27px; line-height:1.25; color:var(--head); font-weight:700; position:relative}
 .bm-hero .sub{margin:0 0 15px; font-size:14px; color:var(--soft); position:relative}
 .bm-badges{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; position:relative}
 .bm-badges span{
-  display:inline-block; font-size:12.5px; color:#7a5a12; background:#fff; border:1px solid var(--line);
+  display:inline-block; font-size:12.5px; color:var(--head); background:#fff; border:1px solid var(--line);
   padding:6px 12px; border-radius:99px; white-space:nowrap;
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-badges span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(201,138,31,.35); background:var(--sky); border-color:var(--line2); cursor:default}
+.bm-badges span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(var(--acc-rgb),.32); background:var(--sky); border-color:var(--line2); cursor:default}
 @keyframes bmPop{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
+/* ---- DESKTOP LAYOUT (kesin kural): images ALWAYS left, text/info ALWAYS right ---- */
 .bm-grid{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:18px; align-items:start; transition:gap .45s cubic-bezier(.25,.8,.3,1)}
 .bm-media{grid-column:1; grid-row:1}
 .bm-c2{grid-column:2; grid-row:1; position:-webkit-sticky; position:sticky; top:var(--top); align-self:start}
@@ -228,12 +238,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-media img:hover{transform:scale(1.025)}
 .bm-media .bm-zoomtag{
   position:absolute; right:10px; bottom:10px; z-index:2;
-  font-size:11.5px; font-weight:700; color:#7a5a12; background:rgba(255,255,255,.92);
+  font-size:11.5px; font-weight:700; color:var(--head); background:rgba(255,255,255,.92);
   border:1px solid var(--line); padding:9px 14px; border-radius:99px; line-height:1;
   opacity:0; transform:translateY(6px); transition:opacity .25s ease, transform .25s ease; pointer-events:none;
 }
 .bm-media .bm-stage:hover .bm-zoomtag{opacity:1; transform:translateY(0)}
-.bm-lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:26px; background:rgba(40,30,10,.82); backdrop-filter:blur(2px); animation:bmFade .2s ease}
+.bm-lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:26px; background:rgba(20,32,50,.82); backdrop-filter:blur(2px); animation:bmFade .2s ease}
 .bm-lightbox.is-open{display:flex}
 .bm-lightbox img{max-width:min(92vw,900px); max-height:88vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .bm-lightbox .bm-close{
@@ -249,10 +259,10 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-info{padding:20px 18px; border:1px solid var(--line); border-radius:var(--r); background:var(--milk)}
 .bm-info h3{margin:0 0 10px; font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gold)}
 .bm-info h3:not(:first-child){margin-top:20px}
-.bm-lede{font-size:14.5px; color:#5c4326; margin:0}
-.bm-lede strong{color:#7a5a12}
+.bm-lede{font-size:14.5px; color:var(--body); margin:0}
+.bm-lede strong{color:var(--head)}
 .bm-trivia{font-size:12.5px; color:var(--soft); font-style:italic; margin:8px 0 0}
-.bm-trivia strong{color:#7a5a12; font-style:normal}
+.bm-trivia strong{color:var(--head); font-style:normal}
 
 /* ---- Highlights: color/background transition only, no transform on the row itself ---- */
 .bm-feat{margin:0 !important; padding:0 !important; list-style:none !important}
@@ -273,13 +283,13 @@ export const STACKED_DESC_EXAMPLE = `<style>
 }
 .bm-feat li:hover .ico{transform:rotate(-15deg); background:#fff}
 .bm-feat .tx{flex:1 1 auto; min-width:0}
-.bm-feat b{display:block; color:#7a5a12; font-size:13.8px; margin-bottom:1px}
+.bm-feat b{display:block; color:var(--head); font-size:13.8px; margin-bottom:1px}
 .bm-feat .t{display:block; color:var(--soft); font-size:13px; line-height:1.45}
 
 /* ---- Compatible layouts chip row ---- */
 .bm-layouts{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 4px}
 .bm-layouts span{
-  font-size:12px; font-weight:700; color:#7a5a12; background:var(--sky);
+  font-size:12px; font-weight:700; color:var(--head); background:var(--sky);
   border:1px solid var(--line); padding:4px 9px; border-radius:8px;
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
@@ -288,7 +298,13 @@ export const STACKED_DESC_EXAMPLE = `<style>
 /* second row: key-count chips, muted so the % row reads first */
 .bm-layouts-keys{margin-top:2px}
 .bm-layouts-keys span{background:var(--milk); color:var(--soft); font-weight:600}
-.bm-layouts-keys span:hover{background:var(--sky); color:#7a5a12}
+.bm-layouts-keys span:hover{background:var(--sky); color:var(--head)}
+/* example keyboards per size (compatibility reference, not an endorsement) */
+.bm-compat-eg{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0 0}
+.bm-compat-eg .bm-eg{display:flex; gap:8px; align-items:baseline; font-size:11.8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--milk)}
+.bm-compat-eg .bm-eg b{flex:0 0 auto; color:var(--gold); font-weight:700; min-width:34px}
+.bm-compat-eg .bm-eg span{color:var(--soft); line-height:1.4}
+@media (max-width:520px){.bm-compat-eg{grid-template-columns:1fr}}
 .bm-layouts-note{font-size:12.5px; color:var(--soft); margin:8px 0 0; line-height:1.5}
 
 /* ---- Specifications ---- */
@@ -314,7 +330,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-spec .bm-r:last-child{border-bottom:0}
 .bm-spec .bm-k{flex:0 0 auto; max-width:44%; color:var(--soft); font-weight:500; margin:0 !important}
 .bm-spec .bm-k::after{content:""}
-.bm-spec .bm-v{flex:1 1 auto; min-width:0; text-align:right; color:#7a5a12; font-weight:600; margin:0 !important; overflow-wrap:break-word}
+.bm-spec .bm-v{flex:1 1 auto; min-width:0; text-align:right; color:var(--head); font-weight:600; margin:0 !important; overflow-wrap:break-word}
 
 /* ---- PBT vs ABS quick comparison ---- */
 .bm-compare{width:100%; border-collapse:separate; border-spacing:0; font-size:12.8px; margin:0}
@@ -327,7 +343,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-compare td{padding:12px 14px; border-top:1px solid var(--line); vertical-align:top; line-height:1.5; transition:background .3s cubic-bezier(.4,0,.2,1)}
 .bm-compare td:first-child{color:var(--soft); white-space:nowrap; font-weight:600}
 .bm-compare tr:hover td{background:var(--sky)}
-.bm-compare .bm-yes{color:#7a5a12; font-weight:700}
+.bm-compare .bm-yes{color:var(--head); font-weight:700}
 
 /* ---- trust row (box + hover) ---- */
 .bm-trust{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; justify-content:center}
@@ -337,39 +353,43 @@ export const STACKED_DESC_EXAMPLE = `<style>
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-trust span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(201,138,31,.3); background:#fff; border-color:var(--gold2)}
+.bm-trust span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(var(--acc-rgb),.28); background:#fff; border-color:var(--gold2)}
 
-.bm-note{margin:16px 0 0; padding:11px 13px; border-radius:12px; background:var(--lav); border:1px solid var(--line); font-size:12.8px; color:#5c4326; line-height:1.5}
-.bm-note b{color:#7a5a12}
+.bm-note{margin:16px 0 0; padding:11px 13px; border-radius:12px; background:var(--lav); border:1px solid var(--line); font-size:12.8px; color:var(--body); line-height:1.5}
+.bm-note b{color:var(--head)}
 
-/* ---- FAQ accordion — native <details>/<summary>, ZERO JavaScript (Shopify
-   removes scripting, so a JS accordion never opens; <details> always works). ---- */
-.bm-faq{margin-top:6px; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+/* ---- FAQ — real accordion. Native <details name="bm-faq"> gives single-open
+   with NO JavaScript (one open closes the rest); the script, when it runs, adds a
+   smooth height transition on open/close. Marka paletiyle uyumlu, ince kenarlıklı,
+   hover'lı, +/− dönüşümlü ikon. ---- */
+.bm-faq{margin-top:6px; border:1px solid var(--line2); border-radius:12px; overflow:hidden; background:#fff}
 .bm-faq-item{border-bottom:1px solid var(--line)}
 .bm-faq-item:last-child{border-bottom:0}
 .bm-faq-q{
   list-style:none; cursor:pointer;
   width:100%; display:flex !important; align-items:center; justify-content:space-between;
-  gap:10px; padding:11px 13px; background:#fff; border:0; text-align:left;
-  font-size:13.4px; font-weight:700; color:#7a5a12; transition:background .25s cubic-bezier(.4,0,.2,1);
+  gap:10px; padding:13px 15px; background:#fff; border:0; text-align:left;
+  font-size:13.6px; font-weight:700; color:var(--head);
+  transition:background .25s cubic-bezier(.4,0,.2,1), color .25s ease;
 }
 .bm-faq-q::-webkit-details-marker{display:none}
 .bm-faq-q::marker{content:""}
-.bm-faq-q:hover{background:var(--sky)}
-.bm-faq-q .bm-plus{flex:0 0 auto; width:18px; height:18px; position:relative; transition:transform .3s ease}
+.bm-faq-q:hover{background:var(--sky); color:var(--gold)}
+.bm-faq-item[open] > .bm-faq-q{background:var(--sky); color:var(--gold)}
+.bm-faq-q .bm-plus{flex:0 0 auto; width:18px; height:18px; position:relative; transition:transform .35s cubic-bezier(.25,.8,.3,1)}
 .bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:""; position:absolute; background:var(--gold); border-radius:2px; transition:opacity .3s ease}
 .bm-faq-q .bm-plus::before{left:0; top:50%; width:100%; height:2px; transform:translateY(-50%)}
 .bm-faq-q .bm-plus::after{top:0; left:50%; width:2px; height:100%; transform:translateX(-50%)}
 .bm-faq-item[open] .bm-plus{transform:rotate(90deg)}
 .bm-faq-item[open] .bm-plus::after{opacity:0}
-.bm-faq-a{overflow:hidden; background:var(--milk)}
-.bm-faq-a p{padding:2px 13px 12px; margin:0; font-size:13px; color:var(--soft); line-height:1.55}
-.bm-faq-item[open] .bm-faq-a{animation:bmFaqIn .28s ease}
-@keyframes bmFaqIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
+.bm-faq-a{overflow:hidden; background:var(--milk); transition:height .35s cubic-bezier(.25,.8,.3,1)}
+.bm-faq-a p{padding:4px 15px 14px; margin:0; font-size:13px; color:var(--body); line-height:1.6}
+.bm-faq-item[open] .bm-faq-a{animation:bmFaqIn .3s ease}
+@keyframes bmFaqIn{from{opacity:0} to{opacity:1}}
 
 /* ---- CTA ---- */
-.bm-cta{margin-top:18px; padding:16px; border-radius:14px; text-align:center; background:linear-gradient(135deg,var(--gold) 0%,#f0c674 100%); box-shadow:0 10px 24px -10px rgba(201,138,31,.55)}
-.bm-cta p{color:#fff8e6; font-size:12.5px; margin:0 0 10px; letter-spacing:.02em}
+.bm-cta{margin-top:18px; padding:16px; border-radius:14px; text-align:center; background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%); box-shadow:0 10px 24px -10px rgba(var(--acc-rgb),.45)}
+.bm-cta p{color:#fff; font-size:12.5px; margin:0 0 10px; letter-spacing:.02em}
 .bm-cta a,.bm-cta button{
   display:inline-flex !important; align-items:center; gap:7px;
   background:#fff; color:var(--gold); font-weight:700; font-size:13.5px;
@@ -389,8 +409,8 @@ export const STACKED_DESC_EXAMPLE = `<style>
     display:flex !important; align-items:center; justify-content:space-between; gap:12px;
     width:100%; margin:0; padding:15px 17px; cursor:pointer; user-select:none;
     -webkit-tap-highlight-color:transparent; border:1px solid var(--line); border-radius:14px;
-    background:linear-gradient(135deg,#fff3d6,#fffaf0);
-    font-size:15.5px; font-weight:700; color:#7a5a12; line-height:1.2;
+    background:linear-gradient(135deg,var(--sky),var(--lav));
+    font-size:15.5px; font-weight:700; color:var(--head); line-height:1.2;
   }
   .bm-bar i{flex:0 0 auto; width:9px; height:9px; margin-right:4px; border-right:2px solid var(--gold); border-bottom:2px solid var(--gold); transform:rotate(45deg); transition:transform .35s cubic-bezier(.25,.8,.3,1)}
   .bm-toggle:checked ~ .bm-bar i{transform:rotate(-135deg)}
@@ -402,8 +422,9 @@ export const STACKED_DESC_EXAMPLE = `<style>
   .bm-c1 .bm-hero{margin:12px 0 0}
   .bm-grid{grid-template-columns:1fr; gap:0; margin-top:12px}
   .bm-toggle:checked ~ .bm-grid{gap:12px}
-  .bm-c2{grid-column:1; grid-row:1; position:static; top:auto}
-  .bm-media{grid-column:1; grid-row:2}
+  /* single column — order is IMAGES FIRST, then the text/info block */
+  .bm-media{grid-column:1; grid-row:1; position:static}
+  .bm-c2{grid-column:1; grid-row:2; position:static; top:auto}
   .bm-info{padding:18px 16px}
   .bm-hero{padding:22px 15px 18px}
   .bm-hero h2{font-size:21px}
@@ -430,7 +451,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-c2"><div class="bm-inner">
 <div class="bm-info bm-reveal">
 
-<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — the Enter and Left Shift keys for both are included, so you can build your keyboard either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
+<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — it includes the pieces both layouts need, so you can build your keyboard either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
 <p class="bm-trivia">🐹 Fun fact: the titular Chiikawa character is hamster-inspired — <strong>Usagi</strong> is his rabbit-loving best friend, and the star of this set.</p>
 
 <h3>Highlights</h3>
@@ -450,7 +471,15 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-layouts bm-layouts-keys">
 <span>61 keys</span><span>64 keys</span><span>68 keys</span><span>75 keys</span><span>84 keys</span><span>87 keys</span><span>98 keys</span><span>104 keys</span><span>108 keys</span>
 </div>
-<p class="bm-layouts-note">Spacebar coverage: 6.25U and 7U bottom-row spacebars, plus 2.75U and 2.25U keys for split bottom rows. Also covers stepped Caps Lock, the L-shaped Enter used on ISO layouts, Left Shift B3 &amp; B4, and 1.5U front-tooth keys — so the set is <strong>ANSI &amp; ISO layout compatible</strong>. Fits Alice, tri-mode 75%, and standard TKL keyboards. Not sure about your keyboard? Match your bottom-row and spacebar size against the "all keys" compatibility photo, or message us and we'll confirm it for you.</p>
+<div class="bm-compat-eg">
+<div class="bm-eg"><b>60%</b><span>Anne Pro 2 · Ducky One 3 Mini · Royal Kludge RK61</span></div>
+<div class="bm-eg"><b>65%</b><span>Keychron K6 · Ducky One 3 SF · Royal Kludge RK68</span></div>
+<div class="bm-eg"><b>75%</b><span>GMMK Pro · Keychron K3 · NuPhy Air75</span></div>
+<div class="bm-eg"><b>TKL</b><span>Ducky One 3 TKL · Leopold FC750R · Keychron C3 Pro</span></div>
+<div class="bm-eg"><b>96%</b><span>Keychron Q5 · Royal Kludge RK96 · Keychron K4</span></div>
+<div class="bm-eg"><b>100%</b><span>Keychron K10 · Ducky One 3 Full-Size · Leopold FC900R</span></div>
+</div>
+<p class="bm-layouts-note">Spacebar coverage: 6.25U and 7U bottom-row spacebars, plus 2.75U and 2.25U keys for split bottom rows. Also covers stepped Caps Lock, ISO-layout keys, Left Shift B3 &amp; B4, and 1.5U front-tooth keys — so the set is <strong>ANSI &amp; ISO layout compatible</strong> and fits Alice, tri-mode 75%, and standard TKL keyboards. The keyboards listed above are common examples in each size for reference only — not endorsements. Not sure about yours? Match your bottom-row and spacebar size against the "all keys" compatibility photo, or message us and we'll confirm it.</p>
 
 <h3>Specifications</h3>
 <div class="bm-spec">
@@ -461,6 +490,8 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-r"><span class="bm-k">Legend placement</span><span class="bm-v">Top print / Side print (by variant)</span></div>
 <span class="bm-sub">Profile &amp; fit</span>
 <div class="bm-r"><span class="bm-k">Profile options</span><span class="bm-v">Cherry Profile / KOA Profile</span></div>
+<div class="bm-r"><span class="bm-k">Cherry Profile sculpt</span><span class="bm-v">Row-specific — each row a different height and angle</span></div>
+<div class="bm-r"><span class="bm-k">KOA Profile sculpt</span><span class="bm-v">Uniform — the same cap shape on every row</span></div>
 <div class="bm-r"><span class="bm-k">Key count</span><span class="bm-v">140 keys (full set)</span></div>
 <div class="bm-r"><span class="bm-k">Switch fit</span><span class="bm-v">MX-style cross-stem switches only</span></div>
 <span class="bm-sub">Layout &amp; compatibility</span>
@@ -484,12 +515,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 <h3>Compatibility &amp; Care</h3>
 <div class="bm-faq">
-<details class="bm-faq-item" open><summary class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches — 60%, 65%, 75%, TKL, 96%, and full-size. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Match your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your keyboard.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>🎹 What's the difference between Cherry and KOA Profile?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced row-to-row steps. They are not interchangeable rows — pick the sculpt you prefer.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>⌨️ Do I need to choose ANSI or ISO?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO, so you can build your keyboard either way. On an ISO keyboard the Enter key is L-shaped (it spans two rows); on ANSI it is a wide single-row bar. Just install the keys your layout uses.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>🖨️ What is Side Print?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type. Top Print keeps the artwork on the top surface.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>💡 Will my RGB shine through the legends?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>These are dye-sublimated PBT keycaps with solid, non-translucent legends, so backlighting glows around each cap rather than through the characters. If you specifically want shine-through legends, that is a different keycap type.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>🧼 How do I clean these keycaps?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well, and let them air-dry fully before reinstalling. Avoid hot water and dishwashers.</p></div></details>
+<details class="bm-faq-item" name="bm-faq" open><summary class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches — 60%, 65%, 75%, TKL, 96%, and full-size. The set is ANSI &amp; ISO layout compatible, so either layout is covered. Match your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your keyboard.</p></div></details>
+<details class="bm-faq-item" name="bm-faq"><summary class="bm-faq-q"><span>🎹 What's the difference between Cherry and KOA Profile?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Cherry Profile has a row-specific sculpt — each row sits at its own height and angle for a relaxed, near-flat typing feel. KOA Profile uses a uniform sculpt — the same cap shape on every row, so it feels consistent from top to bottom. They are not interchangeable; pick the one you prefer.</p></div></details>
+<details class="bm-faq-item" name="bm-faq"><summary class="bm-faq-q"><span>⌨️ Do I need to choose ANSI or ISO?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>No — the set covers the keys that both ANSI and ISO layouts use, so you can build your keyboard either way. Just install the pieces your layout needs; the rest are spares.</p></div></details>
+<details class="bm-faq-item" name="bm-faq"><summary class="bm-faq-q"><span>🖨️ What is Side Print?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type. Top Print keeps the artwork on the top surface.</p></div></details>
+<details class="bm-faq-item" name="bm-faq"><summary class="bm-faq-q"><span>💡 Will my RGB shine through the legends?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>These are dye-sublimated PBT keycaps with solid, non-translucent legends, so backlighting glows around each cap rather than through the characters. If you specifically want shine-through legends, that is a different keycap type.</p></div></details>
+<details class="bm-faq-item" name="bm-faq"><summary class="bm-faq-q"><span>🧼 How do I clean these keycaps?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well, and let them air-dry fully before reinstalling. Avoid hot water and dishwashers.</p></div></details>
 </div>
 
 <div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, thank-you card with a surprise coupon.<br><b>💬 Compatibility questions?</b> Message the store before you order and we'll check your keyboard.</div>
@@ -571,8 +602,32 @@ export const STACKED_DESC_EXAMPLE = `<style>
     }, 90);
     setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
   }
+  /* FAQ: smooth height open/close + single-open accordion. If this script never
+     runs, the native <details name="bm-faq"> still gives click-to-open + single-open. */
+  function closeFaq(item){
+    var b = item.querySelector('.bm-faq-a'); if(!b){ item.removeAttribute('open'); return; }
+    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.height = '0px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); item.removeAttribute('open'); b.style.height = ''; }, {once:true});
+  }
+  function openFaq(item){
+    var group = item.closest('.bm-faq') || document;
+    group.querySelectorAll('.bm-faq-item[open]').forEach(function(o){ if(o !== item) closeFaq(o); });
+    item.setAttribute('open', '');
+    var b = item.querySelector('.bm-faq-a'); if(!b) return;
+    b.style.height = '0px'; void b.offsetHeight;
+    b.style.height = b.scrollHeight + 'px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); b.style.height = 'auto'; }, {once:true});
+  }
   document.addEventListener('click', function(e){
     var t = e.target;
+    var faqQ = t.closest && t.closest('.bm .bm-faq-q');
+    if(faqQ){
+      var faqItem = faqQ.closest('.bm-faq-item'); if(!faqItem) return;
+      e.preventDefault();
+      if(faqItem.hasAttribute('open')) closeFaq(faqItem); else openFaq(faqItem);
+      return;
+    }
     var zoom = t.closest && t.closest('.bm [data-bm-zoom]');
     if(zoom){
       var im = zoom.tagName === 'IMG' ? zoom : zoom.querySelector('img');
@@ -755,8 +810,9 @@ export const OTHER_DESC_EXAMPLE = `<style>
 }
 .pd-ck__box b{color:var(--pd-ink)}
 
-/* --- FAQ — native <details>/<summary>, ZERO JavaScript (Shopify removes scripting) --- */
-.pd-ck__faq{border:1px solid var(--pd-line); border-radius:14px; overflow:hidden}
+/* --- FAQ — real accordion. Native <details name="pd-faq"> = single-open with NO
+   JavaScript; the script adds a smooth height transition when it runs. --- */
+.pd-ck__faq{border:1px solid var(--pd-line2); border-radius:14px; overflow:hidden; background:#fff}
 .pd-faq-item{border-bottom:1px solid var(--pd-line)}
 .pd-faq-item:last-child{border-bottom:0}
 .pd-faq-q{
@@ -767,13 +823,14 @@ export const OTHER_DESC_EXAMPLE = `<style>
 }
 .pd-faq-q::-webkit-details-marker{display:none}
 .pd-faq-q::marker{content:""}
-.pd-faq-q:hover{background:var(--pd-cream)}
-.pd-faq-q::after{content:"+"; flex:0 0 auto; font-size:17px; font-weight:400; color:var(--pd-accent); transition:transform .3s ease}
+.pd-faq-q:hover{background:var(--pd-cream); color:var(--pd-accent)}
+.pd-faq-item[open] > .pd-faq-q{background:var(--pd-cream); color:var(--pd-accent)}
+.pd-faq-q::after{content:"+"; flex:0 0 auto; font-size:18px; font-weight:400; color:var(--pd-accent); transition:transform .35s cubic-bezier(.25,.8,.3,1)}
 .pd-faq-item[open] .pd-faq-q::after{transform:rotate(45deg)}
-.pd-faq-a{overflow:hidden; background:var(--pd-paper)}
-.pd-faq-a p{padding:2px 15px 14px; margin:0; font-size:13px; color:var(--pd-soft); line-height:1.6}
-.pd-faq-item[open] .pd-faq-a{animation:pdFaqIn .28s ease}
-@keyframes pdFaqIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
+.pd-faq-a{overflow:hidden; background:var(--pd-paper); transition:height .34s cubic-bezier(.25,.8,.3,1)}
+.pd-faq-a p{padding:4px 15px 14px; margin:0; font-size:13px; color:var(--pd-soft); line-height:1.6}
+.pd-faq-item[open] .pd-faq-a{animation:pdFaqIn .3s ease}
+@keyframes pdFaqIn{from{opacity:0} to{opacity:1}}
 
 /* --- CTA (must be LAST; the system smooth-scrolls to the store's Add to Cart + glows it in --pd-accent) --- */
 .pd-ck__cta{
@@ -899,6 +956,8 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <tr><th>Legend Placement</th><td>Top print / Side print (by variant)</td></tr>
 <tr><th class="pd-ck__table-grp" colspan="2">Profile &amp; fit</th></tr>
 <tr><th>Profile Options</th><td>Cherry Profile / KOA Profile</td></tr>
+<tr><th>Cherry Profile sculpt</th><td>Row-specific — each row a different height and angle</td></tr>
+<tr><th>KOA Profile sculpt</th><td>Uniform — the same cap shape on every row</td></tr>
 <tr><th>Key Count</th><td>140 keys (full set)</td></tr>
 <tr><th>Switch Type</th><td>MX-Style Cross Mechanical Switches Only</td></tr>
 <tr><th class="pd-ck__table-grp" colspan="2">Layout &amp; compatibility</th></tr>
@@ -941,12 +1000,12 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <div class="pd-ck__rule"></div>
 </div>
 <div class="pd-ck__faq">
-<details class="pd-faq-item" open><summary class="pd-faq-q">Will this fit my keyboard?</summary><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Compare your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your board.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">What is the difference between Cherry and KOA profile?</summary><div class="pd-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced steps. The rows are not interchangeable — pick the sculpt you prefer.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">Do I need to choose ANSI or ISO?</summary><div class="pd-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO. On an ISO keyboard the Enter key is L-shaped (it spans two rows); on ANSI it is a wide single-row bar. Just install the keys your layout uses.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">What does Side Print mean?</summary><div class="pd-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">How do I clean the keycaps?</summary><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">Are the keycaps included with a keyboard?</summary><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></details>
+<details class="pd-faq-item" name="pd-faq" open><summary class="pd-faq-q">Will this fit my keyboard?</summary><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. The set is ANSI &amp; ISO layout compatible, so either layout is covered. Compare your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your keyboard.</p></div></details>
+<details class="pd-faq-item" name="pd-faq"><summary class="pd-faq-q">What is the difference between Cherry and KOA profile?</summary><div class="pd-faq-a"><p>Cherry Profile has a row-specific sculpt — each row sits at its own height and angle. KOA Profile uses a uniform sculpt — the same cap shape on every row. The rows are not interchangeable; pick the feel you prefer.</p></div></details>
+<details class="pd-faq-item" name="pd-faq"><summary class="pd-faq-q">Do I need to choose ANSI or ISO?</summary><div class="pd-faq-a"><p>No — the set covers the keys that both ANSI and ISO layouts use, so you can build your keyboard either way. Just install the pieces your layout needs; the rest are spares.</p></div></details>
+<details class="pd-faq-item" name="pd-faq"><summary class="pd-faq-q">What does Side Print mean?</summary><div class="pd-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></details>
+<details class="pd-faq-item" name="pd-faq"><summary class="pd-faq-q">How do I clean the keycaps?</summary><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></details>
+<details class="pd-faq-item" name="pd-faq"><summary class="pd-faq-q">Are the keycaps included with a keyboard?</summary><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></details>
 </div>
 </section>
 
