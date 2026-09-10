@@ -4,7 +4,7 @@ import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { JobCancelled, type RunningJob } from "../lib/jobs";
 import JobProgress from "./JobProgress";
-import { CLAUDE_MODELS } from "@shared/models.ts";
+import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL } from "@shared/models.ts";
 import type { ChannelId, JobView } from "@shared/types.ts";
 
 export default function AdvicePanel({
@@ -21,6 +21,8 @@ export default function AdvicePanel({
   const st = (draft.imageState as any) ?? {};
   const [channel, setChannel] = useState<ChannelId>((st.adviceChannel as ChannelId) || (draft.channel as ChannelId) || "shopify");
   const [model, setModel] = useState(defaultModel);
+  const [effort, setEffort] = useState("");
+  const [thinking, setThinking] = useState("");
   const [lang, setLang] = useState<string>(st.adviceLang || "en");
   const [advice, setAdvice] = useState<string>(st.advice || "");
   const [useAdvice, setUseAdvice] = useState<boolean>(!!st.useAdvice);
@@ -39,7 +41,10 @@ export default function AdvicePanel({
 
   async function run(mode: "ai" | "local" = "ai") {
     setBusy(true);
-    const r = adviceJob({ draftId: draft.id, channel, model, targetLanguage: lang, mode }, setJob);
+    const r = adviceJob(
+      { draftId: draft.id, channel, model, effort: effort || undefined, thinking: thinking || undefined, targetLanguage: lang, mode },
+      setJob,
+    );
     jobRef.current = r as RunningJob<unknown>;
     try {
       const out = await r.promise;
@@ -113,6 +118,24 @@ export default function AdvicePanel({
               </option>
             ))}
           </select>
+          <div className="ai-picker" style={{ marginTop: 6 }}>
+            <select value={effort} onChange={(e) => setEffort(e.target.value)} title={t("ai.effort")}>
+              <option value="">{t("ai.effortDefault")}</option>
+              {EFFORT_LEVELS.map((e) => (
+                <option key={e} value={e}>
+                  {EFFORT_LABEL[e]}
+                </option>
+              ))}
+            </select>
+            <select value={thinking} onChange={(e) => setThinking(e.target.value)} title={t("ai.thinking")}>
+              <option value="">{t("ai.thinkingDefault")}</option>
+              {THINKING_MODES.map((tm) => (
+                <option key={tm} value={tm}>
+                  {THINKING_LABEL[tm]}
+                </option>
+              ))}
+            </select>
+          </div>
         </label>
 
         <div className="row">

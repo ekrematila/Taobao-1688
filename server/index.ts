@@ -535,7 +535,7 @@ app.post(
 app.post(
   "/api/ai/advice",
   wrap(async (req, res) => {
-    const { draftId, channel, model, targetLanguage, mode } = req.body ?? {};
+    const { draftId, channel, model, effort, thinking, targetLanguage, mode } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     const ch = channel === "etsy" ? "etsy" : "shopify";
@@ -547,6 +547,8 @@ app.post(
           ? localAdvice(draft.product!, ch, targetLanguage)
           : await generateAdvice(draft.product!, ch, {
               model,
+              effort,
+              thinking,
               signal: ctx.signal,
               draftId: draft.id,
               targetLanguage,
@@ -569,7 +571,7 @@ app.post(
 app.post(
   "/api/ai/category-research",
   wrap(async (req, res) => {
-    const { draftId, question, model, targetLanguage, mode = "manus", agentProfile } = req.body ?? {};
+    const { draftId, question, model, effort, thinking, targetLanguage, mode = "manus", agentProfile } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     if (mode === "manus" && !manusConfigured())
@@ -583,6 +585,8 @@ app.post(
       } else if (mode === "ai") {
         r = await researchCategory(draft.product!, String(question || ""), {
           model,
+          effort,
+          thinking,
           signal: ctx.signal,
           draftId: draft.id,
           targetLanguage,

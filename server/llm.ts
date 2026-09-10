@@ -1101,7 +1101,7 @@ function productBrief(p: NormalisedProduct): string {
 export async function generateAdvice(
   product: NormalisedProduct,
   channel: ChannelId,
-  opts: { model?: string; signal?: AbortSignal; draftId?: string; targetLanguage?: string } = {},
+  opts: { model?: string; effort?: Effort; thinking?: ThinkingMode; signal?: AbortSignal; draftId?: string; targetLanguage?: string } = {},
 ): Promise<AdviceResult> {
   const lang = opts.targetLanguage || "en";
   const system = [
@@ -1127,6 +1127,8 @@ export async function generateAdvice(
     .join("\n");
   const { text, usage, model } = await ask(system, user, "advice", {
     model: opts.model,
+    effort: opts.effort,
+    thinking: opts.thinking,
     maxTokens: 2500,
     signal: opts.signal,
     draftId: opts.draftId,
@@ -1142,7 +1144,7 @@ export async function generateAdvice(
 export async function researchCategory(
   product: NormalisedProduct,
   question: string,
-  opts: { model?: string; signal?: AbortSignal; draftId?: string; targetLanguage?: string } = {},
+  opts: { model?: string; effort?: Effort; thinking?: ThinkingMode; signal?: AbortSignal; draftId?: string; targetLanguage?: string } = {},
 ): Promise<CategoryResearchResult> {
   const lang = opts.targetLanguage || "en";
   const system = [
@@ -1165,6 +1167,8 @@ export async function researchCategory(
     .join("\n");
   const { text, usage, model } = await ask(system, user, "categoryResearch", {
     model: opts.model,
+    effort: opts.effort,
+    thinking: opts.thinking,
     maxTokens: 3500,
     signal: opts.signal,
     draftId: opts.draftId,

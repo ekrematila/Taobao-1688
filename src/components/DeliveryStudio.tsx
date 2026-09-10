@@ -348,7 +348,7 @@ export default function DeliveryStudio({
   async function runResearch(mode: "manus" | "ai" | "local" = "manus") {
     setBusy("research");
     const r = categoryResearchJob(
-      { draftId: draft.id, question: researchQ, model, targetLanguage: targetLang, mode, agentProfile: researchManusProfile },
+      { draftId: draft.id, question: researchQ, model, effort: genEffort || undefined, thinking: genThinking || undefined, targetLanguage: targetLang, mode, agentProfile: researchManusProfile },
       setJob,
     );
     jobRef.current = r as RunningJob<unknown>;

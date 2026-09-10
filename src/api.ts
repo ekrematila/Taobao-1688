@@ -152,7 +152,15 @@ export function translateVariantsJob(
   return runJob(() => post("/ai/translate-variants", { draftId, targetLanguage, model }), onProgress);
 }
 export function adviceJob(
-  body: { draftId: string; channel: string; model?: string; targetLanguage?: string; mode?: "ai" | "local" },
+  body: {
+    draftId: string;
+    channel: string;
+    model?: string;
+    effort?: string;
+    thinking?: string;
+    targetLanguage?: string;
+    mode?: "ai" | "local";
+  },
   onProgress: Progress,
 ): RunningJob<import("@shared/types.ts").AdviceResult> {
   return runJob(() => post("/ai/advice", body), onProgress);
@@ -162,6 +170,8 @@ export function categoryResearchJob(
     draftId: string;
     question?: string;
     model?: string;
+    effort?: string;
+    thinking?: string;
     targetLanguage?: string;
     mode?: "manus" | "ai" | "local";
     agentProfile?: string;
