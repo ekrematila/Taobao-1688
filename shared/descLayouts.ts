@@ -128,7 +128,7 @@ export function renderDescriptionHtml(
 export function flattenHtmlForImport(html: string): string {
   let s = String(html || "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<\/?(?:input|label|button)\b[^>]*>/gi, "")
     .replace(/\s+class="[^"]*"/gi, "")
@@ -220,7 +220,7 @@ export function renderImportBody(
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
   const base0 = cleanDescValue(baseHtml);
   if (isPreStyled(base0)) {
-    return oneLine(`<div lang="en">${deTr(ensurePdScaffold(ensureBmScaffold(fillMediaSlots(base0, imgs))))}</div>`);
+    return oneLine(`<div lang="en">${deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))}</div>`);
   }
   if (isSelfContainedLayout(layoutId)) {
     return oneLine(renderDescriptionHtml(layoutId, baseHtml, imgs, meta));
@@ -244,28 +244,26 @@ export function renderImportBody(
   return flattenHtmlForImport(`<div lang="en">${base}${specHtml}${imgHtml}</div>`);
 }
 
-/** The canonical `.bm` runtime — reveal-on-scroll, image lightbox, FAQ accordion,
- *  CTA "scroll to Add to Cart" + glow. Appended by `ensureBmScaffold` when the
- *  model's block is missing it, so the interactions always work. No `//` comments
- *  (safe to one-line for the CSV). */
+/** The canonical `.bm` runtime — PROGRESSIVE ENHANCEMENT only. The block already
+ *  works with no JS (reveals visible by default, FAQ is native `<details>`, the
+ *  CTA also carries an inline `onclick`). This script upgrades image zoom and
+ *  makes the CTA delegated + resilient to a theme re-rendering the description.
+ *  `document`-delegated (never bound at run time) + a `window.__bmInit` guard so
+ *  it is safe if injected more than once. No `//` comments (one-lined for CSV). */
 const BM_SCRIPT =
-  `<script>(function(){var root=document.currentScript.previousElementSibling;` +
-  `while(root&&!(root.classList&&root.classList.contains('bm')))root=root.previousElementSibling;if(!root)return;` +
-  `var reveals=root.querySelectorAll('.bm-reveal');` +
-  `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('bm-show');io.unobserve(e.target);}});},{threshold:.12});reveals.forEach(function(el){io.observe(el);});}` +
-  `else{reveals.forEach(function(el){el.classList.add('bm-show');});}` +
-  `var lb=root.querySelector('[data-bm-lightbox]'),lbi=root.querySelector('[data-bm-lightbox-img]'),cb=root.querySelector('[data-bm-close]');` +
-  `function onKey(e){if(e.key==='Escape'){closeLb();}}` +
-  `function openLb(s){if(!lb||!lbi||!s)return;lbi.src=s;lb.classList.add('is-open');document.addEventListener('keydown',onKey);}` +
-  `function closeLb(){if(!lb)return;lb.classList.remove('is-open');document.removeEventListener('keydown',onKey);}` +
-  `root.querySelectorAll('[data-bm-zoom]').forEach(function(el){el.addEventListener('click',function(){var im=el.tagName==='IMG'?el:el.querySelector('img');if(im){openLb(im.currentSrc||im.src);}});});` +
-  `if(cb){cb.addEventListener('click',closeLb);}if(lb){lb.addEventListener('click',function(e){if(e.target===lb){closeLb();}});}` +
-  `root.querySelectorAll('.bm-faq-item').forEach(function(it){var q=it.querySelector('.bm-faq-q');if(q){q.addEventListener('click',function(){it.classList.toggle('is-open');});}});` +
-  `var atcBtn=root.querySelector('[data-bm-goto-atc]');if(atcBtn){atcBtn.addEventListener('click',function(){` +
-  `var atc=document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart]');` +
-  `if(!atc){return;}atc.scrollIntoView({behavior:'smooth',block:'center'});` +
-  `var g=function(){atc.classList.remove('bm-atc-glow');void atc.offsetWidth;atc.classList.add('bm-atc-glow');setTimeout(function(){atc.classList.remove('bm-atc-glow');},2600);};` +
-  `if('onscrollend' in window){document.addEventListener('scrollend',g,{once:true});}else{setTimeout(g,650);}});}` +
+  `<script>(function(){if(window.__bmInit)return;window.__bmInit=1;` +
+  `function findAtc(){return document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button, button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart, .shopify-payment-button__button');}` +
+  `function glow(el){if(!el)return;el.classList.remove('bm-atc-glow');void el.offsetWidth;el.classList.add('bm-atc-glow');setTimeout(function(){el.classList.remove('bm-atc-glow');},2600);}` +
+  `document.addEventListener('click',function(e){var t=e.target;` +
+  `var z=t.closest&&t.closest('.bm [data-bm-zoom]');` +
+  `if(z){var im=z.tagName==='IMG'?z:z.querySelector('img');var lb=document.querySelector('.bm-lightbox');` +
+  `if(im&&lb){var li=lb.querySelector('[data-bm-lightbox-img]')||lb.querySelector('img');if(li){li.src=im.currentSrc||im.src;lb.classList.add('is-open');}}return;}` +
+  `if((t.closest&&t.closest('.bm-lightbox [data-bm-close]'))||(t.classList&&t.classList.contains('bm-lightbox'))){var o=document.querySelector('.bm-lightbox.is-open');if(o)o.classList.remove('is-open');return;}` +
+  `var cta=t.closest&&t.closest('[data-bm-goto-atc]');if(!cta)return;e.preventDefault();` +
+  `var atc=findAtc();if(!atc)return;atc.scrollIntoView({behavior:'smooth',block:'center'});` +
+  `if('onscrollend' in window){var fb=setTimeout(function(){glow(atc);},1000);document.addEventListener('scrollend',function(){clearTimeout(fb);glow(atc);},{once:true});}else{setTimeout(function(){glow(atc);},600);}` +
+  `});` +
+  `document.addEventListener('keydown',function(e){if(e.key==='Escape'){var o=document.querySelector('.bm-lightbox.is-open');if(o)o.classList.remove('is-open');}});` +
   `})();</script>`;
 
 /** No-JS guard: if Shopify strips the `<script>`, `.bm-reveal` would stay invisible. */
@@ -282,9 +280,9 @@ const BM_STYLE_EXTRA =
   `.bm-lightbox{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:26px;background:rgba(24,26,48,.82)}.bm-lightbox.is-open{display:flex}.bm-lightbox img{max-width:min(92vw,900px);max-height:88vh;border-radius:12px}` +
   `.bm-lightbox .bm-close{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}` +
   `.bm-faq{margin-top:6px;border:1px solid var(--line,rgba(79,87,196,.16));border-radius:12px;overflow:hidden}.bm-faq-item{border-bottom:1px solid var(--line,rgba(79,87,196,.16))}.bm-faq-item:last-child{border-bottom:0}` +
-  `.bm-faq-q{width:100%;display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff;border:0;text-align:left;font-size:13.4px;font-weight:700;color:var(--acc,#4f57c4)}` +
-  `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:transform .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
-  `.bm-faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease}.bm-faq-a p{padding:0 13px 12px;margin:0;font-size:13px;color:var(--soft,#5b6172);line-height:1.55}.bm-faq-item.is-open .bm-faq-a{max-height:280px}` +
+  `.bm-faq-q{list-style:none;cursor:pointer;width:100%;display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff;border:0;text-align:left;font-size:13.4px;font-weight:700;color:var(--acc,#4f57c4)}.bm-faq-q::-webkit-details-marker{display:none}.bm-faq-q::marker{content:""}` +
+  `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative;transition:transform .3s}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:opacity .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item[open] .bm-plus,.bm-faq-item.is-open .bm-plus{transform:rotate(90deg)}.bm-faq-item[open] .bm-plus::after,.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
+  `.bm-faq-a{overflow:hidden}.bm-faq-a p{padding:2px 13px 12px;margin:0;font-size:13px;color:var(--soft,#5b6172);line-height:1.55}.bm-faq-item[open] .bm-faq-a{animation:bmFaqIn .28s ease}@keyframes bmFaqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}` +
   `.bm-cta{margin-top:18px;padding:16px;border-radius:14px;text-align:center;background:linear-gradient(135deg,var(--acc,#4f57c4),var(--acc2,#98a0ea))}.bm-cta p{color:#eef0ff;font-size:12.5px;margin:0 0 10px}.bm-cta button,.bm-cta a{display:inline-flex!important;align-items:center;gap:7px;background:#fff;color:var(--acc,#4f57c4);font-weight:700;font-size:13.5px;padding:10px 20px;border-radius:99px;border:0;text-decoration:none;cursor:pointer}` +
   `@keyframes bmAtcGlow{0%{box-shadow:0 0 0 0 rgba(79,87,196,0)}25%{box-shadow:0 0 9px 3px rgba(79,87,196,.5)}50%{box-shadow:0 0 0 0 rgba(79,87,196,0)}75%{box-shadow:0 0 9px 3px rgba(79,87,196,.5)}100%{box-shadow:0 0 0 0 rgba(79,87,196,0)}}.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}</style>`;
 
@@ -319,16 +317,16 @@ function bmMediaInner(imgs: DescImg[]): string {
  *  or re-renders the description block after the page loads.
  *  We NEVER trust a model-authored `<script>` for this — see `ensurePdScaffold`. */
 const PD_SCRIPT =
-  `<script>(function(){` +
+  `<script>(function(){if(window.__pdInit)return;window.__pdInit=1;` +
   `document.addEventListener('click',function(e){` +
-  `var q=e.target&&e.target.closest&&e.target.closest('.pd-faq-q');` +
+  `var q=e.target&&e.target.closest&&e.target.closest('div.pd-faq-q');` +
   `if(q){var it=q.closest('.pd-faq-item');if(it)it.classList.toggle('pd-open');return;}` +
   `var btn=e.target&&e.target.closest&&e.target.closest('[data-pd-goto-atc]');` +
   `if(!btn)return;e.preventDefault();` +
-  `var atc=document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart');` +
+  `var atc=document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button, button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart, .shopify-payment-button__button');` +
   `if(!atc)return;atc.scrollIntoView({behavior:'smooth',block:'center'});` +
   `var run=function(){atc.classList.remove('pd-atc-glow');void atc.offsetWidth;atc.classList.add('pd-atc-glow');setTimeout(function(){atc.classList.remove('pd-atc-glow');},2600);};` +
-  `if('onscrollend' in window){document.addEventListener('scrollend',run,{once:true});}else{setTimeout(run,650);}` +
+  `if('onscrollend' in window){var fb=setTimeout(run,1000);document.addEventListener('scrollend',function(){clearTimeout(fb);run();},{once:true});}else{setTimeout(run,600);}` +
   `});` +
   `})();</script>`;
 
@@ -350,21 +348,35 @@ const FAQ_CTA_GUARANTEE =
   // 1) reveal blocks are ALWAYS visible — Shopify strips <script>, so a JS-gated
   //    opacity:0 reveal would leave the whole description invisible. Bulletproof.
   `.bm-reveal,.pd-reveal{opacity:1!important;transform:none!important}` +
-  // 2) FAQ accordion — smooth open regardless of a broken/missing model rule.
-  `.pd-faq-a,.bm-faq-a{overflow:hidden!important;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1)}` +
-  `.pd-faq-item.pd-open .pd-faq-a,.pd-faq-item.pd-open>.pd-faq-a,.bm-faq-item.is-open .bm-faq-a,.bm-faq-item.is-open>.bm-faq-a{max-height:1400px!important}` +
-  `.pd-faq-q:hover,.bm-faq-q:hover{filter:brightness(.97)}` +
+  // 2) FAQ = native <details>/<summary>, ZERO JS. Hide the default disclosure
+  //    triangle, make the row a pointer, smooth the open.
+  `summary.bm-faq-q,summary.pd-faq-q{list-style:none!important;cursor:pointer!important;display:flex!important}` +
+  `summary.bm-faq-q::-webkit-details-marker,summary.pd-faq-q::-webkit-details-marker{display:none}` +
+  `summary.bm-faq-q::marker,summary.pd-faq-q::marker{content:""!important}` +
+  `.bm-faq-q:hover,.pd-faq-q:hover{filter:brightness(.97)}` +
+  `details.bm-faq-item[open]>.bm-faq-a,details.pd-faq-item[open]>.pd-faq-a{animation:tpsFaqIn .28s ease}` +
+  `@keyframes tpsFaqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}` +
+  // 2b) legacy fallback: a model still emitting <div class="…-faq-item"> with a JS
+  //     toggle class. Honour the toggle class if present; otherwise (no JS to set
+  //     it) show the answer rather than trapping it closed forever.
+  `div.bm-faq-item .bm-faq-a,div.pd-faq-item .pd-faq-a{overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}` +
+  `div.bm-faq-item.is-open>.bm-faq-a,div.pd-faq-item.pd-open>.pd-faq-a{max-height:1400px!important}` +
   // 3) Add-to-Cart glow — TWO pulses, 2.6s total (peaks at 25% & 75%). This is an
   //    ANIMATION, never a static box-shadow: a static `box-shadow !important` here
   //    would override the keyframe and kill the pulse entirely (the old bug).
   `@keyframes tpsAtcGlow{` +
   `0%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
-  `25%{box-shadow:0 0 0 4px rgba(90,110,230,.22),0 0 24px 5px rgba(90,110,230,.42);transform:scale(1.02)}` +
+  `25%{box-shadow:0 0 0 4px rgba(90,110,230,.24),0 0 26px 6px rgba(90,110,230,.45);transform:scale(1.02)}` +
   `50%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
-  `75%{box-shadow:0 0 0 4px rgba(90,110,230,.22),0 0 24px 5px rgba(90,110,230,.42);transform:scale(1.02)}` +
+  `75%{box-shadow:0 0 0 4px rgba(90,110,230,.24),0 0 26px 6px rgba(90,110,230,.45);transform:scale(1.02)}` +
   `100%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}}` +
   `.pd-atc-glow,.bm-atc-glow{animation:tpsAtcGlow 2.6s ease-in-out 1!important;border-radius:8px}` +
   `@media (prefers-reduced-motion:reduce){.pd-atc-glow,.bm-atc-glow{animation-duration:.01ms!important}}` +
+  // 4) spec rows: force the clean two-column look + a real gap even if the model's
+  //    nesting is off (the "MaterialPBT plastic" no-separator bug).
+  `.bm-spec .bm-r,.bm-spec>div:not(.bm-sub){display:flex!important;flex-wrap:wrap;justify-content:space-between!important;gap:6px 18px!important;align-items:baseline;padding:10px 14px}` +
+  `.bm-spec .bm-k{flex:0 0 auto;max-width:44%;font-weight:500}` +
+  `.bm-spec .bm-v{flex:1 1 auto;text-align:right;font-weight:600}` +
   `</style>`;
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
@@ -373,7 +385,7 @@ const FAQ_CTA_GUARANTEE =
  *  the tested canonical `BM_SCRIPT`. */
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
-  let out = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   if (!/\.bm-lightbox\{/i.test(out)) {
     out = /<\/style>/i.test(out) ? out.replace(/<\/style>/i, `</style>${BM_STYLE_EXTRA}`) : BM_STYLE_EXTRA + out;
@@ -399,8 +411,11 @@ function ensureBmScaffold(html: string): string {
  * wrote is stripped and replaced with the tested canonical one.
  */
 function ensurePdScaffold(html: string): string {
-  if (!/\bpd-faq-item\b/i.test(html) && !/data-pd-goto-atc/i.test(html)) return html;
-  let out = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  // Match the hook only when it is a real ELEMENT — not the `.pd-faq-item` text
+  // inside FAQ_CTA_GUARANTEE's `<style>` (that false match used to make this run
+  // on a `.bm` block and strip its BM_SCRIPT, killing the `.bm` CTA).
+  if (!/<[a-z][a-z0-9]*\b[^>]*\bpd-faq-item\b/i.test(html) && !/\bdata-pd-goto-atc\b/i.test(html)) return html;
+  let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
   // a model-authored `<a href="#" data-pd-goto-atc>` would jump to the top of
   // the page on click before (or if) our delegated handler ever runs — strip
   // any href on the CTA element so the browser has nothing to navigate to.
@@ -412,6 +427,19 @@ function ensurePdScaffold(html: string): string {
   // the model's `<style>` (that produces `<style><style>` and the browser prints
   // the CSS as text).
   return out + FAQ_CTA_GUARANTEE + PD_SCRIPT;
+}
+
+/**
+ * Add the runtime scaffold (guard styles, lightbox, canonical `<script>`) to a
+ * model-authored pre-styled block. Dispatches by block TYPE: a `.bm` block gets
+ * ONLY `ensureBmScaffold` (running `ensurePdScaffold` after it used to strip the
+ * freshly-added BM_SCRIPT — because FAQ_CTA_GUARANTEE's CSS mentions
+ * `.pd-faq-item` — leaving the `.bm` "scroll to Add to Cart" button with no
+ * handler at all). Anything else goes through `ensurePdScaffold`.
+ */
+function scaffoldPrestyled(html: string): string {
+  const isBm = /<div\b[^>]*class\s*=\s*["']bm["']/i.test(html) || /class\s*=\s*["']bm["']/i.test(html);
+  return isBm ? ensureBmScaffold(html) : ensurePdScaffold(html);
 }
 
 /**
@@ -519,7 +547,7 @@ function renderDescBody(
   // (the `.bm` sticky card for "Alt alta görsel", or a bespoke block in the
   // spirit of the reference examples for "Diğer HTML düzenler"). If it did → just
   // drop the product images into its media slots and return it verbatim.
-  if (isPreStyled(base)) return ensurePdScaffold(ensureBmScaffold(fillMediaSlots(base, imgs)));
+  if (isPreStyled(base)) return scaffoldPrestyled(fillMediaSlots(base, imgs));
   // fallback: model wrote only semantic HTML → build the `.bm` card from it.
   if (isSelfContainedLayout(layoutId)) return ensureBmScaffold(renderBmSticky(base, imgs, meta));
   if (layoutId === "none" || !imgs.length) return ensureHtml(base);
@@ -852,7 +880,7 @@ function renderBmSticky(baseIn: string, imgs: DescImg[], meta?: DescMeta): strin
   // strip that machinery so mining reads real copy, not CSS text.
   const base = String(baseIn || "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "")
     .replace(/<\/?(?:input|label)\b[^>]*>/gi, "")
     .replace(/<img\b[^>]*>/gi, "");
 

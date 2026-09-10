@@ -139,6 +139,9 @@ XDA Profile, DSA Profile, SA Profile, ASA Profile, KAT Profile, XVX Profile
  * incl. spaces & symbols; the operator length band overrides that when set.
  * The renderer fills the empty <div class="bm-media"></div> with the real product
  * photos and guarantees the .bm-lightbox node + <script> are present.
+ * NOTE: the FAQ is a native <details>/<summary> (NO JavaScript — Shopify strips
+ * <script>, so a JS accordion never opens); the CTA <button> also carries an
+ * inline onclick so it works even with every <script> removed.
  */
 export const STACKED_DESC_EXAMPLE = `<style>
 /* ===== Stacked-image product description v3 — RE-THEME the palette per product
@@ -172,9 +175,9 @@ export const STACKED_DESC_EXAMPLE = `<style>
 @media (prefers-reduced-motion:reduce){
   .bm *{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important}
 }
-/* NOTE: reveal is visible by default — Shopify's rich-text editor strips <script>,
-   so a JS-gated opacity:0 would leave the whole block invisible. Keep it at
-   opacity:1 always; the transition only smooths a class change if JS is present. */
+/* NOTE: reveal is visible by default — Shopify's editor removes scripting, so a
+   JS-gated opacity:0 would leave the whole block invisible. Keep it at opacity:1
+   always; the transition only smooths a class change if JS is present. */
 .bm-reveal{opacity:1; transform:none; transition:opacity .55s ease, transform .55s ease}
 .bm-reveal.bm-show{opacity:1; transform:none}
 .bm-toggle{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
@@ -289,16 +292,26 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-layouts-note{font-size:12.5px; color:var(--soft); margin:8px 0 0; line-height:1.5}
 
 /* ---- Specifications ---- */
-.bm-spec{display:block !important; margin:0 !important; padding:0 !important; font-size:13.5px}
+.bm-spec{
+  display:block !important; margin:0 !important; padding:0 !important; font-size:13.3px;
+  border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--milk);
+}
+.bm-spec .bm-sub{
+  display:block; padding:9px 14px 7px; font-size:10.5px; font-weight:700;
+  letter-spacing:.11em; text-transform:uppercase; color:var(--gold);
+  background:var(--sky); border-bottom:1px solid var(--line);
+}
+.bm-spec .bm-sub:not(:first-child){border-top:1px solid var(--line)}
 .bm-spec .bm-r{
-  display:flex !important; flex-wrap:nowrap; align-items:baseline;
-  justify-content:space-between; gap:12px; width:100%;
-  margin:0 !important; padding:8px 6px; border-bottom:1px solid var(--line);
-  border-radius:8px; transition:background .3s cubic-bezier(.4,0,.2,1);
+  display:flex !important; flex-wrap:wrap; align-items:baseline;
+  justify-content:space-between; gap:8px 18px; width:100%;
+  margin:0 !important; padding:10px 14px; border-bottom:1px solid var(--line);
+  transition:background .25s cubic-bezier(.4,0,.2,1);
 }
 .bm-spec .bm-r:hover{background:var(--sky)}
 .bm-spec .bm-r:last-child{border-bottom:0}
-.bm-spec .bm-k{flex:0 0 auto; color:var(--soft); margin:0 !important}
+.bm-spec .bm-k{flex:0 0 auto; max-width:44%; color:var(--soft); font-weight:500; margin:0 !important}
+.bm-spec .bm-k::after{content:""}
 .bm-spec .bm-v{flex:1 1 auto; min-width:0; text-align:right; color:#7a5a12; font-weight:600; margin:0 !important; overflow-wrap:break-word}
 
 /* ---- PBT vs ABS quick comparison ---- */
@@ -314,34 +327,43 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-compare tr:hover td{background:var(--sky)}
 .bm-compare .bm-yes{color:#7a5a12; font-weight:700}
 
-/* ---- trust row ---- */
+/* ---- trust row (box + hover) ---- */
 .bm-trust{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; justify-content:center}
 .bm-trust span{
   font-size:11.5px; color:var(--soft); background:var(--milk); border:1px solid var(--line);
-  padding:6px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:5px;
+  padding:8px 12px; border-radius:12px; display:inline-flex; align-items:center; gap:5px;
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
 }
+.bm-trust span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(201,138,31,.3); background:#fff; border-color:var(--gold2)}
 
 .bm-note{margin:16px 0 0; padding:11px 13px; border-radius:12px; background:var(--lav); border:1px solid var(--line); font-size:12.8px; color:#5c4326; line-height:1.5}
 .bm-note b{color:#7a5a12}
 
-/* ---- FAQ accordion ---- */
+/* ---- FAQ accordion — native <details>/<summary>, ZERO JavaScript (Shopify
+   removes scripting, so a JS accordion never opens; <details> always works). ---- */
 .bm-faq{margin-top:6px; border:1px solid var(--line); border-radius:12px; overflow:hidden}
 .bm-faq-item{border-bottom:1px solid var(--line)}
 .bm-faq-item:last-child{border-bottom:0}
 .bm-faq-q{
+  list-style:none; cursor:pointer;
   width:100%; display:flex !important; align-items:center; justify-content:space-between;
   gap:10px; padding:11px 13px; background:#fff; border:0; text-align:left;
-  font-size:13.4px; font-weight:700; color:#7a5a12; transition:background .3s cubic-bezier(.4,0,.2,1);
+  font-size:13.4px; font-weight:700; color:#7a5a12; transition:background .25s cubic-bezier(.4,0,.2,1);
 }
+.bm-faq-q::-webkit-details-marker{display:none}
+.bm-faq-q::marker{content:""}
 .bm-faq-q:hover{background:var(--sky)}
-.bm-faq-q .bm-plus{flex:0 0 auto; width:18px; height:18px; position:relative}
-.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:""; position:absolute; background:var(--gold); border-radius:2px; transition:transform .3s ease}
+.bm-faq-q .bm-plus{flex:0 0 auto; width:18px; height:18px; position:relative; transition:transform .3s ease}
+.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:""; position:absolute; background:var(--gold); border-radius:2px; transition:opacity .3s ease}
 .bm-faq-q .bm-plus::before{left:0; top:50%; width:100%; height:2px; transform:translateY(-50%)}
 .bm-faq-q .bm-plus::after{top:0; left:50%; width:2px; height:100%; transform:translateX(-50%)}
-.bm-faq-item.is-open .bm-plus::after{transform:translateX(-50%) rotate(90deg); opacity:0}
-.bm-faq-a{max-height:0; overflow:hidden; background:var(--milk); transition:max-height .35s ease}
-.bm-faq-a p{padding:0 13px 12px; margin:0; font-size:13px; color:var(--soft); line-height:1.55}
-.bm-faq-item.is-open .bm-faq-a{max-height:260px}
+.bm-faq-item[open] .bm-plus{transform:rotate(90deg)}
+.bm-faq-item[open] .bm-plus::after{opacity:0}
+.bm-faq-a{overflow:hidden; background:var(--milk)}
+.bm-faq-a p{padding:2px 13px 12px; margin:0; font-size:13px; color:var(--soft); line-height:1.55}
+.bm-faq-item[open] .bm-faq-a{animation:bmFaqIn .28s ease}
+@keyframes bmFaqIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
 
 /* ---- CTA ---- */
 .bm-cta{margin-top:18px; padding:16px; border-radius:14px; text-align:center; background:linear-gradient(135deg,var(--gold) 0%,#f0c674 100%); box-shadow:0 10px 24px -10px rgba(201,138,31,.55)}
@@ -405,8 +427,8 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-c2"><div class="bm-inner">
 <div class="bm-info bm-reveal">
 
-<p class="bm-lede">Bring a slice of pure kawaii to your setup with this <strong>140-piece PBT keycap set</strong> starring Chiikawa's beloved Usagi and friends. Every legend is <strong>dye-sublimated</strong> straight into thick, durable PBT plastic so the tiny cartoon faces and pastel doodles never fade, peel, or wear thin — even after years of daily typing. ✨</p>
-<p class="bm-trivia">🐹 Fun fact: the titular Chiikawa character is actually hamster-inspired — <strong>Usagi</strong> is his rabbit-loving best friend, and the star of this set!</p>
+<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — the Enter and Left Shift keys for both are included, so you can build your board either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
+<p class="bm-trivia">🐹 Fun fact: the titular Chiikawa character is hamster-inspired — <strong>Usagi</strong> is his rabbit-loving best friend, and the star of this set.</p>
 
 <h3>Highlights</h3>
 <ul class="bm-feat">
@@ -425,17 +447,25 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-layouts bm-layouts-keys">
 <span>61 keys</span><span>64 keys</span><span>68 keys</span><span>75 keys</span><span>84 keys</span><span>87 keys</span><span>98 keys</span><span>104 keys</span><span>108 keys</span>
 </div>
-<p class="bm-layouts-note">Spacebar coverage: includes 6.25U and 7U bottom-row spacebars, plus 3U / 2.75U split spacebars for HHKB-style and split boards. Also covers stepped Caps Lock, ISO Enter, Left Shift B3 &amp; B4, and 1.5U large front-tooth keys. Fits Alice, tri-mode 75%, and standard TKL boards — always match your bottom-row and spacebar size against the "all keys" compatibility photo before ordering.</p>
+<p class="bm-layouts-note">Spacebar coverage: 6.25U and 7U bottom-row spacebars, plus 2.75U and 2.25U keys for split and HHKB-style bottom rows. Also covers stepped Caps Lock, the tall L-shaped Enter used on ISO boards, Left Shift B3 &amp; B4, and 1.5U front-tooth keys — so the set is <strong>ANSI &amp; ISO layout compatible</strong>. Fits Alice, tri-mode 75%, and standard TKL keyboards. Not sure about your board? Match your bottom-row and spacebar size against the "all keys" compatibility photo, or message us and we'll confirm it for you.</p>
 
 <h3>Specifications</h3>
 <div class="bm-spec">
-<div class="bm-r"><span class="bm-k">Key count</span><span class="bm-v">140 pcs</span></div>
+<span class="bm-sub">Build &amp; legends</span>
 <div class="bm-r"><span class="bm-k">Material</span><span class="bm-v">PBT plastic</span></div>
-<div class="bm-r"><span class="bm-k">Printing method</span><span class="bm-v">Dye-sublimation</span></div>
-<div class="bm-r"><span class="bm-k">Profile</span><span class="bm-v">Cherry Profile / KOA Profile</span></div>
-<div class="bm-r"><span class="bm-k">Legend placement</span><span class="bm-v">Top print / Side print</span></div>
+<div class="bm-r"><span class="bm-k">Legend process</span><span class="bm-v">Dye-sublimation — fused in, not printed on top</span></div>
+<div class="bm-r"><span class="bm-k">Surface finish</span><span class="bm-v">Textured matte, anti-shine</span></div>
+<div class="bm-r"><span class="bm-k">Legend placement</span><span class="bm-v">Top print / Side print (by variant)</span></div>
+<span class="bm-sub">Fit &amp; layout</span>
+<div class="bm-r"><span class="bm-k">Profile options</span><span class="bm-v">Cherry Profile / KOA Profile</span></div>
+<div class="bm-r"><span class="bm-k">Key count</span><span class="bm-v">140 keys (full set)</span></div>
+<div class="bm-r"><span class="bm-k">Layout support</span><span class="bm-v">ANSI &amp; ISO layout compatible</span></div>
+<div class="bm-r"><span class="bm-k">Keyboard sizes</span><span class="bm-v">60% / 65% / 75% / TKL / 96% / full-size / Alice</span></div>
+<div class="bm-r"><span class="bm-k">Spacebar support</span><span class="bm-v">6.25U, 7U, 2.75U, 2.25U</span></div>
+<div class="bm-r"><span class="bm-k">Switch fit</span><span class="bm-v">MX-style cross-stem switches only</span></div>
+<span class="bm-sub">Design</span>
 <div class="bm-r"><span class="bm-k">Theme</span><span class="bm-v">Chiikawa Usagi cartoon</span></div>
-<div class="bm-r"><span class="bm-k">Switch fit</span><span class="bm-v">MX-style cross-stem switches</span></div>
+<div class="bm-r"><span class="bm-k">Character art</span><span class="bm-v">Usagi &amp; friends, soft pastel line work</span></div>
 </div>
 
 <h3>Why PBT Over ABS</h3>
@@ -449,17 +479,19 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 <h3>Compatibility &amp; Care</h3>
 <div class="bm-faq">
-<div class="bm-faq-item is-open"><button type="button" class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>Fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL, and full-size layouts. Please compare your bottom row and spacebar sizes against the compatibility photos before ordering.</p></div></div>
-<div class="bm-faq-item"><button type="button" class="bm-faq-q"><span>🎹 What's the difference between Cherry and KOA profile?</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, ergonomic typing angle, while KOA Profile sits slightly taller with its own distinct row sculpt. Choose the variant that matches your preferred feel — they are not interchangeable rows.</p></div></div>
-<div class="bm-faq-item"><button type="button" class="bm-faq-q"><span>🖨️ What is Side Print?</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>Side Print places the artwork and legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean and minimal while the character art still peeks through when you type.</p></div></div>
-<div class="bm-faq-item"><button type="button" class="bm-faq-q"><span>🧼 How do I clean these keycaps?</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>Dust with a soft dry brush or cloth. For deeper cleaning, hand-wash with warm water and mild soap, rinse thoroughly, and let air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></div>
+<details class="bm-faq-item" open><summary class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches — 60%, 65%, 75%, TKL, 96%, and full-size. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Match your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your board.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>🎹 What's the difference between Cherry and KOA Profile?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced row-to-row steps. They are not interchangeable rows — pick the sculpt you prefer.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>⌨️ Do I need to choose ANSI or ISO?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO, so you can build your keyboard either way. On an ISO board the Enter key is the tall L-shape; on ANSI it is the wide bar. Just install the keys your layout uses.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>🖨️ What is Side Print?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type. Top Print keeps the artwork on the top surface.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>💡 Will my RGB shine through the legends?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>These are dye-sublimated PBT keycaps with solid, non-translucent legends, so backlighting glows around each cap rather than through the characters. If you specifically want shine-through legends, that is a different keycap type.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>🧼 How do I clean these keycaps?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well, and let them air-dry fully before reinstalling. Avoid hot water and dishwashers.</p></div></details>
 </div>
 
-<div class="bm-note"><b>📦 In the box:</b> 140 Chiikawa Usagi keycaps in your chosen profile and print variant. Keyboard, switches, and puller not included.<br><b>💡 Before you order:</b> confirm your layout, bottom-row size, keyboard compatibility, and desired profile/print variant.<br><b>🧼 Care:</b> hand-wash gently with mild soap and air-dry fully; avoid harsh solvents.</div>
+<div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, and a thank-you card with a surprise coupon.<br><b>🧼 Care:</b> hand-wash gently with mild soap, then air-dry fully.</div>
 
 <div class="bm-cta">
-<p>Ready to make your desk irresistibly cute? ✨</p>
-<button type="button" data-bm-goto-atc>🛒 Add to Cart</button>
+<p>Give your setup a soft, huggable upgrade ✨</p>
+<button type="button" data-bm-goto-atc onclick="var a=document.querySelector('form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);}return false;">🛒 Add to Cart</button>
 </div>
 <div class="bm-trust">
 <span>🚚 Ships worldwide</span>
@@ -473,40 +505,46 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button><img src="" alt="Zoomed product image" data-bm-lightbox-img></div>
 </div>
 <script>
+/* Progressive enhancement only. The description works with NO JavaScript:
+   reveals are visible by default, the FAQ is a native <details>, and the CTA
+   button also carries an inline onclick. This script (when it runs) upgrades
+   image zoom and makes the CTA delegated + resilient to theme re-renders. */
 (function(){
-  var root = document.currentScript.previousElementSibling;
-  while(root && !(root.classList && root.classList.contains('bm'))) root = root.previousElementSibling;
-  if(!root) return;
-  var reveals = root.querySelectorAll('.bm-reveal');
-  if('IntersectionObserver' in window){
-    var io = new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('bm-show'); io.unobserve(e.target);}});},{threshold:.12});
-    reveals.forEach(function(el){io.observe(el);});
-  } else { reveals.forEach(function(el){el.classList.add('bm-show');}); }
-  var lightbox = root.querySelector('[data-bm-lightbox]');
-  var lightboxImg = root.querySelector('[data-bm-lightbox-img]');
-  var closeBtn = root.querySelector('[data-bm-close]');
-  function onKey(e){ if(e.key === 'Escape'){ closeLightbox(); } }
-  function openLightbox(src){ if(!lightbox || !lightboxImg || !src) return; lightboxImg.src = src; lightbox.classList.add('is-open'); document.addEventListener('keydown', onKey); }
-  function closeLightbox(){ if(!lightbox) return; lightbox.classList.remove('is-open'); document.removeEventListener('keydown', onKey); }
-  root.querySelectorAll('[data-bm-zoom]').forEach(function(el){
-    el.addEventListener('click', function(){ var img = el.tagName === 'IMG' ? el : el.querySelector('img'); if(img){ openLightbox(img.currentSrc || img.src); } });
-  });
-  if(closeBtn){ closeBtn.addEventListener('click', closeLightbox); }
-  if(lightbox){ lightbox.addEventListener('click', function(e){ if(e.target === lightbox){ closeLightbox(); } }); }
-  root.querySelectorAll('.bm-faq-item').forEach(function(item){
-    var q = item.querySelector('.bm-faq-q');
-    if(q){ q.addEventListener('click', function(){ item.classList.toggle('is-open'); }); }
-  });
-  var atcBtn = root.querySelector('[data-bm-goto-atc]');
-  if(atcBtn){
-    atcBtn.addEventListener('click', function(){
-      var atc = document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart]');
-      if(!atc){ return; }
-      atc.scrollIntoView({behavior:'smooth', block:'center'});
-      var glowIt = function(){ atc.classList.remove('bm-atc-glow'); void atc.offsetWidth; atc.classList.add('bm-atc-glow'); setTimeout(function(){ atc.classList.remove('bm-atc-glow'); }, 2600); };
-      if('onscrollend' in window){ document.addEventListener('scrollend', glowIt, {once:true}); } else { setTimeout(glowIt, 650); }
-    });
+  if(window.__bmInit) return; window.__bmInit = 1;
+  function findAtc(){
+    return document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button, button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart, .shopify-payment-button__button');
   }
+  function glow(el){
+    if(!el) return;
+    el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
+    setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var zoom = t.closest && t.closest('.bm [data-bm-zoom]');
+    if(zoom){
+      var im = zoom.tagName === 'IMG' ? zoom : zoom.querySelector('img');
+      var lb = document.querySelector('.bm-lightbox');
+      if(im && lb){ var li = lb.querySelector('[data-bm-lightbox-img]') || lb.querySelector('img'); if(li){ li.src = im.currentSrc || im.src; lb.classList.add('is-open'); } }
+      return;
+    }
+    if((t.closest && t.closest('.bm-lightbox [data-bm-close]')) || (t.classList && t.classList.contains('bm-lightbox'))){
+      var open = document.querySelector('.bm-lightbox.is-open'); if(open) open.classList.remove('is-open'); return;
+    }
+    var cta = t.closest && t.closest('[data-bm-goto-atc]');
+    if(!cta) return;
+    e.preventDefault();
+    var atc = findAtc();
+    if(!atc) return;
+    atc.scrollIntoView({behavior:'smooth', block:'center'});
+    if('onscrollend' in window){
+      var fb = setTimeout(function(){ glow(atc); }, 1000);
+      document.addEventListener('scrollend', function(){ clearTimeout(fb); glow(atc); }, {once:true});
+    } else { setTimeout(function(){ glow(atc); }, 600); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ var open = document.querySelector('.bm-lightbox.is-open'); if(open) open.classList.remove('is-open'); }
+  });
 })();
 </script>`;
 
@@ -517,9 +555,10 @@ export const STACKED_DESC_EXAMPLE = `<style>
  * (palette, prefix, emojis, section names, copy). Contract it MUST keep: empty
  * `<div class="pd-media"></div>` slots (ONE image each, the renderer fills them,
  * arranged in grids / a wide cinematic / variant cards — never stacked, never a
- * lone full 1:1), the `pd-faq-item`/`pd-faq-q`/`pd-faq-a` hooks (+ `pd-open` on
- * the first), `data-pd-goto-atc` on the CTA button, NO `<script>` (the system
- * injects it), and the CTA is the LAST element. Sent by the Delivery editor as
+ * lone full 1:1), the FAQ as native `<details class="pd-faq-item"><summary
+ * class="pd-faq-q">` + `<div class="pd-faq-a">` (first one `open`; NO JavaScript),
+ * `data-pd-goto-atc` on the CTA `<button>` (which also carries an inline onclick),
+ * NO `<script>`, and the CTA is the LAST element. Sent by the Delivery editor as
  * the default `examples` whenever a non-self-contained layout is picked.
  */
 export const OTHER_DESC_EXAMPLE = `<style>
@@ -666,20 +705,25 @@ export const OTHER_DESC_EXAMPLE = `<style>
 }
 .pd-ck__box b{color:var(--pd-ink)}
 
-/* --- FAQ (JS-free; the system toggles .pd-open) --- */
+/* --- FAQ — native <details>/<summary>, ZERO JavaScript (Shopify removes scripting) --- */
 .pd-ck__faq{border:1px solid var(--pd-line); border-radius:14px; overflow:hidden}
 .pd-faq-item{border-bottom:1px solid var(--pd-line)}
 .pd-faq-item:last-child{border-bottom:0}
 .pd-faq-q{
+  list-style:none; cursor:pointer;
   width:100%; display:flex !important; align-items:center; justify-content:space-between; gap:12px;
   padding:13px 15px; background:#fff; border:0; text-align:left;
-  font-size:13.6px; font-weight:700; color:var(--pd-ink);
+  font-size:13.6px; font-weight:700; color:var(--pd-ink); transition:background .25s ease;
 }
+.pd-faq-q::-webkit-details-marker{display:none}
+.pd-faq-q::marker{content:""}
+.pd-faq-q:hover{background:var(--pd-cream)}
 .pd-faq-q::after{content:"+"; flex:0 0 auto; font-size:17px; font-weight:400; color:var(--pd-accent); transition:transform .3s ease}
-.pd-faq-item.pd-open .pd-faq-q::after{transform:rotate(45deg)}
-.pd-faq-a{max-height:0; overflow:hidden; background:var(--pd-paper); transition:max-height .45s cubic-bezier(.4,0,.2,1)}
-.pd-faq-a p{padding:0 15px 14px; margin:0; font-size:13px; color:var(--pd-soft); line-height:1.6}
-.pd-faq-item.pd-open .pd-faq-a{max-height:640px}
+.pd-faq-item[open] .pd-faq-q::after{transform:rotate(45deg)}
+.pd-faq-a{overflow:hidden; background:var(--pd-paper)}
+.pd-faq-a p{padding:2px 15px 14px; margin:0; font-size:13px; color:var(--pd-soft); line-height:1.6}
+.pd-faq-item[open] .pd-faq-a{animation:pdFaqIn .28s ease}
+@keyframes pdFaqIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
 
 /* --- CTA (must be LAST; the system smooth-scrolls to the store's Add to Cart + glows it in --pd-accent) --- */
 .pd-ck__cta{
@@ -840,18 +884,19 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <div class="pd-ck__rule"></div>
 </div>
 <div class="pd-ck__faq">
-<div class="pd-faq-item pd-open"><button type="button" class="pd-faq-q">Will this fit my keyboard?</button><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. Compare your bottom row and spacebar sizes against the compatibility photos before ordering.</p></div></div>
-<div class="pd-faq-item"><button type="button" class="pd-faq-q">What is the difference between Cherry and KOA profile?</button><div class="pd-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed typing angle. KOA Profile sits slightly taller with its own row sculpt. Choose the one that matches your preferred feel — the rows are not interchangeable.</p></div></div>
-<div class="pd-faq-item"><button type="button" class="pd-faq-q">What does Side Print mean?</button><div class="pd-faq-a"><p>Side Print places the artwork and legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></div>
-<div class="pd-faq-item"><button type="button" class="pd-faq-q">How do I clean the keycaps?</button><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></div>
-<div class="pd-faq-item"><button type="button" class="pd-faq-q">Are the keycaps included with a keyboard?</button><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></div>
+<details class="pd-faq-item" open><summary class="pd-faq-q">Will this fit my keyboard?</summary><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Compare your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your board.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">What is the difference between Cherry and KOA profile?</summary><div class="pd-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced steps. The rows are not interchangeable — pick the sculpt you prefer.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">Do I need to choose ANSI or ISO?</summary><div class="pd-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO. On an ISO board the Enter key is the tall L-shape; on ANSI it is the wide bar. Just install the keys your layout uses.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">What does Side Print mean?</summary><div class="pd-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">How do I clean the keycaps?</summary><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">Are the keycaps included with a keyboard?</summary><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></details>
 </div>
 </section>
 
 <section class="pd-ck__section">
 <div class="pd-ck__cta">
-<p>Ready to make your desk irresistibly cute? ✨</p>
-<button type="button" data-pd-goto-atc>🛒 Add to Cart</button>
+<p>Give your setup a soft, huggable upgrade ✨</p>
+<button type="button" data-pd-goto-atc onclick="var a=document.querySelector('form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});a.classList.remove('pd-atc-glow');void a.offsetWidth;a.classList.add('pd-atc-glow');setTimeout(function(){a.classList.remove('pd-atc-glow');},2600);}return false;">🛒 Add to Cart</button>
 </div>
 </section>
 
