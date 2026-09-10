@@ -3,6 +3,7 @@ import { env } from "./env.ts";
 import { db, getSetting, now } from "./db.ts";
 import { CHARS_PER_LINE, claudePricing, DESC_STYLES, htmlBudgetFactor, TITLE_VOCAB } from "@shared/models.ts";
 import { isSelfContainedLayout } from "@shared/descLayouts.ts";
+import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
 import { cleanPropsRecord, cleanSpecs } from "@shared/specs.ts";
 import {
@@ -82,7 +83,7 @@ const SHOPIFY_DESC_RULE_STACKED = [
   '2) `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>` satırını `</style>`\'dan hemen sonra koy.',
   '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner> <div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 5-7 emoji\'li `<span>` rozet).',
   '4) `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 2-3 cümle (anahtarlar `<strong>`); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi (`<strong>` vurgulu); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Compatible Layouts</h3>`+`<div class="bm-layouts">` ürüne uyan boyut/tuş-sayısı `<span>` çipleri + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` 6-9 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>` (GERÇEK veriler); `<h3>Why PBT Over ABS</h3>` (veya ürüne uygun bir "neden bu / X vs Y" başlığı)+`<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 4-5 `<div class="bm-faq-item">` (ilki `is-open`) → `<button type="button" class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>CEVAP</p></div>`; `<div class="bm-note"><b>📦 In the box:</b> … <br><b>💡 Before you order:</b> … <br><b>🧼 Care:</b> …</div>`; `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc>🛒 Add to Cart</button></div>`; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
-  '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer, `.bm-lightbox` düğümünü + çalışan `<script>`\'i ekler.',
+  '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer, `.bm-lightbox` düğümünü + çalışan `<script>`\'i ekler. KENDİN `<script>` YAZMA — yazsan bile SİLİNİR; etkileşim SADECE `.bm*` sınıfları ve `data-bm-*` attribute\'ları ile işaretlenir.',
   "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz. Yukarıdaki UZUNLUK HEDEFİNE uy (bu hedef `<style>` + CSS + şablon + metin dahil TÜM HTML'i sayar; görsel/detay çoksa FAQ/spec/highlight/rozet sayısını artırıp hedefe yaklaş); dolgu/tekrar YOK.",
 ].join(" ");
 
@@ -671,21 +672,31 @@ export async function generateListing(
     .map((f) => f.key)
     .filter((k) => !(isShopify && k === "seo_description"));
 
-  // per-field example budget (chars) — tags get more room; the description
-  // example is passed through in FULL (operator: never shorten it).
+  // per-field example budget (chars) — tags get more room; the Shopify
+  // description reference is a single compact self-contained block (~19–25k), so
+  // 40k is a safety backstop, not a real trim.
   const EX_CAP: Partial<Record<GeneratedField["key"], number>> = {
     title: 2500,
     title_alt: 2500,
-    description: Number.MAX_SAFE_INTEGER,
+    description: 40000,
     tags: 16000,
+  };
+
+  // The Shopify description reference: the operator's own text wins; else the
+  // compact `.bm` (stacked) or `.pd-*` (other) block — NOT the big 5-example
+  // file, which was ~75k tokens per call (a real cause of slow generation).
+  const descExample = (f: { key: GeneratedField["key"]; examples?: string }): string => {
+    if (f.examples?.trim()) return f.examples.trim();
+    if (isShopify && f.key === "description")
+      return isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE;
+    return readExample(input.channel, f.key);
   };
 
   const fieldSpec = input.fields
     .filter((f) => wantedKeys.includes(f.key))
     .map((f) => {
       const parts = [`- key: ${f.key} (${FIELD_LABEL[f.key]})`];
-      // operator's own examples win; otherwise the baked reference file
-      const src = f.examples?.trim() || readExample(input.channel, f.key);
+      const src = descExample(f);
       const ex = src.slice(0, EX_CAP[f.key] ?? 4200);
       if (ex) parts.push(`  örnekler (biçim/ton için — İÇERİĞİ kopyalama, ÜRÜNE göre yeniden yaz):\n${ex}`);
       if (f.rules?.trim()) parts.push(`  kurallar: ${f.rules.trim()}`);
@@ -830,10 +841,10 @@ export async function generateListing(
           : "",
         "",
         "ÖRNEK (biçim / iskelet için — İÇERİĞİ KOPYALAMA, bu ürüne göre yeniden yaz):",
-        (input.fields.find((f) => f.key === "description")?.examples?.trim() || readExample("shopify", "description")).slice(
-          0,
-          EX_CAP.description ?? 200000,
-        ),
+        (
+          input.fields.find((f) => f.key === "description")?.examples?.trim() ||
+          (isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE)
+        ).slice(0, EX_CAP.description ?? 40000),
         "",
         "KAYNAK ÜRÜN VERİSİ:",
         `Başlık (Çince): ${product.title}`,

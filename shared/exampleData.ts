@@ -500,6 +500,353 @@ export const STACKED_DESC_EXAMPLE = `<style>
 })();
 </script>`;
 
+/**
+ * Reference example for the "Diğer HTML düzenler" Shopify description — a
+ * bespoke, self-contained styled block (own `.pd-<prefix>` class family +
+ * `--pd-accent`). The model MIMICS this structure but re-themes it per product
+ * (palette, prefix, emojis, section names, copy). Contract it MUST keep: empty
+ * `<div class="pd-media"></div>` slots (ONE image each, the renderer fills them,
+ * arranged in grids / a wide cinematic / variant cards — never stacked, never a
+ * lone full 1:1), the `pd-faq-item`/`pd-faq-q`/`pd-faq-a` hooks (+ `pd-open` on
+ * the first), `data-pd-goto-atc` on the CTA button, NO `<script>` (the system
+ * injects it), and the CTA is the LAST element. Sent by the Delivery editor as
+ * the default `examples` whenever a non-self-contained layout is picked.
+ */
+export const OTHER_DESC_EXAMPLE = `<style>
+/* ===== Diger HTML duzenler reference — a bespoke, self-contained Shopify
+   product description. Re-theme per product: your own class prefix, palette,
+   emojis, section names and copy. Keep the structure and the hook classes
+   exactly as they appear below. ===== */
+.pd-ck{
+  --pd-accent:#d9799b;            /* product's dominant colour — also drives the CTA glow */
+  --pd-ink:#4a3550; --pd-soft:#8a7590; --pd-line:rgba(217,121,155,.20);
+  --pd-line2:rgba(217,121,155,.34); --pd-cream:#fff5f9; --pd-cream2:#ffeef5;
+  --pd-paper:#fffafc; --pd-r:16px;
+  font-family:"Trebuchet MS",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,
+    "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  color:var(--pd-ink); line-height:1.62; text-align:left; overflow-wrap:break-word;
+  width:100%; max-width:1180px; margin:0 auto; padding:0;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+.pd-ck *{box-sizing:border-box; min-width:0; max-width:100%}
+.pd-ck p{margin:0 0 12px}
+.pd-ck img{display:block; width:100%; height:auto; border:0}
+.pd-ck div,.pd-ck span,.pd-ck ul,.pd-ck li,.pd-ck p,.pd-ck h2,.pd-ck h3,.pd-ck h4,.pd-ck button,.pd-ck table{float:none !important}
+.pd-ck button{font:inherit; cursor:pointer}
+@media (prefers-reduced-motion:reduce){
+  .pd-ck *{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+
+/* --- section rhythm --- */
+.pd-ck__section{margin:0 0 30px}
+.pd-ck__head{text-align:center; margin:0 0 18px}
+.pd-ck__kicker{
+  display:inline-block; font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--pd-accent); background:#fff; border:1px solid var(--pd-line);
+  padding:5px 12px; border-radius:99px; margin-bottom:10px;
+}
+.pd-ck__h2{margin:0 0 6px; font-size:22px; line-height:1.25; color:var(--pd-ink); font-weight:800}
+.pd-ck__lead{margin:0 auto; max-width:640px; font-size:14px; color:var(--pd-soft)}
+.pd-ck__rule{width:44px; height:3px; border-radius:99px; background:var(--pd-accent); margin:12px auto 0; opacity:.5}
+
+/* --- top strip --- */
+.pd-ck__strip{
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+  padding:12px 14px; margin:0 0 22px; border:1px solid var(--pd-line);
+  border-radius:var(--pd-r); background:linear-gradient(135deg,var(--pd-cream),var(--pd-paper));
+}
+.pd-ck__strip span{
+  font-size:12px; font-weight:700; color:var(--pd-ink); background:#fff;
+  border:1px solid var(--pd-line); padding:5px 11px; border-radius:99px; white-space:nowrap;
+}
+
+/* --- hero --- */
+.pd-ck__hero{
+  position:relative; overflow:hidden; text-align:center; padding:38px 22px 30px; margin:0 0 26px;
+  border:1px solid var(--pd-line); border-radius:var(--pd-r);
+  background:linear-gradient(165deg,var(--pd-cream2) 0%,var(--pd-cream) 55%,var(--pd-paper) 100%);
+}
+.pd-ck__hero h1{margin:0 0 10px; font-size:28px; line-height:1.22; color:var(--pd-ink); font-weight:800}
+.pd-ck__hero .pd-ck__sub{margin:0 auto 16px; max-width:560px; font-size:14.5px; color:var(--pd-soft)}
+.pd-ck__badges{display:flex; flex-wrap:wrap; gap:8px; justify-content:center}
+.pd-ck__badges span{
+  font-size:12.5px; color:var(--pd-ink); background:#fff; border:1px solid var(--pd-line);
+  padding:6px 12px; border-radius:99px; white-space:nowrap;
+}
+
+/* --- prose --- */
+.pd-ck__prose{max-width:760px; margin:0 auto 18px; font-size:14.5px; color:#5c4763}
+.pd-ck__prose strong{color:var(--pd-ink)}
+
+/* --- image layouts (each .pd-media is ONE photo, filled by the system) --- */
+.pd-ck__grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 0 12px}
+.pd-ck__grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:0 0 12px}
+.pd-ck__grid2 .pd-media,.pd-ck__grid3 .pd-media{border-radius:12px; overflow:hidden; border:1px solid var(--pd-line); background:var(--pd-cream)}
+.pd-media--wide{border-radius:var(--pd-r); overflow:hidden; border:1px solid var(--pd-line); background:var(--pd-cream); margin:0 0 12px}
+.pd-media--wide img{aspect-ratio:16/7; object-fit:cover; object-position:center}
+
+/* --- features --- */
+.pd-ck__features{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.pd-ck__feature{
+  border:1px solid var(--pd-line); border-radius:14px; padding:16px 16px 14px; background:#fff;
+}
+.pd-ck__feature-ic{
+  width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  font-size:18px; background:var(--pd-cream2); margin-bottom:8px;
+}
+.pd-ck__feature h3{margin:0 0 4px; font-size:14.5px; color:var(--pd-ink); font-weight:700}
+.pd-ck__feature p{margin:0; font-size:13px; color:var(--pd-soft); line-height:1.5}
+
+/* --- spotlight --- */
+.pd-ck__spotlight{
+  border:1px solid var(--pd-line); border-radius:var(--pd-r); padding:24px 22px;
+  background:linear-gradient(135deg,var(--pd-cream),var(--pd-paper));
+}
+.pd-ck__spotlight h2{margin:0 0 8px; font-size:19px; color:var(--pd-ink); font-weight:800}
+.pd-ck__spotlight p{margin:0 0 14px; font-size:13.6px; color:#5c4763; line-height:1.6}
+.pd-ck__mini{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+.pd-ck__mini div{
+  border:1px solid var(--pd-line); border-radius:10px; padding:10px; background:#fff; text-align:center;
+}
+.pd-ck__mini b{display:block; font-size:12.5px; color:var(--pd-ink)}
+.pd-ck__mini span{display:block; font-size:11.5px; color:var(--pd-soft); margin-top:2px}
+
+/* --- variant cards (each carries its own .pd-media) --- */
+.pd-ck__variants{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.pd-ck__variant{border:1px solid var(--pd-line); border-radius:14px; overflow:hidden; background:#fff}
+.pd-ck__variant .pd-media{background:var(--pd-cream)}
+.pd-ck__variant-body{padding:14px 16px 16px}
+.pd-ck__variant-tag{
+  display:inline-block; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--pd-accent); background:var(--pd-cream2); border:1px solid var(--pd-line);
+  padding:3px 9px; border-radius:99px; margin-bottom:6px;
+}
+.pd-ck__variant h3{margin:0 0 4px; font-size:14.5px; color:var(--pd-ink); font-weight:700}
+.pd-ck__variant p{margin:0; font-size:12.8px; color:var(--pd-soft); line-height:1.5}
+
+/* --- specs table --- */
+.pd-ck__table-wrap{border:1px solid var(--pd-line); border-radius:var(--pd-r); overflow:hidden}
+.pd-ck__table{width:100%; border-collapse:collapse; font-size:13.4px}
+.pd-ck__table th,.pd-ck__table td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--pd-line); vertical-align:top}
+.pd-ck__table tr:last-child th,.pd-ck__table tr:last-child td{border-bottom:0}
+.pd-ck__table th{width:38%; color:var(--pd-soft); font-weight:600; background:var(--pd-cream)}
+.pd-ck__table td{color:var(--pd-ink); font-weight:600}
+.pd-ck__notice{
+  margin:12px 0 0; padding:12px 14px; border-radius:12px; font-size:12.8px; line-height:1.5;
+  color:#8a2b2b; background:#fdeaea; border:1px solid rgba(200,60,60,.25);
+}
+.pd-ck__notice b{color:#8a2b2b}
+
+/* --- universal compatibility list --- */
+.pd-ck__compat{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0}
+.pd-ck__compat span{
+  display:flex; align-items:center; gap:8px; font-size:12.8px; font-weight:600; color:var(--pd-ink);
+  border:1px solid var(--pd-line); border-radius:10px; padding:9px 12px; background:#fff;
+}
+.pd-ck__tip{
+  margin:12px 0 0; padding:11px 13px; border-radius:12px; font-size:12.6px; line-height:1.5;
+  color:#5c4763; background:var(--pd-cream2); border:1px solid var(--pd-line);
+}
+.pd-ck__tip b{color:var(--pd-ink)}
+
+/* --- in the box --- */
+.pd-ck__box{
+  border:1px dashed var(--pd-line2); border-radius:14px; padding:16px 18px; background:var(--pd-paper);
+  font-size:13.2px; color:#5c4763; line-height:1.6;
+}
+.pd-ck__box b{color:var(--pd-ink)}
+
+/* --- FAQ (JS-free; the system toggles .pd-open) --- */
+.pd-ck__faq{border:1px solid var(--pd-line); border-radius:14px; overflow:hidden}
+.pd-faq-item{border-bottom:1px solid var(--pd-line)}
+.pd-faq-item:last-child{border-bottom:0}
+.pd-faq-q{
+  width:100%; display:flex !important; align-items:center; justify-content:space-between; gap:12px;
+  padding:13px 15px; background:#fff; border:0; text-align:left;
+  font-size:13.6px; font-weight:700; color:var(--pd-ink);
+}
+.pd-faq-q::after{content:"+"; flex:0 0 auto; font-size:17px; font-weight:400; color:var(--pd-accent); transition:transform .3s ease}
+.pd-faq-item.pd-open .pd-faq-q::after{transform:rotate(45deg)}
+.pd-faq-a{max-height:0; overflow:hidden; background:var(--pd-paper); transition:max-height .45s cubic-bezier(.4,0,.2,1)}
+.pd-faq-a p{padding:0 15px 14px; margin:0; font-size:13px; color:var(--pd-soft); line-height:1.6}
+.pd-faq-item.pd-open .pd-faq-a{max-height:640px}
+
+/* --- CTA (must be LAST; the system smooth-scrolls to the store's Add to Cart + glows it in --pd-accent) --- */
+.pd-ck__cta{
+  margin-top:8px; padding:22px; border-radius:var(--pd-r); text-align:center;
+  background:linear-gradient(135deg,var(--pd-accent),color-mix(in srgb,var(--pd-accent) 60%,#fff));
+}
+.pd-ck__cta p{color:#fff; font-size:13px; margin:0 0 12px}
+.pd-ck__cta button{
+  display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--pd-accent);
+  font-weight:800; font-size:14px; padding:12px 24px; border-radius:99px; border:0;
+}
+
+@media (max-width:720px){
+  .pd-ck__features,.pd-ck__variants,.pd-ck__compat{grid-template-columns:1fr}
+  .pd-ck__grid3{grid-template-columns:1fr 1fr}
+  .pd-ck__mini{grid-template-columns:1fr 1fr}
+  .pd-ck__hero h1{font-size:23px}
+  .pd-ck__table th{width:44%}
+}
+</style>
+<div class="pd-ck" lang="en">
+
+<div class="pd-ck__strip">
+<span>🐰 Chiikawa Usagi</span><span>🧵 PBT Dye-Sub</span><span>🎹 Cherry &amp; KOA Profile</span><span>🔢 140 Keys</span><span>🖨️ Side-Print Option</span><span>⌨️ MX Compatible</span>
+</div>
+
+<section class="pd-ck__section pd-ck__hero">
+<h1>🐰 Chiikawa Usagi Cartoon Keycap Set 🍯</h1>
+<p class="pd-ck__sub">A 140-piece PBT set built around Chiikawa's rabbit-loving best friend — dye-sublimated art that never fades, on a soft Cherry or KOA sculpt.</p>
+<div class="pd-ck__badges">
+<span>🐰 Usagi &amp; friends</span><span>🧵 Thick PBT</span><span>🖨️ Dye-sublimation</span><span>🎹 Cherry / KOA</span><span>🍯 Kawaii pastel</span>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__prose">
+<p>Bring a slice of pure kawaii to your desk. Every legend on this set is <strong>dye-sublimated</strong> straight into thick, durable PBT, so the tiny cartoon faces and pastel doodles never peel, fade, or wear shiny — even after years of daily typing.</p>
+<p>Full 140-key coverage dresses most 60% to full-size boards, function row and extras included, with a side-print variant that keeps the keycap top clean while the art peeks through as you type.</p>
+</div>
+<div class="pd-ck__grid2">
+<div class="pd-media"></div>
+<div class="pd-media"></div>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__head">
+<div class="pd-ck__kicker">Why This Set</div>
+<h2 class="pd-ck__h2">Key Features</h2>
+<div class="pd-ck__rule"></div>
+</div>
+<div class="pd-ck__features">
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🐰</div><h3>Chiikawa Usagi artwork</h3><p>Usagi and the whole cast, spread across the board with soft pastel detailing.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🧵</div><h3>Thick PBT plastic</h3><p>Resists shine and grease far longer than standard ABS keycaps.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🖨️</div><h3>Dye-sublimated legends</h3><p>Ink is fused into the plastic itself, not printed on top — it cannot rub off.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🎹</div><h3>Cherry &amp; KOA profiles</h3><p>Pick the sculpted feel that matches your typing style — low Cherry or taller KOA.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🖋️</div><h3>Side-print variant</h3><p>Legends sit on the front face, keeping the top surface clean and minimal.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🍯</div><h3>140-key coverage</h3><p>Enough caps for 60%, 65%, 75%, TKL and full-size layouts, function row included.</p></article>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__grid3">
+<div class="pd-media"></div>
+<div class="pd-media"></div>
+<div class="pd-media"></div>
+</div>
+</section>
+
+<section class="pd-ck__section pd-ck__spotlight">
+<h2>PBT &amp; Dye-Sub. Zero Fade.</h2>
+<p>Ordinary keycaps wear down fast — legends fade, surfaces go glossy. This set is different. Dye-sublimation bonds the artwork into dense PBT at a molecular level, so it ages gracefully and keeps its matte, textured feel through years of daily use.</p>
+<div class="pd-ck__mini">
+<div><b>Material</b><span>Premium PBT</span></div>
+<div><b>Printing</b><span>Dye-sublimation</span></div>
+<div><b>Finish</b><span>Textured matte</span></div>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-media pd-media--wide"></div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__head">
+<div class="pd-ck__kicker">Choose Your Set</div>
+<h2 class="pd-ck__h2">Two Ways to Build It</h2>
+<p class="pd-ck__lead">The same 140-key set, in your preferred profile and print style.</p>
+<div class="pd-ck__rule"></div>
+</div>
+<div class="pd-ck__variants">
+<article class="pd-ck__variant">
+<div class="pd-media"></div>
+<div class="pd-ck__variant-body">
+<span class="pd-ck__variant-tag">Top Print</span>
+<h3>Cherry Profile · Top Print</h3>
+<p>Low, gently sculpted keycaps with the artwork on top — the classic look and a relaxed typing angle.</p>
+</div>
+</article>
+<article class="pd-ck__variant">
+<div class="pd-media"></div>
+<div class="pd-ck__variant-body">
+<span class="pd-ck__variant-tag">Side Print</span>
+<h3>KOA Profile · Side Print</h3>
+<p>A taller sculpt with legends on the front face — clean tops, with the character art peeking through as you type.</p>
+</div>
+</article>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__head">
+<div class="pd-ck__kicker">Full Specs</div>
+<h2 class="pd-ck__h2">Technical Specifications</h2>
+<div class="pd-ck__rule"></div>
+</div>
+<div class="pd-ck__table-wrap">
+<table class="pd-ck__table"><tbody>
+<tr><th>Profile Options</th><td>Cherry Profile / KOA Profile</td></tr>
+<tr><th>Key Count</th><td>140 keys (full set)</td></tr>
+<tr><th>Layout Support</th><td>ANSI &amp; ISO compatible</td></tr>
+<tr><th>Keyboard Sizes</th><td>60% / 65% / 75% / 80% TKL / 96% / Full-Size / Alice &amp; more</td></tr>
+<tr><th>Switch Type</th><td>MX-Style Cross Mechanical Switches Only</td></tr>
+<tr><th>Material</th><td>Premium PBT</td></tr>
+<tr><th>Printing Method</th><td>Dye-Sublimation (permanent, fade-resistant)</td></tr>
+<tr><th>Surface Finish</th><td>Textured Matte (anti-shine)</td></tr>
+<tr><th>Legend Placement</th><td>Top print / Side print (by variant)</td></tr>
+</tbody></table>
+</div>
+<div class="pd-ck__notice"><b>⚠️ Compatibility Notice:</b> This keycap set works only with MX-style mechanical switches. It is not compatible with membrane keyboards, laptop scissor switches, or low-profile mechanical keyboards. Check that your keyboard uses standard MX switches before ordering.</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__head">
+<div class="pd-ck__kicker">Fits Your Board</div>
+<h2 class="pd-ck__h2">Universal Compatibility with Most Mechanical Keyboards</h2>
+<div class="pd-ck__rule"></div>
+</div>
+<div class="pd-ck__compat">
+<span>⚓ 60% Compact Layouts</span>
+<span>⚓ 65% Compact with Arrows</span>
+<span>⚓ 75% Compact Full Function</span>
+<span>⚓ 80% TKL (Tenkeyless)</span>
+<span>⚓ 96% / 100% Full-Size</span>
+<span>⚓ Alice Ergonomic Layout</span>
+</div>
+<div class="pd-ck__tip"><b>💡 Tip:</b> Compatible with ANSI &amp; ISO layouts. Not sure your keyboard is compatible? Send us a photo or the model number and our team will verify it before you order.</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__box"><b>📦 In the box:</b> 140 Chiikawa Usagi keycaps in your chosen profile and print variant. Keyboard, switches and keycap puller are not included.<br><b>💡 Before you order:</b> confirm your layout, bottom-row and spacebar sizes, and your desired profile / print variant.<br><b>🧼 Care:</b> hand-wash gently with warm water and mild soap, rinse and air-dry fully before reinstalling. Avoid hot water and dishwashers.</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__head">
+<div class="pd-ck__kicker">Good to Know</div>
+<h2 class="pd-ck__h2">Compatibility &amp; Care</h2>
+<div class="pd-ck__rule"></div>
+</div>
+<div class="pd-ck__faq">
+<div class="pd-faq-item pd-open"><button type="button" class="pd-faq-q">Will this fit my keyboard?</button><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. Compare your bottom row and spacebar sizes against the compatibility photos before ordering.</p></div></div>
+<div class="pd-faq-item"><button type="button" class="pd-faq-q">What is the difference between Cherry and KOA profile?</button><div class="pd-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed typing angle. KOA Profile sits slightly taller with its own row sculpt. Choose the one that matches your preferred feel — the rows are not interchangeable.</p></div></div>
+<div class="pd-faq-item"><button type="button" class="pd-faq-q">What does Side Print mean?</button><div class="pd-faq-a"><p>Side Print places the artwork and legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></div>
+<div class="pd-faq-item"><button type="button" class="pd-faq-q">How do I clean the keycaps?</button><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></div>
+<div class="pd-faq-item"><button type="button" class="pd-faq-q">Are the keycaps included with a keyboard?</button><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></div>
+</div>
+</section>
+
+<section class="pd-ck__section">
+<div class="pd-ck__cta">
+<p>Ready to make your desk irresistibly cute? ✨</p>
+<button type="button" data-pd-goto-atc>🛒 Add to Cart</button>
+</div>
+</section>
+
+</div>`;
+
 /* ---------- default field examples shown in the Delivery editor ---------- */
 
 const ETSY_TAG_EXAMPLE = ETSY_TAG_VOCAB.slice(0, 39).join(", ");

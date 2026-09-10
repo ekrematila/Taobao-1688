@@ -307,10 +307,12 @@ const PD_STYLE_FALLBACK =
   `</style>`;
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
- *  the runtime `<script>` even if the model left them out. */
+ *  the runtime `<script>`. We NEVER trust a model-authored `<script>` here either
+ *  (same reason as `ensurePdScaffold`): strip whatever the model wrote and inject
+ *  the tested canonical `BM_SCRIPT`. */
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
-  let out = html;
+  let out = html.replace(/<script[\s\S]*?<\/script>/gi, "");
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   if (!/\.bm-lightbox\{/i.test(out)) {
     out = /<\/style>/i.test(out) ? out.replace(/<\/style>/i, `</style>${BM_STYLE_EXTRA}`) : BM_STYLE_EXTRA + out;
@@ -324,10 +326,7 @@ function ensureBmScaffold(html: string): string {
     if (last >= 0) out = out.slice(0, last) + BM_LIGHTBOX + out.slice(last);
     else out += BM_LIGHTBOX;
   }
-  if (!/data-bm-goto-atc[\s\S]*<\/script>|<script>[\s\S]*data-bm-zoom/i.test(out)) {
-    out += BM_SCRIPT;
-  }
-  return out;
+  return out + BM_SCRIPT;
 }
 
 /**

@@ -686,6 +686,7 @@ export async function translateImage(opts: {
 
   const prompt = [
     `This is a SURGICAL TEXT-LAYER edit of a finished product image, NOT a redesign. You will return the EXACT same image with only the Chinese overlay text swapped for its ${targetLanguage} translation (and seller watermarks/off-topic marks erased). Treat every non-text pixel as locked.`,
+    `METHOD — treat this as INPAINTING / a masked local edit, never a full re-generation: keep the source photo's pixels and only repaint the small rectangles that hold overlay text or a watermark. The product, its exact shape, its exact colours, the exact photograph and the exact background must come back visually identical to the input — a viewer flipping between the two images should see ONLY the text change language. If your tool re-generates the whole frame, constrain it hard to the source.`,
     `IMAGE MODEL — prefer the "${model}" image model for this render if you have it; if not, use your best available image-editing model. Either way you MUST still return the edited image.`,
     "",
     "ABSOLUTE RULES — breaking any one of these fails the job:",

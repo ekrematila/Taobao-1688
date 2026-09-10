@@ -10,7 +10,7 @@ import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
 import { CLAUDE_MODELS, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS } from "@shared/models.ts";
-import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE } from "@shared/exampleData.ts";
+import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
 import { cleanSpecs } from "@shared/specs.ts";
@@ -263,9 +263,12 @@ export default function DeliveryStudio({
   const keys = FIELDS_BY_CHANNEL[channel];
   const examplesQ = useQuery({ queryKey: ["examples"], queryFn: api.examples, staleTime: 60 * 60 * 1000 });
   const defaultExample = (k: string): string => {
-    // "Alt alta görsel" description → the .bm sticky-card reference is the default example
-    if (k === "description" && channel === "shopify" && isSelfContainedLayout(layout)) {
-      return (examplesQ.data as any)?.shopify?.descriptionStacked || STACKED_DESC_EXAMPLE;
+    if (k === "description" && channel === "shopify") {
+      // "Alt alta görsel" → the .bm sticky-card reference; "Diğer HTML düzenler"
+      // → the compact bespoke .pd-* reference (both re-themed per product).
+      return isSelfContainedLayout(layout)
+        ? (examplesQ.data as any)?.shopify?.descriptionStacked || STACKED_DESC_EXAMPLE
+        : (examplesQ.data as any)?.shopify?.descriptionOther || OTHER_DESC_EXAMPLE;
     }
     return (examplesQ.data as any)?.[channel]?.[k] ?? (DEFAULT_FIELD_EXAMPLES as any)[channel]?.[k] ?? "";
   };
