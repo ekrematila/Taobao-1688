@@ -359,6 +359,11 @@ pre.json {
 .seg-b:hover { background: var(--panel-2); color: var(--ink); }
 .seg-b.on { background: var(--accent-soft); color: var(--accent); }
 
+/* compact "which AI, how smart" row — model / effort / thinking / manus-version */
+.ai-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ai-picker select { font-size: 11px; padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
+.ai-picker-l { font-size: 10.5px; color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; }
+
 /* per-image description crop popover */
 .crop-pop-scrim { position: fixed; inset: 0; z-index: 59; }
 .crop-pop {

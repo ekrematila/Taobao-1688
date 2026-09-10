@@ -200,9 +200,19 @@ export interface GenerateListingInput {
   /** cost/length budget — scales the AUTO-sized description target + token budget.
    *  "full" (classic) · "lean" (-25% tokens) · "min" (-50% tokens) */
   htmlBudget?: "full" | "lean" | "min";
+  /** override the global effort / thinking for THIS generation */
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
+  thinking?: "adaptive" | "off";
   /** optional: a DIFFERENT Claude model for the HTML description only (2nd pass).
    *  Empty / same as `model` → single pass, no extra call. */
   descModel?: string;
+  /** who writes the HTML description: "claude" (default) or "manus" (agent task). */
+  descProvider?: "claude" | "manus";
+  /** Manus agent profile when descProvider === "manus" */
+  descManusProfile?: string;
+  /** effort / thinking for the description 2nd pass (Claude) */
+  descEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+  descThinking?: "adaptive" | "off";
   /** description tone/style key from DESC_STYLES */
   descStyle?: string;
   /** the step-2 AI advice text, applied when the operator opted in */

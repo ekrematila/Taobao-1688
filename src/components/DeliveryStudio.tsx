@@ -9,7 +9,7 @@ import ListingPreview from "./ListingPreview";
 import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
-import { CLAUDE_MODELS, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS } from "@shared/models.ts";
+import { CLAUDE_MODELS, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, MANUS_PROFILES } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
@@ -98,6 +98,12 @@ export default function DeliveryStudio({
   const [htmlBand, setHtmlBand] = useState("400-500");
   const [htmlUnit, setHtmlUnit] = useState<"line" | "char">("line");
   const [descModel, setDescModel] = useState(""); // "" = same as the main model
+  const [genEffort, setGenEffort] = useState<string>(""); // "" = app default
+  const [genThinking, setGenThinking] = useState<string>("");
+  const [descProvider, setDescProvider] = useState<"claude" | "manus">("claude");
+  const [descManusProfile, setDescManusProfile] = useState("manus-1.6");
+  const [descEffort, setDescEffort] = useState<string>("");
+  const [descThinking, setDescThinking] = useState<string>("");
   const [descStyle, setDescStyle] = useState("product");
   // shipping & customs (persisted on draft.product so exports/push can read them).
   // "Type" is not its own field — it mirrors the Ürün türü (productType) value.
@@ -180,6 +186,12 @@ export default function DeliveryStudio({
       setHtmlBand(dc.htmlBand ?? "400-500");
       setHtmlUnit(dc.htmlUnit === "char" ? "char" : "line");
       setDescModel(typeof dc.descModel === "string" ? dc.descModel : "");
+      setGenEffort(typeof dc.genEffort === "string" ? dc.genEffort : "");
+      setGenThinking(typeof dc.genThinking === "string" ? dc.genThinking : "");
+      setDescProvider(dc.descProvider === "manus" ? "manus" : "claude");
+      setDescManusProfile(typeof dc.descManusProfile === "string" ? dc.descManusProfile : "manus-1.6");
+      setDescEffort(typeof dc.descEffort === "string" ? dc.descEffort : "");
+      setDescThinking(typeof dc.descThinking === "string" ? dc.descThinking : "");
       setDescStyle(dc.descStyle ?? "product");
       setPerVariantCustoms(!!dc.perVariantCustoms);
     }
@@ -223,13 +235,13 @@ export default function DeliveryStudio({
         .patchDraft(draft.id, {
           imageState: {
             ...((draft.imageState as any) ?? {}),
-            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, descStyle, perVariantCustoms },
+            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, perVariantCustoms },
           },
         })
         .catch(() => {});
     }, 600);
     return () => clearTimeout(id);
-  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, descStyle, perVariantCustoms]);
+  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, perVariantCustoms]);
 
   // persist shipping & customs onto draft.product (debounced, silent, fresh-merged)
   useEffect(() => {
@@ -285,6 +297,8 @@ export default function DeliveryStudio({
         globalRules,
         productNote: productNote.trim() || undefined,
         model,
+        effort: (genEffort || undefined) as any,
+        thinking: (genThinking || undefined) as any,
         mode,
         brand: channel === "etsy" ? brand : undefined,
         // length is AUTO-sized from the product; htmlBudget scales it + the token cost
@@ -293,8 +307,13 @@ export default function DeliveryStudio({
         // "Diğer HTML düzenler" and "Alt alta görsel".
         htmlLengthBand: channel === "shopify" ? htmlBand : undefined,
         htmlLengthUnit: channel === "shopify" ? htmlUnit : undefined,
-        // optional 2nd-pass model just for the HTML description
-        descModel: channel === "shopify" && descModel && descModel !== model ? descModel : undefined,
+        // HTML description writer: Claude (optional different model + effort/thinking) or Manus
+        descProvider: channel === "shopify" && descProvider === "manus" ? "manus" : undefined,
+        descManusProfile: channel === "shopify" && descProvider === "manus" ? descManusProfile : undefined,
+        descModel:
+          channel === "shopify" && descProvider === "claude" && descModel && descModel !== model ? descModel : undefined,
+        descEffort: ((channel === "shopify" && descProvider === "claude" && descEffort) || undefined) as any,
+        descThinking: ((channel === "shopify" && descProvider === "claude" && descThinking) || undefined) as any,
         descStyle,
         advice: applyAdvice && adviceText ? adviceText : undefined,
         categoryResearch: applyResearch && research ? research : undefined,
@@ -601,6 +620,24 @@ export default function DeliveryStudio({
                 </option>
               ))}
             </select>
+            <div className="ai-picker" style={{ marginTop: 6 }}>
+              <select value={genEffort} onChange={(e) => setGenEffort(e.target.value)} title={t("ai.effort")}>
+                <option value="">{t("ai.effortDefault")}</option>
+                {EFFORT_LEVELS.map((e) => (
+                  <option key={e} value={e}>
+                    {EFFORT_LABEL[e]}
+                  </option>
+                ))}
+              </select>
+              <select value={genThinking} onChange={(e) => setGenThinking(e.target.value)} title={t("ai.thinking")}>
+                <option value="">{t("ai.thinkingDefault")}</option>
+                {THINKING_MODES.map((tm) => (
+                  <option key={tm} value={tm}>
+                    {THINKING_LABEL[tm]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </label>
 
           {/* Step-2 advice gate (mirrors the AdvicePanel checkbox) */}
@@ -930,14 +967,50 @@ export default function DeliveryStudio({
           {channel === "shopify" && (
             <label className="field">
               {t("delivery.descModel")}
-              <select value={descModel} onChange={(e) => setDescModel(e.target.value)}>
-                <option value="">{t("delivery.descModelSame")}</option>
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+              <span className="seg tiny" style={{ marginBottom: 4 }}>
+                <button type="button" className={"seg-b" + (descProvider === "claude" ? " on" : "")} onClick={() => setDescProvider("claude")}>
+                  Claude
+                </button>
+                <button type="button" className={"seg-b" + (descProvider === "manus" ? " on" : "")} onClick={() => setDescProvider("manus")}>
+                  Manus
+                </button>
+              </span>
+              {descProvider === "claude" ? (
+                <div className="ai-picker">
+                  <select value={descModel} onChange={(e) => setDescModel(e.target.value)}>
+                    <option value="">{t("delivery.descModelSame")}</option>
+                    {CLAUDE_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id}
+                      </option>
+                    ))}
+                  </select>
+                  <select value={descEffort} onChange={(e) => setDescEffort(e.target.value)} title={t("ai.effort")}>
+                    <option value="">{t("ai.effortDefault")}</option>
+                    {EFFORT_LEVELS.map((e) => (
+                      <option key={e} value={e}>
+                        {EFFORT_LABEL[e]}
+                      </option>
+                    ))}
+                  </select>
+                  <select value={descThinking} onChange={(e) => setDescThinking(e.target.value)} title={t("ai.thinking")}>
+                    <option value="">{t("ai.thinkingDefault")}</option>
+                    {THINKING_MODES.map((tm) => (
+                      <option key={tm} value={tm}>
+                        {THINKING_LABEL[tm]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <select value={descManusProfile} onChange={(e) => setDescManusProfile(e.target.value)}>
+                  {MANUS_PROFILES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              )}
               <span className="tiny muted" style={{ marginTop: 3 }}>{t("delivery.descModelHint")}</span>
             </label>
           )}

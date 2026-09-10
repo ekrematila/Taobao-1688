@@ -41,6 +41,18 @@ export const EFFORT_LABEL: Record<Effort, string> = {
 /** Fast mode (2.5x output speed, premium price) — research preview, these models only. */
 export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8"];
 
+/** Claude "thinking" (adaptive extended reasoning) on/off. */
+export const THINKING_MODES = ["adaptive", "off"] as const;
+export type ThinkingMode = (typeof THINKING_MODES)[number];
+export const THINKING_LABEL: Record<ThinkingMode, string> = {
+  adaptive: "düşünme: açık (adaptive)",
+  off: "düşünme: kapalı",
+};
+
+/** Manus agent profile (version / capacity) for every Manus-backed action. */
+export const MANUS_PROFILES = ["manus-1.6-lite", "manus-1.6", "manus-1.6-max"] as const;
+export type ManusProfile = (typeof MANUS_PROFILES)[number];
+
 /* --------------------------- listing generation --------------------------- */
 
 /** Built-in "Ürün türü" presets; the operator can save more (Settings.productTypes). */

@@ -150,6 +150,41 @@ const oneLine = (s: string) => String(s || "").replace(/\r\n?|\n/g, " ").replace
 /** did the model emit its own COMPLETE styled block (needs a real `<style>`)? */
 const isPreStyled = (html: string) => /<style[\s>][\s\S]*?<\/style>/i.test(html);
 
+/**
+ * Repair a description value that a model mangled: a `{"fields":…}` / `{"description":…}`
+ * JSON wrapper leaking in as text, a double-escaped body (literal `\n` / `\"` / `\t`),
+ * a leading run of blank lines before the real markup, and any stray `<input>` /
+ * `<label for>` the layout doesn't own. Idempotent — safe to run on a clean value.
+ */
+export function cleanDescValue(v: string): string {
+  let s = String(v ?? "").trim();
+  if (!s) return s;
+  // 1) a JSON wrapper pasted in as text → pull the description string out
+  if (s[0] === "{" || s[0] === "[") {
+    const m = s.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (m) s = m[1];
+    else {
+      try {
+        const o = JSON.parse(s);
+        const d = o?.description ?? (Array.isArray(o?.fields) ? o.fields.find((f: any) => f?.key === "description")?.value : "");
+        if (typeof d === "string" && d) s = d;
+      } catch {
+        /* leave it */
+      }
+    }
+  }
+  // 2) double-escaped body: literal \n \t \r \" \\ → real chars (only if it clearly is one)
+  if (/\\n|\\"/.test(s) && !/\n/.test(s.slice(0, 400))) {
+    s = s.replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\\t/g, "  ").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+  // 3) drop a leading blank run before the first tag
+  s = s.replace(/^[\s﻿]+(?=<)/, "");
+  // 4) neutralise a stray form control the templates don't use as a real toggle
+  //    (a `.bm-toggle` / `.pd-*` checkbox is fine; a bare <input> is not)
+  s = s.replace(/<input(?![^>]*\bclass\s*=\s*["'][^"']*\b(?:bm-toggle|pd-[\w-]*toggle)\b)[^>]*>/gi, "");
+  return s.trim();
+}
+
 /** wrap bare text (no tags at all) into paragraphs so the body is NEVER plain text. */
 const ensureHtml = (s: string) => {
   const t = String(s || "").trim();
@@ -177,7 +212,7 @@ export function renderImportBody(
   meta?: DescMeta,
 ): string {
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
-  const base0 = (baseHtml || "").trim();
+  const base0 = cleanDescValue(baseHtml);
   if (isPreStyled(base0)) {
     return oneLine(`<div lang="en">${deTr(ensurePdScaffold(ensureBmScaffold(fillMediaSlots(base0, imgs))))}</div>`);
   }
@@ -446,7 +481,7 @@ function renderDescBody(
   imgsIn: DescImg[],
   meta?: DescMeta,
 ): string {
-  const base = baseHtml || "";
+  const base = cleanDescValue(baseHtml);
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
   // The model is asked to emit a COMPLETE styled block for EVERY Shopify layout
   // (the `.bm` sticky card for "Alt alta görsel", or a bespoke block in the

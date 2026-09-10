@@ -685,36 +685,28 @@ export async function translateImage(opts: {
   const model = await pickImageModel(sourceBytes);
 
   const prompt = [
-    `This is a SURGICAL TEXT-LAYER edit of a finished product image, NOT a redesign. You will return the EXACT same image with only the Chinese overlay text swapped for its ${targetLanguage} translation (and seller watermarks/off-topic marks erased). Treat every non-text pixel as locked.`,
-    `METHOD — treat this as INPAINTING / a masked local edit, never a full re-generation: keep the source photo's pixels and only repaint the small rectangles that hold overlay text or a watermark. The product, its exact shape, its exact colours, the exact photograph and the exact background must come back visually identical to the input — a viewer flipping between the two images should see ONLY the text change language. If your tool re-generates the whole frame, constrain it hard to the source.`,
-    `IMAGE MODEL — prefer the "${model}" image model for this render if you have it; if not, use your best available image-editing model. Either way you MUST still return the edited image.`,
+    `GOAL — return this exact product image as if a NATIVE ${targetLanguage} graphic designer had made it from the start. The ONLY thing that changes is the language of the overlay text (Chinese → ${targetLanguage}). Everything else — the product, the background, the photo, every colour and pixel that is not overlay text — is LOCKED and comes back visually identical.`,
+    `METHOD — this is an INPAINT / masked local edit, not a re-generation. Keep the source pixels; repaint ONLY the rectangles that contain overlay text or a watermark. A viewer flipping between input and output must see ONLY the text change language — nothing else.`,
+    `IMAGE MODEL — prefer "${model}" if available; otherwise your best image-editing model. You MUST return the edited image.`,
     "",
-    "ABSOLUTE RULES — breaking any one of these fails the job:",
-    "  • Do NOT move, resize, rotate, recolor, relight, restyle, redraw or 'improve' the product by even one pixel. It stays byte-for-byte where it is.",
-    "  • Do NOT redraw or restyle icons, illustrations, badges, banners, boxes, brackets, lines, arrows or any decorative element. Their shape, size, position and style are fixed.",
-    "  • Do NOT change the background, gradient, texture, colors, lighting, shadows, composition, layout, framing, canvas size or aspect ratio.",
-    "  • Do NOT re-crop, un-crop, re-center, zoom, pan or add/remove margin. If the source image is cropped or cut off at an edge, the output is cropped or cut off IDENTICALLY at the same edge, the same amount.",
-    "  • Do NOT re-flow, re-wrap or rearrange the layout of text blocks. Each block stays in its exact box.",
+    `#1 RULE — SAME STYLE, SAME VIBE. Whatever the Chinese text looks like, the ${targetLanguage} text must look the SAME. If the Chinese headline is a BOLD DISPLAY / condensed / heavy poster font, the ${targetLanguage} headline is ALSO bold display / condensed / heavy — never a thin default sans. If the Chinese is a soft rounded kawaii style, match that. If it is 3D / bevelled / neon / chrome / outlined / gradient / brush-script / pixel / hand-lettered — reproduce THAT treatment on the ${targetLanguage} text. Same font weight, same UPPER/lowercase, same italic, same fill colour or gradient, same outline / stroke / drop-shadow / glow / bevel, same letter-spacing, same alignment, same baseline, same position, same box. Reference: a Chinese "蓝莓牛奶" set in a bold condensed blue face becomes an equally bold condensed blue "BLUEBERRY MILK", NOT plain grey text. A flat, thin, default-font result is a FAILED job.`,
+    `#2 RULE — FULLY ERASE the original glyphs. No ghosting, no faint Chinese characters showing through behind the new text, no blur smear, no double-exposure. Rebuild whatever was behind the removed text so it looks untouched, THEN lay the ${targetLanguage} text on top cleanly.`,
+    "#3 RULE — the product's OWN printed characters (key legends like Tab/Shift/Enter, sculpted art, real manufacturer marks physically on the product) stay as they are — do not translate or touch them. Only OVERLAY text added on top of the photo is translated.",
     "",
-    "WHAT YOU MAY CHANGE — nothing else:",
-    "STEP 1 — Identify the niche" +
+    "STEPS:",
+    "1 — Identify the niche" +
       (productContext ? ` (seller context: ${productContext.slice(0, 400)})` : "") +
-      " — only so you pick the right terminology.",
-    "STEP 2 — Find every Chinese OVERLAY text block added on top of the photo (headlines, sub-headlines, callouts, spec labels, banner text, arrow captions, comparison captions, badge text).",
-    `STEP 3 — Translate that overlay text into ${targetLanguage} ONLY (never any other language) with correct niche terminology. Glossary you MUST honour: ${KEYCAP_GLOSSARY} Never translate these literally. Keep it tight and natural.`,
-    `STEP 4 — TYPOGRAPHIC RE-SETTING, not a plain-text paste. Replace each Chinese block IN PLACE so it looks like the ORIGINAL designer set that block in ${targetLanguage} from the start. Reproduce ALL of it: the same typeface CHARACTER (serif / geometric sans / rounded / condensed / handwritten-brush / display / pixel), the same weight, the same UPPER/lower case treatment, the same italic/oblique, the same letter-spacing and line-spacing, the same fill COLOR or gradient, the same outline/stroke, drop shadow, glow, bevel/3D, texture or knockout, the same alignment (left/center/right) and the same baseline. Match the original font SIZE. Only if the translation is physically too long for the exact original box, reduce the font size in small steps until it fits that SAME box — do not enlarge the box, do not move it, do not push other elements, do not re-wrap onto a different number of lines than the original unless the original box's width forces it. If the ORIGINAL text was itself clipped / cut off at an edge or box border, let the translation be clipped the SAME way in the SAME place — do not 'fix' it. ${targetLanguage} runs LONGER than Chinese: whenever the original text sat inside a decorative frame, bracket ("「」" / "【】" / "『』"), underline, pill, ribbon or box, the translation MUST stay INSIDE it — shrink the font and/or tighten letter-spacing until it fits; it must NEVER overflow, touch or collide with that frame. A flat, default-font, style-stripped result — or text spilling out of its frame — is a FAILED job.`,
-    "STEP 4b — REMOVE these overlaid marks (they are not the product), reconstructing exactly what was behind them so it looks untouched — no ghosting, blur patch or smear:",
-    "  • Seller / shop name text and shop-type tags (\"…店\", \"旗舰店\", \"专卖店\", \"官方\", \"授权店\", personal seller names like \"徐老师…\") and the seller's own logo / wordmark / avatar badge.",
-    "  • Watermarks: a single mark, a semi-transparent stamp, OR a repeating tiled pattern — sparse or dense, all of it.",
-    "  • Off-topic text: URLs, WeChat/QQ/phone numbers, social handles, marketplace names (Taobao/Tmall/1688/Pinduoduo), 'scan to buy' / QR codes, anti-copy notices.",
-    "  • KEEP the product's own real printed characters (Tab, Shift, key legends…), its genuine sculpted/printed design, and any manufacturer marking that is physically part of the product. Do NOT add a new brand.",
-    `STEP 5 — No Chinese characters may remain in any overlay/caption text. ${NO_CJK_DIRECTIVE}`,
-    "STEP 6 — In ALMOST every case you must RETURN THE EDITED IMAGE as a file attachment. Only if the image is genuinely free of BOTH Chinese overlay text AND any watermark/seller mark, reply with the single token NO_CHANGE_NEEDED ON ITS OWN as the very last line and attach nothing. If ANY Chinese overlay text is present you MUST translate it and return the image — never skip, and when unsure, translate. Do NOT write the token NO_CHANGE_NEEDED anywhere else in your reply.",
-    instruction ? `\nAdditional instruction from the operator (still obey the ABSOLUTE RULES above): ${instruction}` : "",
-    "\nRender at the EXACT same pixel dimensions and aspect ratio as the source — never resize, never pad, never crop differently." +
-      (imageSpec ? ` (Operator hint, apply only if it does not change framing: ${imageSpec}.)` : ""),
+      " so terminology is right.",
+    "2 — Find every Chinese OVERLAY block: headlines, sub-headlines, callouts, spec labels, banner text, arrow captions, comparison captions, badge text.",
+    `3 — Translate each into ${targetLanguage} ONLY, tight and natural, correct niche terms. Glossary you MUST honour: ${KEYCAP_GLOSSARY}`,
+    `4 — Re-set each block IN PLACE per RULE #1 above. Match the original font SIZE. If the ${targetLanguage} is physically longer than the box (it usually is), shrink the font and tighten tracking until it fits the SAME box — never enlarge/move the box, never push other elements, never spill outside a frame / bracket ("「」"/"【】") / underline / pill / ribbon it sat inside. If the original text was itself clipped at an edge, clip the translation the SAME way in the SAME place.`,
+    "5 — REMOVE (not translate) and cleanly reconstruct behind: seller / shop-name text and shop-type tags (\"…店\", \"旗舰店\", \"专卖店\", \"官方\", personal names like \"徐老师…\") and the seller's logo / wordmark / avatar badge; watermarks (single, stamp, or tiled — all of it); off-topic text (URLs, WeChat/QQ/phone, marketplace names Taobao/Tmall/1688/Pinduoduo, 'scan to buy', QR codes, anti-copy notices).",
+    `6 — ${NO_CJK_DIRECTIVE} No Chinese may remain anywhere in the overlay/caption text.`,
+    "7 — Return the edited image as a file attachment. Reply with the single token NO_CHANGE_NEEDED (its own final line, nothing attached) ONLY if the image has NO Chinese overlay AND NO watermark/seller mark. If there is ANY Chinese overlay text you MUST translate and return the image. Do not write that token anywhere else.",
+    instruction ? `\nOperator instruction (still obey the rules above): ${instruction}` : "",
+    `\nOUTPUT SIZE — keep the SAME aspect ratio; scale so the SHORTEST side is 800–1000 px; export at MAXIMUM quality (PNG or high-quality JPEG). Do not pad, do not crop differently, do not add margin.` +
+      (imageSpec ? ` (${imageSpec})` : ""),
     `\n${spd.hint}`,
-    "\nReturn the final image as a file attachment.",
   ].join("\n");
 
   ctx?.setStatus(`Görsel çevriliyor (${model})…`);

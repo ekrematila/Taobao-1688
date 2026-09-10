@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
 import { db, getSetting, now } from "./db.ts";
 import { CHARS_PER_LINE, claudePricing, DESC_STYLES, htmlBudgetFactor, TITLE_VOCAB } from "@shared/models.ts";
-import { isSelfContainedLayout } from "@shared/descLayouts.ts";
+import { isSelfContainedLayout, cleanDescValue } from "@shared/descLayouts.ts";
 import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
 import { cleanPropsRecord, cleanSpecs } from "@shared/specs.ts";
@@ -24,6 +24,7 @@ import {
 } from "@shared/listingFormat.ts";
 import { detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { readExample } from "./examples.ts";
+import { runManusTask, manusConfigured } from "./manus.ts";
 import type {
   AdviceResult,
   CategoryResearchResult,
@@ -313,13 +314,20 @@ export async function ask(
   system: string,
   user: string,
   kind: string,
-  opts: { model?: string; maxTokens?: number; signal?: AbortSignal; draftId?: string } = {},
+  opts: {
+    model?: string;
+    effort?: Effort;
+    thinking?: ThinkingMode;
+    maxTokens?: number;
+    signal?: AbortSignal;
+    draftId?: string;
+  } = {},
 ) {
   system = stripLoneSurrogates(system);
   user = stripLoneSurrogates(user);
   const m = opts.model || activeModel();
-  const thinking = activeThinking();
-  let effort = activeEffort();
+  const thinking: ThinkingMode = opts.thinking ?? activeThinking();
+  let effort: Effort = opts.effort && EFFORT_LEVELS.includes(opts.effort) ? opts.effort : activeEffort();
   // {type:"disabled"} thinking is rejected above effort "high" — cap it.
   if (thinking === "off" && EFFORT_ORDER[effort] > EFFORT_ORDER.high) effort = "high";
 
@@ -773,7 +781,14 @@ export async function generateListing(
   for (let attempt = 0; attempt < 3; attempt++) {
     const maxTok = attempt === 2 ? Math.min(64000, Math.round(descMaxTokens * 1.6)) : descMaxTokens;
     const u = attempt === 1 ? `${user}\n\nUYARI: Önceki yanıtın GEÇERLİ JSON DEĞİLDİ. Bu sefer SADECE istenen JSON nesnesini yaz — öncesinde/sonrasında hiçbir açıklama, özür ya da markdown olmasın.` : user;
-    const r = await ask(system, u, "generateListing", { model: input.model, maxTokens: maxTok, signal, draftId: input.draftId });
+    const r = await ask(system, u, "generateListing", {
+      model: input.model,
+      effort: input.effort,
+      thinking: input.thinking,
+      maxTokens: maxTok,
+      signal,
+      draftId: input.draftId,
+    });
     usage = { inputTokens: usage.inputTokens + r.usage.inputTokens, outputTokens: usage.outputTokens + r.usage.outputTokens, costUsd: usage.costUsd + r.usage.costUsd };
     model = r.model;
     text = r.text;
@@ -803,7 +818,7 @@ export async function generateListing(
   }
   let fields: GeneratedField[] = (parsed.fields || []).map((f: any) => ({
     key: f.key,
-    value: String(f.value ?? ""),
+    value: f.key === "description" ? cleanDescValue(String(f.value ?? "")) : String(f.value ?? ""),
   }));
 
   const getF = (k: GeneratedField["key"]) => fields.find((f) => f.key === k);
@@ -813,10 +828,12 @@ export async function generateListing(
     else fields.push({ key: k, value: v });
   };
 
-  // OPTIONAL: build the HTML `description` again with a DIFFERENT model (the
-  // operator can point the big styled block at e.g. Sonnet while title/tags stay
-  // on the main model). Falls back silently to the first-pass description.
-  if (isShopify && input.descModel && input.descModel !== model) {
+  // OPTIONAL 2nd pass for the HTML `description` only — with a DIFFERENT Claude
+  // model, or with MANUS (an agent task). Title/tags stay on the main model.
+  // Falls back silently to the first-pass description on any error.
+  const wantManusDesc = isShopify && input.descProvider === "manus" && manusConfigured();
+  const wantClaudeDesc = isShopify && !wantManusDesc && !!input.descModel && input.descModel !== model;
+  if (wantManusDesc || wantClaudeDesc) {
     try {
       const dTitle = getF("title")?.value || product.titleTranslated || product.title;
       const dSys = [
@@ -854,18 +871,41 @@ export async function generateListing(
       ]
         .filter(Boolean)
         .join("\n");
-      const r2 = await ask(dSys, dUsr, "generateListingDesc", {
-        model: input.descModel,
-        maxTokens: descMaxTokens,
-        signal,
-        draftId: input.draftId,
-      });
-      const d2 = String(extractJson(r2.text).description ?? "").trim();
+      let d2 = "";
+      let du: LlmUsage = zeroUsage();
+      if (wantManusDesc) {
+        const mres = await runManusTask([{ type: "text", text: `${dSys}\n\n${dUsr}` }], {
+          locale: "en",
+          timeoutMs: 10 * 60 * 1000,
+          agentProfile: input.descManusProfile,
+        });
+        let raw = mres.text ?? "";
+        try {
+          raw = String((extractJson(raw) as any)?.description ?? raw);
+        } catch {
+          /* not JSON — use the text as-is (cleanDescValue strips any wrapper) */
+        }
+        d2 = cleanDescValue(raw);
+        du = zeroUsage();
+        if (mres.taskId)
+          logManusUsage("generateListingDesc", mres.creditsUsed, mres.creditsEstimated, input.draftId, mres.taskId);
+      } else {
+        const r2 = await ask(dSys, dUsr, "generateListingDesc", {
+          model: input.descModel,
+          effort: input.descEffort,
+          thinking: input.descThinking,
+          maxTokens: descMaxTokens,
+          signal,
+          draftId: input.draftId,
+        });
+        d2 = cleanDescValue(String(extractJson(r2.text).description ?? ""));
+        du = r2.usage;
+      }
       if (d2) {
         setF("description", d2);
-        usage.inputTokens += r2.usage.inputTokens;
-        usage.outputTokens += r2.usage.outputTokens;
-        usage.costUsd += r2.usage.costUsd;
+        usage.inputTokens += du.inputTokens;
+        usage.outputTokens += du.outputTokens;
+        usage.costUsd += du.costUsd;
       }
     } catch {
       /* keep the first-pass description */

@@ -94,7 +94,7 @@ import {
 import { generateBlog, researchBlogSeo, productStyleHint } from "./blog.ts";
 import { renderBlogHtml } from "@shared/blogPresets.ts";
 import type { BlogConfig, BlogRecord } from "@shared/types.ts";
-import { persistFromUrl, persistFileFromUrl, persistDataUrl, mediaPath } from "./imagestore.ts";
+import { persistFromUrl, persistFileFromUrl, persistDataUrl, mediaPath, normaliseShortestEdge } from "./imagestore.ts";
 import { existsSync as fsExists } from "node:fs";
 import {
   getDraft,
@@ -833,6 +833,9 @@ app.post(
         let persisted = it.resultUrl as string;
         try {
           persisted = await persistFromUrl(it.resultUrl, manusFileAuthHeaders());
+          // operator rule: a translated image's SHORTEST side is always 800–1000 px,
+          // high quality — no other size constraint.
+          persisted = await normaliseShortestEdge(persisted);
         } catch {
           /* fall back to the ephemeral url */
         }
