@@ -172,8 +172,11 @@ export const STACKED_DESC_EXAMPLE = `<style>
 @media (prefers-reduced-motion:reduce){
   .bm *{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important}
 }
-.bm-reveal{opacity:0; transform:translateY(14px); transition:opacity .55s ease, transform .55s ease}
-.bm-reveal.bm-show{opacity:1; transform:translateY(0)}
+/* NOTE: reveal is visible by default — Shopify's rich-text editor strips <script>,
+   so a JS-gated opacity:0 would leave the whole block invisible. Keep it at
+   opacity:1 always; the transition only smooths a class change if JS is present. */
+.bm-reveal{opacity:1; transform:none; transition:opacity .55s ease, transform .55s ease}
+.bm-reveal.bm-show{opacity:1; transform:none}
 .bm-toggle{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
 .bm-bar{display:none}
 .bm-c1,.bm-c2{display:block}
@@ -265,7 +268,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
   transform:rotate(0deg); transform-origin:50% 50%; will-change:transform;
   transition:transform .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-feat li:hover .ico{transform:rotate(15deg); background:#fff}
+.bm-feat li:hover .ico{transform:rotate(-15deg); background:#fff}
 .bm-feat .tx{flex:1 1 auto; min-width:0}
 .bm-feat b{display:block; color:#7a5a12; font-size:13.8px; margin-bottom:1px}
 .bm-feat .t{display:block; color:var(--soft); font-size:13px; line-height:1.45}
@@ -279,6 +282,10 @@ export const STACKED_DESC_EXAMPLE = `<style>
   transition:background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
 }
 .bm-layouts span:hover{background:#fff; border-color:var(--gold2)}
+/* second row: key-count chips, muted so the % row reads first */
+.bm-layouts-keys{margin-top:2px}
+.bm-layouts-keys span{background:var(--milk); color:var(--soft); font-weight:600}
+.bm-layouts-keys span:hover{background:var(--sky); color:#7a5a12}
 .bm-layouts-note{font-size:12.5px; color:var(--soft); margin:8px 0 0; line-height:1.5}
 
 /* ---- Specifications ---- */
@@ -413,9 +420,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 <h3>Compatible Layouts</h3>
 <div class="bm-layouts">
-<span>60</span><span>61</span><span>64</span><span>68</span><span>75</span><span>78</span><span>80</span><span>82</span><span>84</span><span>87</span><span>96</span><span>98</span><span>100</span><span>104</span><span>108</span>
+<span>60%</span><span>65%</span><span>75%</span><span>TKL</span><span>96%</span><span>100%</span><span>Alice</span>
 </div>
-<p class="bm-layouts-note">Also supports Left Shift B3 &amp; B4, Alice-style layouts, 7U spacebars, and 1.5U large front-tooth keys. Always match your bottom-row and spacebar size against the compatibility photos before ordering.</p>
+<div class="bm-layouts bm-layouts-keys">
+<span>61 keys</span><span>64 keys</span><span>68 keys</span><span>75 keys</span><span>84 keys</span><span>87 keys</span><span>98 keys</span><span>104 keys</span><span>108 keys</span>
+</div>
+<p class="bm-layouts-note">Spacebar coverage: includes 6.25U and 7U bottom-row spacebars, plus 3U / 2.75U split spacebars for HHKB-style and split boards. Also covers stepped Caps Lock, ISO Enter, Left Shift B3 &amp; B4, and 1.5U large front-tooth keys. Fits Alice, tri-mode 75%, and standard TKL boards — always match your bottom-row and spacebar size against the "all keys" compatibility photo before ordering.</p>
 
 <h3>Specifications</h3>
 <div class="bm-spec">
@@ -493,7 +503,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
       var atc = document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart]');
       if(!atc){ return; }
       atc.scrollIntoView({behavior:'smooth', block:'center'});
-      var glowIt = function(){ atc.classList.remove('bm-atc-glow'); void atc.offsetWidth; atc.classList.add('bm-atc-glow'); setTimeout(function(){ atc.classList.remove('bm-atc-glow'); }, 2800); };
+      var glowIt = function(){ atc.classList.remove('bm-atc-glow'); void atc.offsetWidth; atc.classList.add('bm-atc-glow'); setTimeout(function(){ atc.classList.remove('bm-atc-glow'); }, 2600); };
       if('onscrollend' in window){ document.addEventListener('scrollend', glowIt, {once:true}); } else { setTimeout(glowIt, 650); }
     });
   }

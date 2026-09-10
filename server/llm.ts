@@ -70,8 +70,14 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
     "Görsel SEÇİMİYLE (hangi fotoğraf, tekrar/benzer kopya elemek) UĞRAŞMA — sistemimiz aynı fotoğrafın farklı boyuttaki kopyalarını zaten otomatik eler ve her slota gerçek, birbirinden farklı bir ürün fotoğrafı yerleştirir. Senin işin SADECE doğru sayıda/düzende `pd-media` slotu açmak.",
     "MUTLAK YASAK: kendi `<script>` YAZMA — FAQ ve CTA etkileşimini SADECE yukarıdaki `pd-faq-item`/`pd-faq-q`/`pd-faq-a` sınıfları ve `data-pd-goto-atc` attribute'u ile işaretle; JavaScript'i sistemimiz ekler. Kendi script'in eklenirse SİLİNİR.",
     "BÖLÜM BAŞLIKLARI HEDEF DİLDE olacak — ASLA Çince başlık yazma ('套餐说明', '产品参数', '官方标配' vb. YASAK). Kaynaktaki Çince başlıkları hedef dile çevir.",
-    "Yukarıdaki HTML AÇIKLAMA UZUNLUĞU hedefine uy (varsa). Örnek metinleri KOPYALAMA; iskeleti/zenginliği taklit et, içeriği bu ürüne göre yaz. `<style>` serbest ve ZORUNLU; `<iframe>` yok.",
-    "SON KONTROL (yanıtı göndermeden önce zihninde bir kez gözden geçir, ayrı bir mesaj yazma — sadece düzeltilmiş son hali gönder): (1) tek başına, yanında hiçbir şey olmadan tam alan kaplayan kare bir görsel var mı → varsa ızgaraya al ya da yanına metin ekle; (2) `pd-media` slotlarının HERBİRİ tek görsel mi, hiçbiri birden fazla görsel içermiyor mu; (3) CTA gerçekten en sonda mı, sonrasında başka içerik yok mu; (4) FAQ/CTA sınıfları (`pd-faq-item`/`pd-faq-q`/`pd-faq-a`/`data-pd-goto-atc`) doğru mu; (5) hiç Çince karakter kalmamış mı. Bir sorun varsa göndermeden DÜZELT.",
+    "UZUNLUK — KESİN: operatör bir karakter/satır bandı verdiyse görünen metin gövdesi O BANDIN İÇİNDE olMAK ZORUNDA. Bandın ALTINDA çıktı KABUL EDİLMEZ — kısa kaldıysan FAQ, spec satırı, feature kartı, spotlight/intro paragrafı ve uyumluluk notlarını GERÇEK bilgiyle genişleterek banda çık; üstündeysen dolguyu kes. `<style>` serbest ve ZORUNLU; `<iframe>` yok. Örnek metinleri KOPYALAMA.",
+    "EMOJİ ANİMASYONU: emoji/ikon taşıyan hover'larda (`.pd-<önek>__feature-ic` vb.) `transform:rotate(-15deg)` + yumuşak `transition` — emoji hover'da 15° SOLA yatar. Tüm geçişler smooth (cubic-bezier), ani/sert değil.",
+    "Herhangi bir `*-reveal` sınıfı kullanırsan başlangıç durumu GÖRÜNÜR olsun (`opacity:1;transform:none`) — JS'e bağımlı görünmezlik YASAK, Shopify `<script>`'i siler.",
+    "UYUMLULUK bölümüne (keycap setiyse) ürünün TÜM tuşlarının göründüğü görsele bakarak SOMUT not ekle: spacebar boyutları (ör. '6.25U/7U bottom-row, 3U/2.75U split spacebar'), stepped Caps / ISO Enter / split shift gibi özel tuşlar ve uyumlu klavye tipi örnekleri (Alice, tri-mode 75%, standart TKL). Uydurma yok.",
+    "SPECS tablosu DAİMA doğru ve şık — yalnız GERÇEK veri; bilinmeyen değer için o satırı yazma.",
+    "ÜLKE BAYRAĞI EMOJİSİ YASAK (🇳🇱 🇯🇵 🏴 vb.) — hiçbir yerde kullanma.",
+    "TÜM CİHAZLARLA UYUMLU: `@media` kırılım noktalarını (ör. `max-width:720px`) mutlaka ekle; telefon/tablet/masaüstünde düzgün görünsün.",
+    "SON KONTROL (yanıtı göndermeden önce zihninde bir kez gözden geçir, ayrı bir mesaj yazma — sadece düzeltilmiş son hali gönder): (1) tek başına, yanında hiçbir şey olmadan tam alan kaplayan kare bir görsel var mı → varsa ızgaraya al ya da yanına metin ekle; (2) `pd-media` slotlarının HERBİRİ tek görsel mi, hiçbiri birden fazla görsel içermiyor mu; (3) CTA gerçekten en sonda mı, sonrasında başka içerik yok mu; (4) FAQ/CTA sınıfları (`pd-faq-item`/`pd-faq-q`/`pd-faq-a`/`data-pd-goto-atc`) doğru mu; (5) hiç Çince karakter ya da ülke bayrağı emojisi kalmamış mı; (6) uzunluk bandın içinde mi (altındaysa GERÇEK içerik ekle). Bir sorun varsa göndermeden DÜZELT.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -85,7 +91,15 @@ const SHOPIFY_DESC_RULE_STACKED = [
   '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner> <div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 5-7 emoji\'li `<span>` rozet).',
   '4) `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 2-3 cümle (anahtarlar `<strong>`); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi (`<strong>` vurgulu); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Compatible Layouts</h3>`+`<div class="bm-layouts">` ürüne uyan boyut/tuş-sayısı `<span>` çipleri + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` 6-9 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>` (GERÇEK veriler); `<h3>Why PBT Over ABS</h3>` (veya ürüne uygun bir "neden bu / X vs Y" başlığı)+`<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 4-5 `<div class="bm-faq-item">` (ilki `is-open`) → `<button type="button" class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></button><div class="bm-faq-a"><p>CEVAP</p></div>`; `<div class="bm-note"><b>📦 In the box:</b> … <br><b>💡 Before you order:</b> … <br><b>🧼 Care:</b> …</div>`; `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc>🛒 Add to Cart</button></div>`; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
   '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer, `.bm-lightbox` düğümünü + çalışan `<script>`\'i ekler. KENDİN `<script>` YAZMA — yazsan bile SİLİNİR; etkileşim SADECE `.bm*` sınıfları ve `data-bm-*` attribute\'ları ile işaretlenir.',
-  "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz. Yukarıdaki UZUNLUK HEDEFİNE uy (bu hedef `<style>` + CSS + şablon + metin dahil TÜM HTML'i sayar; görsel/detay çoksa FAQ/spec/highlight/rozet sayısını artırıp hedefe yaklaş); dolgu/tekrar YOK.",
+  "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz.",
+  "UZUNLUK — KESİN: operatör bir karakter/satır bandı verdiyse çıktı O BANDIN İÇİNDE olMAK ZORUNDA (bu hedef `<style>` + CSS + şablon + tüm görünür metin dahil TÜM HTML'i sayar). Bandın ALTINDA bir çıktı KABUL EDİLMEZ — kısa kaldıysan FAQ (6-8'e çıkar), spec satırı, highlight, `bm-compare` satırı, `bm-trivia`, rozet ve `bm-lede`/`bm-note` paragraflarını GERÇEK bilgiyle genişleterek banda çık; bandın üstündeysen dolguyu kes. Dolgu/tekrar cümle YOK ama band alt sınırına MUTLAKA ulaş.",
+  "`.bm-reveal` kuralı `opacity:1;transform:none` olacak (hem `.bm-reveal` hem `.bm-reveal.bm-show`). Başta görünmez (`opacity:0`) yapıp JS ile açan efekt YASAK — Shopify `<script>`'i siler, açıklama BOŞ görünür.",
+  "EMOJİ ANİMASYONU: emoji taşıyan hover'larda (özellikle `.bm-feat li:hover .ico`) `transform:rotate(-15deg)` olacak — emoji hover'da 15° SOLA yatar; tüm hover/animasyon geçişleri `transition` ile YUMUŞAK (cubic-bezier) olsun, ani/sert geçiş yok.",
+  "COMPATIBLE LAYOUTS — İKİ SATIR: `<div class=\"bm-layouts\">` içinde yüzde/boyut çipleri (`60%`,`65%`,`75%`,`TKL`,`96%`,`100%`,`Alice` — ürüne UYANLAR); hemen altında `<div class=\"bm-layouts bm-layouts-keys\">` içinde tuş SAYISI çipleri (`61 keys`,`68 keys`,`84 keys`,`104 keys` — ürüne UYANLAR).",
+  "COMPATIBILITY NOTU: `<p class=\"bm-layouts-note\">` içine ürünün TÜM tuşlarının göründüğü uyumluluk görseline bakarak SOMUT notlar yaz: spacebar boyutları (ör. '6.25U ve 7U bottom-row, 3U/2.75U split spacebar dahil'), stepped Caps / ISO Enter / split shift gibi özel tuşlar ve uyumlu klavye tipi örnekleri (ör. 'Alice, tri-mode 75%, standart TKL'). Uydurma — sadece görselde/veride görüneni yaz.",
+  "SPECIFICATIONS: `bm-spec` satırları DAİMA doğru ve şık — yalnız ürünün GERÇEK verisi; bilinmeyen/boş değer için o satırı HİÇ yazma, uydurma yok.",
+  "ÜLKE BAYRAĞI EMOJİSİ YASAK (🇳🇱 🇯🇵 🇺🇸 🏴 vb.) — anlamsız ve gereksiz; hiçbir yerde kullanma.",
+  "TÜM CİHAZLARLA UYUMLU: örnekteki `@media (max-width:899px/420px/380px)` kurallarını AYNEN koru; çıktı telefon/tablet/masaüstünde düzgün görünmeli.",
 ].join(" ");
 
 export function activeModel(): string {
@@ -909,6 +923,71 @@ export async function generateListing(
       }
     } catch {
       /* keep the first-pass description */
+    }
+  }
+
+  // AI SELF-REVIEW pass — Shopify HTML `description` only. One extra Claude call
+  // that re-reads the generated block "like a human editor" against a fixed
+  // checklist (length in band, media slots present, reveal visible, emoji hover
+  // -15deg, 2-pulse 2.6s glow, no country-flag emoji, accurate specs, responsive)
+  // and returns a corrected FULL HTML. Falls back silently to the pre-review one.
+  if (isShopify) {
+    const cur = getF("description")?.value?.trim() || "";
+    if (cur.length > 400 && /<style/i.test(cur)) {
+      try {
+        const bandTxt =
+          input.htmlLengthBand && /^\d+-\d+$/.test(input.htmlLengthBand)
+            ? `${input.htmlLengthBand} ${input.htmlLengthUnit === "char" ? "karakter" : "satır"}`
+            : "";
+        const rSys = [
+          "Sen kıdemli bir Shopify ürün-açıklama editörüsün. Sana bir ürün için üretilmiş TAM HTML açıklama verilecek.",
+          "Bir insan gibi dikkatle oku. Eklenmesi gereken alan varsa EKLE, gereksiz/yanlış alan varsa ÇIKAR, düzeltilmesi gereken yer varsa DÜZELT. Şu kontrol listesine göre:",
+          bandTxt
+            ? `1) UZUNLUK: istenen band ${bandTxt}. Çıktı bu bandın İÇİNDE olmalı. ALTINDAYSA gerçek içerik (FAQ, spec satırı, highlight, karşılaştırma, paragraf, uyumluluk notu) ekleyerek banda çıkar; ÜSTÜNDEYSE dolguyu kes. Bandın altında çıktı KABUL EDİLMEZ.`
+            : "1) UZUNLUK: yukarıdaki uzunluk hedefine uy; kısa kaldıysa gerçek içerik ekle.",
+          "2) `.bm-reveal` / `.pd-reveal` kuralları `opacity:1;transform:none` olmalı — JS'e bağımlı görünmezlik YOK (Shopify `<script>`'i siler, blok boş görünür).",
+          "3) Emoji taşıyan hover'lar (`.ico` / `*-feature-ic` vb.) `transform:rotate(-15deg)` + yumuşak `transition` — emoji hover'da 15° SOLA yatar. Tüm geçişler smooth.",
+          "4) Add-to-Cart glow: 2 kez, toplam 2.6s (`@keyframes ... 2.6s ... 1`, %25 ve %75'te iki tepe). Statik `box-shadow !important` ile animasyonu ezme.",
+          "5) Ülke bayrağı emojisi (🇳🇱 🇯🇵 🏴 vb.) varsa HEPSİNİ kaldır.",
+          "6) Görsel slotları: `.bm-media` boş `<div>` olarak DURMALI (veya `.pd-media` tekli slotlar). Sen `<img>` YAZMA; ama slot hiç yoksa uygun yere boş slot EKLE.",
+          "7) Keycap setiyse Compatible Layouts iki satır olmalı: yüzde/boyut + hemen altında tuş sayısı (`bm-layouts-keys`). Compatibility notunda spacebar boyutları (7U/3U vb.) ve uyumlu klavye tipi örnekleri somut yazılı olmalı.",
+          "8) Specifications: yalnız gerçek veriler, uydurma/boş satır yok, şık.",
+          "9) Tüm cihazlarda düzgün: `@media` kuralları korunmalı/eklenmeli.",
+          "10) `.bm*` / `.pd-*` sınıf adları, `data-bm-*` / `data-pd-goto-atc` kancaları, bölüm yapısı KORUNMALI. `<script>` EKLEME. Çince karakter kalmasın.",
+          `Çıktı dili: ${input.targetLanguage.toUpperCase()}. Markdown/kod bloğu yok.`,
+          'Yanıtı SADECE şu şemada geçerli JSON ver: {"description":"<düzeltilmiş TAM HTML>"}. Hiç düzeltme gerekmese bile mevcut HTML\'i aynen bu şemada geri ver.',
+        ]
+          .filter(Boolean)
+          .join("\n");
+        const rUsr = [
+          `ÜRÜN: ${getF("title")?.value || product.titleTranslated || product.title}`,
+          bandTxt ? `İSTENEN UZUNLUK BANDI: ${bandTxt} (bu bandın içinde kal)` : "",
+          htmlLenLine,
+          input.productNote?.trim() ? `OPERATÖR DETAYLARI (son söz): ${input.productNote.trim().slice(0, 2500)}` : "",
+          "",
+          "MEVCUT HTML AÇIKLAMA:",
+          cur,
+        ]
+          .filter(Boolean)
+          .join("\n");
+        const rr = await ask(rSys, rUsr, "generateListingDescReview", {
+          model: input.descModel || input.model,
+          effort: input.descEffort || input.effort,
+          thinking: input.descThinking || input.thinking,
+          maxTokens: Math.min(64000, Math.round(descMaxTokens * 1.35)),
+          signal,
+          draftId: input.draftId,
+        });
+        const fixed = cleanDescValue(String(extractJson(rr.text).description ?? ""));
+        if (fixed.length > 400 && /<style/i.test(fixed) && /class\s*=\s*["'](?:bm|pd-)/i.test(fixed)) {
+          setF("description", fixed);
+        }
+        usage.inputTokens += rr.usage.inputTokens;
+        usage.outputTokens += rr.usage.outputTokens;
+        usage.costUsd += rr.usage.costUsd;
+      } catch {
+        /* keep the pre-review description */
+      }
     }
   }
 

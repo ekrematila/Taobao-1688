@@ -39,3 +39,11 @@ test("cleanDescValue keeps a real .bm-toggle checkbox", () => {
   const withToggle = "<style>.bm{}</style><div class=\"bm\"><input class=\"bm-toggle\" type=\"checkbox\"><label>x</label></div>";
   assert.ok(cleanDescValue(withToggle).includes('class="bm-toggle"'));
 });
+
+test("cleanDescValue strips country-flag emoji but keeps other emoji", () => {
+  const withFlag = "<style>.bm{}</style><p class=\"bm\">🐹 Fun fact 🇳🇱 from the Netherlands</p>";
+  const out = cleanDescValue(withFlag);
+  assert.ok(!/[\uD83C][\uDDE6-\uDDFF]/.test(out), "no regional-indicator letters left");
+  assert.ok(out.includes("🐹"), "hamster emoji kept");
+  assert.ok(out.includes("Fun fact"));
+});

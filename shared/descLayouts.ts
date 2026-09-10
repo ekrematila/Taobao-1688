@@ -182,6 +182,12 @@ export function cleanDescValue(v: string): string {
   // 4) neutralise a stray form control the templates don't use as a real toggle
   //    (a `.bm-toggle` / `.pd-*` checkbox is fine; a bare <input> is not)
   s = s.replace(/<input(?![^>]*\bclass\s*=\s*["'][^"']*\b(?:bm-toggle|pd-[\w-]*toggle)\b)[^>]*>/gi, "");
+  // 5) drop country-flag emoji (regional-indicator letters + the ZWJ tag/pennant
+  //    forms) — "🇳🇱 next to a fun fact" is meaningless noise on a product page.
+  s = s
+    .replace(/\uD83C[\uDDE6-\uDDFF](?:\uD83C[\uDDE6-\uDDFF])?/g, "")
+    .replace(/🏴(?:\uDB40[\uDC00-\uDFFF])+/g, "")
+    .replace(/[ \t]{2,}/g, " ");
   return s.trim();
 }
 
@@ -258,7 +264,7 @@ const BM_SCRIPT =
   `var atcBtn=root.querySelector('[data-bm-goto-atc]');if(atcBtn){atcBtn.addEventListener('click',function(){` +
   `var atc=document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart]');` +
   `if(!atc){return;}atc.scrollIntoView({behavior:'smooth',block:'center'});` +
-  `var g=function(){atc.classList.remove('bm-atc-glow');void atc.offsetWidth;atc.classList.add('bm-atc-glow');setTimeout(function(){atc.classList.remove('bm-atc-glow');},2800);};` +
+  `var g=function(){atc.classList.remove('bm-atc-glow');void atc.offsetWidth;atc.classList.add('bm-atc-glow');setTimeout(function(){atc.classList.remove('bm-atc-glow');},2600);};` +
   `if('onscrollend' in window){document.addEventListener('scrollend',g,{once:true});}else{setTimeout(g,650);}});}` +
   `})();</script>`;
 
@@ -270,7 +276,7 @@ const BM_NOSCRIPT = `<noscript><style>.bm-reveal{opacity:1 !important;transform:
  *  card, or an older model block). */
 const BM_STYLE_EXTRA =
   `<style>@media (prefers-reduced-motion:reduce){.bm *{animation-duration:.01ms!important;transition-duration:.01ms!important}}` +
-  `.bm-reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:translateY(0)}` +
+  `.bm-reveal{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:none}` +
   `.bm-media .bm-stage{position:relative;cursor:zoom-in}.bm-media img{transition:transform .5s cubic-bezier(.25,.8,.3,1);cursor:zoom-in;background:var(--sky,#eaeefc)}.bm-media img:hover{transform:scale(1.03)}` +
   `.bm-media .bm-zoomtag{position:absolute;right:10px;bottom:10px;z-index:2;font-size:11.5px;font-weight:700;color:var(--acc,#4f57c4);background:rgba(255,255,255,.92);border:1px solid var(--line,rgba(79,87,196,.16));padding:5px 10px;border-radius:99px;opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s;pointer-events:none}.bm-media .bm-stage:hover .bm-zoomtag{opacity:1;transform:translateY(0)}` +
   `.bm-lightbox{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:26px;background:rgba(24,26,48,.82)}.bm-lightbox.is-open{display:flex}.bm-lightbox img{max-width:min(92vw,900px);max-height:88vh;border-radius:12px}` +
@@ -280,7 +286,7 @@ const BM_STYLE_EXTRA =
   `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:transform .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
   `.bm-faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease}.bm-faq-a p{padding:0 13px 12px;margin:0;font-size:13px;color:var(--soft,#5b6172);line-height:1.55}.bm-faq-item.is-open .bm-faq-a{max-height:280px}` +
   `.bm-cta{margin-top:18px;padding:16px;border-radius:14px;text-align:center;background:linear-gradient(135deg,var(--acc,#4f57c4),var(--acc2,#98a0ea))}.bm-cta p{color:#eef0ff;font-size:12.5px;margin:0 0 10px}.bm-cta button,.bm-cta a{display:inline-flex!important;align-items:center;gap:7px;background:#fff;color:var(--acc,#4f57c4);font-weight:700;font-size:13.5px;padding:10px 20px;border-radius:99px;border:0;text-decoration:none;cursor:pointer}` +
-  `@keyframes bmAtcGlow{0%,100%{box-shadow:0 0 0 0 rgba(79,87,196,0)}50%{box-shadow:0 0 9px 3px rgba(79,87,196,.5)}}.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}</style>`;
+  `@keyframes bmAtcGlow{0%{box-shadow:0 0 0 0 rgba(79,87,196,0)}25%{box-shadow:0 0 9px 3px rgba(79,87,196,.5)}50%{box-shadow:0 0 0 0 rgba(79,87,196,0)}75%{box-shadow:0 0 9px 3px rgba(79,87,196,.5)}100%{box-shadow:0 0 0 0 rgba(79,87,196,0)}}.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}</style>`;
 
 const BM_LIGHTBOX =
   `<div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button>` +
@@ -321,7 +327,7 @@ const PD_SCRIPT =
   `if(!btn)return;e.preventDefault();` +
   `var atc=document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart');` +
   `if(!atc)return;atc.scrollIntoView({behavior:'smooth',block:'center'});` +
-  `var run=function(){atc.classList.remove('pd-atc-glow');void atc.offsetWidth;atc.classList.add('pd-atc-glow');setTimeout(function(){atc.classList.remove('pd-atc-glow');},1300);};` +
+  `var run=function(){atc.classList.remove('pd-atc-glow');void atc.offsetWidth;atc.classList.add('pd-atc-glow');setTimeout(function(){atc.classList.remove('pd-atc-glow');},2600);};` +
   `if('onscrollend' in window){document.addEventListener('scrollend',run,{once:true});}else{setTimeout(run,650);}` +
   `});` +
   `})();</script>`;
@@ -340,11 +346,25 @@ const PD_SCRIPT =
  *  `transition:max-height.45s` typo) cannot stop the accordion opening. Covers
  *  both toggle-class conventions: `.pd-open` (pd-*) and `.is-open` (.bm). */
 const FAQ_CTA_GUARANTEE =
-  `<style>.pd-faq-a,.bm-faq-a{overflow:hidden!important;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1)}` +
+  `<style>` +
+  // 1) reveal blocks are ALWAYS visible — Shopify strips <script>, so a JS-gated
+  //    opacity:0 reveal would leave the whole description invisible. Bulletproof.
+  `.bm-reveal,.pd-reveal{opacity:1!important;transform:none!important}` +
+  // 2) FAQ accordion — smooth open regardless of a broken/missing model rule.
+  `.pd-faq-a,.bm-faq-a{overflow:hidden!important;max-height:0;transition:max-height .45s cubic-bezier(.4,0,.2,1)}` +
   `.pd-faq-item.pd-open .pd-faq-a,.pd-faq-item.pd-open>.pd-faq-a,.bm-faq-item.is-open .bm-faq-a,.bm-faq-item.is-open>.bm-faq-a{max-height:1400px!important}` +
-  `.pd-atc-glow,.bm-atc-glow{transition:box-shadow .5s ease,transform .3s ease!important;transform:scale(1.015)!important;box-shadow:0 0 0 3px rgba(120,120,120,.16),0 0 20px 2px rgba(120,120,120,.28)!important}` +
-  `@supports (color:color-mix(in srgb,red,blue)){.pd-atc-glow{box-shadow:0 0 0 3px color-mix(in srgb,var(--pd-accent,#8a8a8a) 22%,transparent),0 0 20px 2px color-mix(in srgb,var(--pd-accent,#8a8a8a) 34%,transparent)!important}` +
-  `.bm-atc-glow{box-shadow:0 0 0 3px color-mix(in srgb,var(--acc,#8a8a8a) 22%,transparent),0 0 20px 2px color-mix(in srgb,var(--acc,#8a8a8a) 34%,transparent)!important}}` +
+  `.pd-faq-q:hover,.bm-faq-q:hover{filter:brightness(.97)}` +
+  // 3) Add-to-Cart glow — TWO pulses, 2.6s total (peaks at 25% & 75%). This is an
+  //    ANIMATION, never a static box-shadow: a static `box-shadow !important` here
+  //    would override the keyframe and kill the pulse entirely (the old bug).
+  `@keyframes tpsAtcGlow{` +
+  `0%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
+  `25%{box-shadow:0 0 0 4px rgba(90,110,230,.22),0 0 24px 5px rgba(90,110,230,.42);transform:scale(1.02)}` +
+  `50%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}` +
+  `75%{box-shadow:0 0 0 4px rgba(90,110,230,.22),0 0 24px 5px rgba(90,110,230,.42);transform:scale(1.02)}` +
+  `100%{box-shadow:0 0 0 0 rgba(90,110,230,0);transform:scale(1)}}` +
+  `.pd-atc-glow,.bm-atc-glow{animation:tpsAtcGlow 2.6s ease-in-out 1!important;border-radius:8px}` +
+  `@media (prefers-reduced-motion:reduce){.pd-atc-glow,.bm-atc-glow{animation-duration:.01ms!important}}` +
   `</style>`;
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
@@ -410,6 +430,18 @@ function ensurePdScaffold(html: string): string {
 function fillMediaSlots(html: string, imgs: DescImg[]): string {
   if (!imgs.length) return html;
   const bmRe = /<div\b[^>]*class\s*=\s*["'][^"']*\bbm-media\b[^"']*["'][^>]*>\s*(?:<!--[\s\S]*?-->\s*)*<\/div>/i;
+  // a `.bm` block that forgot its media slot entirely → give it one just before
+  // the wrapper closes, so the product photos still land (was: "görseller gelmemiş").
+  if (
+    !bmRe.test(html) &&
+    !/\bpd-media\b/i.test(html) &&
+    /class\s*=\s*["']bm["']/i.test(html) &&
+    !/<img\b/i.test(html)
+  ) {
+    const cut = html.search(/<div\b[^>]*\bdata-bm-lightbox\b/i);
+    const at = cut >= 0 ? cut : html.lastIndexOf("</div>");
+    html = at >= 0 ? html.slice(0, at) + `<div class="bm-media"></div>` + html.slice(at) : html + `<div class="bm-media"></div>`;
+  }
   if (bmRe.test(html)) {
     return html.replace(bmRe, (m) => `${m.slice(0, m.indexOf(">") + 1)}${bmMediaInner(imgs)}</div>`);
   }
