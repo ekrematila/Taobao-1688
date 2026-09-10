@@ -297,11 +297,13 @@ export const STACKED_DESC_EXAMPLE = `<style>
   border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--milk);
 }
 .bm-spec .bm-sub{
-  display:block; padding:9px 14px 7px; font-size:10.5px; font-weight:700;
-  letter-spacing:.11em; text-transform:uppercase; color:var(--gold);
-  background:var(--sky); border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:8px;
+  padding:10px 14px; font-size:10.5px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--gold);
+  background:var(--sky); border-bottom:1px solid var(--line2);
 }
-.bm-spec .bm-sub:not(:first-child){border-top:1px solid var(--line)}
+.bm-spec .bm-sub::before{content:""; flex:0 0 auto; width:14px; height:2px; border-radius:2px; background:var(--gold2)}
+.bm-spec .bm-sub:not(:first-child){border-top:1px solid var(--line2); margin-top:0}
 .bm-spec .bm-r{
   display:flex !important; flex-wrap:wrap; align-items:baseline;
   justify-content:space-between; gap:8px 18px; width:100%;
@@ -378,8 +380,9 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-cta a:hover,.bm-cta button:hover{transform:translateY(-2px); box-shadow:0 10px 20px -6px rgba(0,0,0,.25)}
 .bm-cta a:active,.bm-cta button:active{transform:translateY(0)}
 
-@keyframes bmAtcGlow{0%{box-shadow:0 0 0 0 rgba(201,138,31,0)} 25%{box-shadow:0 0 9px 3px rgba(201,138,31,.5)} 50%{box-shadow:0 0 0 0 rgba(201,138,31,0)} 75%{box-shadow:0 0 9px 3px rgba(201,138,31,.5)} 100%{box-shadow:0 0 0 0 rgba(201,138,31,0)}}
-.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1 !important}
+/* NOTE: the Add-to-Cart glow (.bm-atc-glow) has ONE definition only — it lives in
+   the always-appended guarantee stylesheet at the very end of this block, so it
+   is never duplicated or overridden. Do not redeclare @keyframes for it here. */
 
 @media (max-width:899px){
   .bm-bar{
@@ -427,17 +430,17 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-c2"><div class="bm-inner">
 <div class="bm-info bm-reveal">
 
-<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — the Enter and Left Shift keys for both are included, so you can build your board either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
+<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — the Enter and Left Shift keys for both are included, so you can build your keyboard either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
 <p class="bm-trivia">🐹 Fun fact: the titular Chiikawa character is hamster-inspired — <strong>Usagi</strong> is his rabbit-loving best friend, and the star of this set.</p>
 
 <h3>Highlights</h3>
 <ul class="bm-feat">
-<li><span class="ico">🐰</span><span class="tx"><b>Chiikawa Usagi artwork</b><span class="t">Adorable Usagi and cast illustrations spread across the whole board.</span></span></li>
+<li><span class="ico">🐰</span><span class="tx"><b>Chiikawa Usagi artwork</b><span class="t">Adorable Usagi and cast illustrations spread across the whole keyboard.</span></span></li>
 <li><span class="ico">🧵</span><span class="tx"><b>Thick PBT plastic</b><span class="t">Resists shine and grease far longer than standard ABS keycaps.</span></span></li>
 <li><span class="ico">🖨️</span><span class="tx"><b>Dye-sublimated legends</b><span class="t">Ink is fused into the plastic itself, not printed on top.</span></span></li>
 <li><span class="ico">🎹</span><span class="tx"><b>Cherry &amp; KOA profile options</b><span class="t">Pick the sculpted feel that matches your typing style.</span></span></li>
 <li><span class="ico">🖋️</span><span class="tx"><b>Side-print variant available</b><span class="t">Keeps the keycap top clean while legends sit on the front face.</span></span></li>
-<li><span class="ico">🍯</span><span class="tx"><b>140-key full coverage</b><span class="t">Enough caps to dress most 60%–TKL–full-size boards, function row included.</span></span></li>
+<li><span class="ico">🍯</span><span class="tx"><b>140-key full coverage</b><span class="t">Enough caps for most 60% to full-size mechanical keyboards, function row included.</span></span></li>
 </ul>
 
 <h3>Compatible Layouts</h3>
@@ -447,25 +450,27 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-layouts bm-layouts-keys">
 <span>61 keys</span><span>64 keys</span><span>68 keys</span><span>75 keys</span><span>84 keys</span><span>87 keys</span><span>98 keys</span><span>104 keys</span><span>108 keys</span>
 </div>
-<p class="bm-layouts-note">Spacebar coverage: 6.25U and 7U bottom-row spacebars, plus 2.75U and 2.25U keys for split and HHKB-style bottom rows. Also covers stepped Caps Lock, the tall L-shaped Enter used on ISO boards, Left Shift B3 &amp; B4, and 1.5U front-tooth keys — so the set is <strong>ANSI &amp; ISO layout compatible</strong>. Fits Alice, tri-mode 75%, and standard TKL keyboards. Not sure about your board? Match your bottom-row and spacebar size against the "all keys" compatibility photo, or message us and we'll confirm it for you.</p>
+<p class="bm-layouts-note">Spacebar coverage: 6.25U and 7U bottom-row spacebars, plus 2.75U and 2.25U keys for split bottom rows. Also covers stepped Caps Lock, the L-shaped Enter used on ISO layouts, Left Shift B3 &amp; B4, and 1.5U front-tooth keys — so the set is <strong>ANSI &amp; ISO layout compatible</strong>. Fits Alice, tri-mode 75%, and standard TKL keyboards. Not sure about your keyboard? Match your bottom-row and spacebar size against the "all keys" compatibility photo, or message us and we'll confirm it for you.</p>
 
 <h3>Specifications</h3>
 <div class="bm-spec">
-<span class="bm-sub">Build &amp; legends</span>
+<span class="bm-sub">Material &amp; manufacturing</span>
 <div class="bm-r"><span class="bm-k">Material</span><span class="bm-v">PBT plastic</span></div>
 <div class="bm-r"><span class="bm-k">Legend process</span><span class="bm-v">Dye-sublimation — fused in, not printed on top</span></div>
 <div class="bm-r"><span class="bm-k">Surface finish</span><span class="bm-v">Textured matte, anti-shine</span></div>
 <div class="bm-r"><span class="bm-k">Legend placement</span><span class="bm-v">Top print / Side print (by variant)</span></div>
-<span class="bm-sub">Fit &amp; layout</span>
+<span class="bm-sub">Profile &amp; fit</span>
 <div class="bm-r"><span class="bm-k">Profile options</span><span class="bm-v">Cherry Profile / KOA Profile</span></div>
 <div class="bm-r"><span class="bm-k">Key count</span><span class="bm-v">140 keys (full set)</span></div>
+<div class="bm-r"><span class="bm-k">Switch fit</span><span class="bm-v">MX-style cross-stem switches only</span></div>
+<span class="bm-sub">Layout &amp; compatibility</span>
 <div class="bm-r"><span class="bm-k">Layout support</span><span class="bm-v">ANSI &amp; ISO layout compatible</span></div>
 <div class="bm-r"><span class="bm-k">Keyboard sizes</span><span class="bm-v">60% / 65% / 75% / TKL / 96% / full-size / Alice</span></div>
 <div class="bm-r"><span class="bm-k">Spacebar support</span><span class="bm-v">6.25U, 7U, 2.75U, 2.25U</span></div>
-<div class="bm-r"><span class="bm-k">Switch fit</span><span class="bm-v">MX-style cross-stem switches only</span></div>
-<span class="bm-sub">Design</span>
-<div class="bm-r"><span class="bm-k">Theme</span><span class="bm-v">Chiikawa Usagi cartoon</span></div>
-<div class="bm-r"><span class="bm-k">Character art</span><span class="bm-v">Usagi &amp; friends, soft pastel line work</span></div>
+<div class="bm-r"><span class="bm-k">Theme</span><span class="bm-v">Chiikawa Usagi cartoon (Usagi &amp; friends, pastel line work)</span></div>
+<span class="bm-sub">Care</span>
+<div class="bm-r"><span class="bm-k">Cleaning</span><span class="bm-v">Hand-wash, mild soap, air-dry fully</span></div>
+<div class="bm-r"><span class="bm-k">Avoid</span><span class="bm-v">Hot water, dishwashers, harsh solvents</span></div>
 </div>
 
 <h3>Why PBT Over ABS</h3>
@@ -479,19 +484,19 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 <h3>Compatibility &amp; Care</h3>
 <div class="bm-faq">
-<details class="bm-faq-item" open><summary class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches — 60%, 65%, 75%, TKL, 96%, and full-size. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Match your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your board.</p></div></details>
+<details class="bm-faq-item" open><summary class="bm-faq-q"><span>🧷 Will this fit my keyboard?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches — 60%, 65%, 75%, TKL, 96%, and full-size. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Match your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your keyboard.</p></div></details>
 <details class="bm-faq-item"><summary class="bm-faq-q"><span>🎹 What's the difference between Cherry and KOA Profile?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced row-to-row steps. They are not interchangeable rows — pick the sculpt you prefer.</p></div></details>
-<details class="bm-faq-item"><summary class="bm-faq-q"><span>⌨️ Do I need to choose ANSI or ISO?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO, so you can build your keyboard either way. On an ISO board the Enter key is the tall L-shape; on ANSI it is the wide bar. Just install the keys your layout uses.</p></div></details>
+<details class="bm-faq-item"><summary class="bm-faq-q"><span>⌨️ Do I need to choose ANSI or ISO?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO, so you can build your keyboard either way. On an ISO keyboard the Enter key is L-shaped (it spans two rows); on ANSI it is a wide single-row bar. Just install the keys your layout uses.</p></div></details>
 <details class="bm-faq-item"><summary class="bm-faq-q"><span>🖨️ What is Side Print?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type. Top Print keeps the artwork on the top surface.</p></div></details>
 <details class="bm-faq-item"><summary class="bm-faq-q"><span>💡 Will my RGB shine through the legends?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>These are dye-sublimated PBT keycaps with solid, non-translucent legends, so backlighting glows around each cap rather than through the characters. If you specifically want shine-through legends, that is a different keycap type.</p></div></details>
 <details class="bm-faq-item"><summary class="bm-faq-q"><span>🧼 How do I clean these keycaps?</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well, and let them air-dry fully before reinstalling. Avoid hot water and dishwashers.</p></div></details>
 </div>
 
-<div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, and a thank-you card with a surprise coupon.<br><b>🧼 Care:</b> hand-wash gently with mild soap, then air-dry fully.</div>
+<div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, thank-you card with a surprise coupon.<br><b>💬 Compatibility questions?</b> Message the store before you order and we'll check your keyboard.</div>
 
 <div class="bm-cta">
 <p>Give your setup a soft, huggable upgrade ✨</p>
-<button type="button" data-bm-goto-atc onclick="var a=document.querySelector('form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);}return false;">🛒 Add to Cart</button>
+<button type="button" data-bm-goto-atc onclick="var a=document.querySelector('form[action*=cart] button[type=submit],form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart')||document.querySelector('.shopify-payment-button__button');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;">🛒 Add to Cart</button>
 </div>
 <div class="bm-trust">
 <span>🚚 Ships worldwide</span>
@@ -512,12 +517,35 @@ export const STACKED_DESC_EXAMPLE = `<style>
 (function(){
   if(window.__bmInit) return; window.__bmInit = 1;
   function findAtc(){
-    return document.querySelector('form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button, button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, .btn--add-to-cart, .shopify-payment-button__button');
+    // the real "Add to Cart" first; the Shop-Pay / dynamic-checkout button is only a last resort
+    return document.querySelector(
+      'form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] [type="submit"], ' +
+      'button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, #ProductSubmitButton, ' +
+      '.btn--add-to-cart, .add-to-cart, .product-form__cart-submit'
+    ) || document.querySelector('.shopify-payment-button__button');
   }
   function glow(el){
     if(!el) return;
     el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
     setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
+  }
+  // run the callback only once the page has actually stopped scrolling, so the
+  // glow plays from its first frame with the button in view (never mid-scroll).
+  function afterScrollSettles(cb){
+    var done = false;
+    function fire(){ if(done) return; done = true; cb(); }
+    if('onscrollend' in window){
+      var cap = setTimeout(fire, 1600);
+      window.addEventListener('scrollend', function h(){ window.removeEventListener('scrollend', h); clearTimeout(cap); fire(); }, {once:true});
+      return;
+    }
+    var last = window.pageYOffset, still = 0;
+    var iv = setInterval(function(){
+      var y = window.pageYOffset;
+      if(Math.abs(y - last) < 2){ still += 90; if(still >= 220){ clearInterval(iv); fire(); } }
+      else { still = 0; last = y; }
+    }, 90);
+    setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
   }
   document.addEventListener('click', function(e){
     var t = e.target;
@@ -537,10 +565,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
     var atc = findAtc();
     if(!atc) return;
     atc.scrollIntoView({behavior:'smooth', block:'center'});
-    if('onscrollend' in window){
-      var fb = setTimeout(function(){ glow(atc); }, 1000);
-      document.addEventListener('scrollend', function(){ clearTimeout(fb); glow(atc); }, {once:true});
-    } else { setTimeout(function(){ glow(atc); }, 600); }
+    afterScrollSettles(function(){ glow(atc); });
   });
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){ var open = document.querySelector('.bm-lightbox.is-open'); if(open) open.classList.remove('is-open'); }
@@ -680,6 +705,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 .pd-ck__table tr:last-child th,.pd-ck__table tr:last-child td{border-bottom:0}
 .pd-ck__table th{width:38%; color:var(--pd-soft); font-weight:600; background:var(--pd-cream)}
 .pd-ck__table td{color:var(--pd-ink); font-weight:600}
+.pd-ck__table .pd-ck__table-grp{width:auto; text-align:left; background:var(--pd-cream2); color:var(--pd-accent); font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; padding:9px 14px}
 .pd-ck__notice{
   margin:12px 0 0; padding:12px 14px; border-radius:12px; font-size:12.8px; line-height:1.5;
   color:#8a2b2b; background:#fdeaea; border:1px solid rgba(200,60,60,.25);
@@ -842,15 +868,22 @@ export const OTHER_DESC_EXAMPLE = `<style>
 </div>
 <div class="pd-ck__table-wrap">
 <table class="pd-ck__table"><tbody>
-<tr><th>Profile Options</th><td>Cherry Profile / KOA Profile</td></tr>
-<tr><th>Key Count</th><td>140 keys (full set)</td></tr>
-<tr><th>Layout Support</th><td>ANSI &amp; ISO compatible</td></tr>
-<tr><th>Keyboard Sizes</th><td>60% / 65% / 75% / 80% TKL / 96% / Full-Size / Alice &amp; more</td></tr>
-<tr><th>Switch Type</th><td>MX-Style Cross Mechanical Switches Only</td></tr>
+<tr><th class="pd-ck__table-grp" colspan="2">Material &amp; manufacturing</th></tr>
 <tr><th>Material</th><td>Premium PBT</td></tr>
 <tr><th>Printing Method</th><td>Dye-Sublimation (permanent, fade-resistant)</td></tr>
 <tr><th>Surface Finish</th><td>Textured Matte (anti-shine)</td></tr>
 <tr><th>Legend Placement</th><td>Top print / Side print (by variant)</td></tr>
+<tr><th class="pd-ck__table-grp" colspan="2">Profile &amp; fit</th></tr>
+<tr><th>Profile Options</th><td>Cherry Profile / KOA Profile</td></tr>
+<tr><th>Key Count</th><td>140 keys (full set)</td></tr>
+<tr><th>Switch Type</th><td>MX-Style Cross Mechanical Switches Only</td></tr>
+<tr><th class="pd-ck__table-grp" colspan="2">Layout &amp; compatibility</th></tr>
+<tr><th>Layout Support</th><td>ANSI &amp; ISO layout compatible</td></tr>
+<tr><th>Keyboard Sizes</th><td>60% / 65% / 75% / 80% TKL / 96% / Full-Size / Alice &amp; more</td></tr>
+<tr><th>Spacebar Support</th><td>6.25U, 7U, 2.75U, 2.25U</td></tr>
+<tr><th class="pd-ck__table-grp" colspan="2">Care</th></tr>
+<tr><th>Cleaning</th><td>Hand-wash, mild soap, air-dry fully</td></tr>
+<tr><th>Avoid</th><td>Hot water, dishwashers, harsh solvents</td></tr>
 </tbody></table>
 </div>
 <div class="pd-ck__notice"><b>⚠️ Compatibility Notice:</b> This keycap set works only with MX-style mechanical switches. It is not compatible with membrane keyboards, laptop scissor switches, or low-profile mechanical keyboards. Check that your keyboard uses standard MX switches before ordering.</div>
@@ -874,7 +907,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 </section>
 
 <section class="pd-ck__section">
-<div class="pd-ck__box"><b>📦 In the box:</b> 140 Chiikawa Usagi keycaps in your chosen profile and print variant. Keyboard, switches and keycap puller are not included.<br><b>💡 Before you order:</b> confirm your layout, bottom-row and spacebar sizes, and your desired profile / print variant.<br><b>🧼 Care:</b> hand-wash gently with warm water and mild soap, rinse and air-dry fully before reinstalling. Avoid hot water and dishwashers.</div>
+<div class="pd-ck__box"><b>📦 In the box:</b> keycap set, keycap puller, thank-you card with a surprise coupon.<br><b>💬 Compatibility questions?</b> Message the store before you order and we'll check your keyboard.</div>
 </section>
 
 <section class="pd-ck__section">
@@ -886,7 +919,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <div class="pd-ck__faq">
 <details class="pd-faq-item" open><summary class="pd-faq-q">Will this fit my keyboard?</summary><div class="pd-faq-a"><p>It fits any keyboard using standard MX-style cross-stem switches across 60%, 65%, 75%, TKL and full-size layouts. The set is ANSI &amp; ISO layout compatible, so either bottom-row style is covered. Compare your spacebar size and row count against the "all keys" compatibility photo before ordering, or message us and we'll confirm your board.</p></div></details>
 <details class="pd-faq-item"><summary class="pd-faq-q">What is the difference between Cherry and KOA profile?</summary><div class="pd-faq-a"><p>Cherry Profile is low and gently sculpted for a relaxed, near-flat typing angle. KOA Profile sits taller with a deeper per-row dish and more pronounced steps. The rows are not interchangeable — pick the sculpt you prefer.</p></div></details>
-<details class="pd-faq-item"><summary class="pd-faq-q">Do I need to choose ANSI or ISO?</summary><div class="pd-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO. On an ISO board the Enter key is the tall L-shape; on ANSI it is the wide bar. Just install the keys your layout uses.</p></div></details>
+<details class="pd-faq-item"><summary class="pd-faq-q">Do I need to choose ANSI or ISO?</summary><div class="pd-faq-a"><p>No — every set includes the Enter and Left Shift keys for both ANSI and ISO. On an ISO keyboard the Enter key is L-shaped (it spans two rows); on ANSI it is a wide single-row bar. Just install the keys your layout uses.</p></div></details>
 <details class="pd-faq-item"><summary class="pd-faq-q">What does Side Print mean?</summary><div class="pd-faq-a"><p>Side Print places the legends on the front-facing edge of the keycap instead of the top, keeping the top surface clean while the character art still shows as you type.</p></div></details>
 <details class="pd-faq-item"><summary class="pd-faq-q">How do I clean the keycaps?</summary><div class="pd-faq-a"><p>Dust with a soft dry brush or cloth. For a deeper clean, hand-wash with warm water and mild soap, rinse well and let them air-dry completely before reinstalling. Avoid hot water and dishwashers.</p></div></details>
 <details class="pd-faq-item"><summary class="pd-faq-q">Are the keycaps included with a keyboard?</summary><div class="pd-faq-a"><p>No — this listing is for the keycap set only. The keyboard, switches, cables and any props shown in the photos are for display purposes only.</p></div></details>
@@ -896,7 +929,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <section class="pd-ck__section">
 <div class="pd-ck__cta">
 <p>Give your setup a soft, huggable upgrade ✨</p>
-<button type="button" data-pd-goto-atc onclick="var a=document.querySelector('form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});a.classList.remove('pd-atc-glow');void a.offsetWidth;a.classList.add('pd-atc-glow');setTimeout(function(){a.classList.remove('pd-atc-glow');},2600);}return false;">🛒 Add to Cart</button>
+<button type="button" data-pd-goto-atc onclick="var a=document.querySelector('form[action*=cart] button[type=submit],form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart')||document.querySelector('.shopify-payment-button__button');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('pd-atc-glow');void a.offsetWidth;a.classList.add('pd-atc-glow');setTimeout(function(){a.classList.remove('pd-atc-glow');},2600);},650);}return false;">🛒 Add to Cart</button>
 </div>
 </section>
 
