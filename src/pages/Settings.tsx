@@ -27,6 +27,8 @@ export default function SettingsPage() {
   const [shopToken, setShopToken] = useState("");
   const [shopClientId, setShopClientId] = useState("");
   const [shopClientSecret, setShopClientSecret] = useState("");
+  const [etsyUrl, setEtsyUrl] = useState("http://localhost:4317");
+  const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [vClaude, setVClaude] = useState<VerifyClaudeResult | "loading" | null>(null);
@@ -60,6 +62,7 @@ export default function SettingsPage() {
       setUsdPerCredit(s.data.manusUsdPerCredit);
       setClaudeBalance(s.data.anthropicBalanceUsd);
       setAutoPush(s.data.autoPushShopify);
+      if (s.data.etsyAppUrl) setEtsyUrl(s.data.etsyAppUrl);
       hydrated.current = true;
     }
   }, [s.data]);
@@ -542,6 +545,53 @@ export default function SettingsPage() {
               <input type="checkbox" style={{ width: 16 }} checked={autoPush} onChange={(e) => setAutoPush(e.target.checked)} />
               <span className="tiny">{t("settings.autoPush")}</span>
             </label>
+          </div>
+
+          {/* Etsy Command Center companion app */}
+          <div className="card">
+            <h3>🧵 {t("settings.secEtsyApp")}</h3>
+            <span className={"badge " + (s.data?.etsyAppConnected ? "ok" : "warn")}>
+              {s.data?.etsyAppConnected ? t("settings.etsyAppConnected") : t("settings.etsyAppNotSet")}
+            </span>
+            <div className="col" style={{ gap: 8 }}>
+              <p className="tiny muted">{t("settings.etsyAppHint")}</p>
+              <label className="field">
+                {t("settings.etsyAppUrl")}
+                <input value={etsyUrl} onChange={(e) => setEtsyUrl(e.target.value)} placeholder="http://localhost:4317" />
+              </label>
+              <div className="row" style={{ gap: 8 }}>
+                <button
+                  className="btn sm"
+                  disabled={pairing}
+                  onClick={async () => {
+                    setPairing(true);
+                    try {
+                      const r = await api.pairEtsyApp(etsyUrl.trim());
+                      toast(t("settings.etsyAppPaired", { url: r.url }), "ok");
+                      s.refetch();
+                    } catch (e) {
+                      toast((e as Error).message, "err");
+                    } finally {
+                      setPairing(false);
+                    }
+                  }}
+                >
+                  {pairing ? <span className="spin" /> : t("settings.etsyAppPair")}
+                </button>
+                {s.data?.etsyAppConnected && (
+                  <button
+                    className="btn ghost sm"
+                    onClick={async () => {
+                      await api.saveSettings({ clearEtsyApp: true });
+                      setEtsyUrl("http://localhost:4317");
+                      s.refetch();
+                    }}
+                  >
+                    {t("settings.clear")}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

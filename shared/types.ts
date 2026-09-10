@@ -303,6 +303,10 @@ export interface Settings {
   shopifyRedirectUri: string;
   shopifyApiVersion: string;
   autoPushShopify: boolean;
+  /** base URL of the "Etsy Command Center" companion app */
+  etsyAppUrl: string;
+  /** true once paired (url + key both known) */
+  etsyAppConnected: boolean;
   previewReferenceUrl: string;
   uiLang: "tr" | "en";
   /** researched once, kept fixed — the operator's own brand */
@@ -324,6 +328,9 @@ export interface SettingsPatch {
   shopifyClientId?: string;
   shopifyClientSecret?: string;
   clearShopify?: boolean;
+  etsyAppUrl?: string;
+  etsyAppKey?: string;
+  clearEtsyApp?: boolean;
   llmModel?: string;
   llmEffort?: string;
   llmThinking?: "adaptive" | "off";

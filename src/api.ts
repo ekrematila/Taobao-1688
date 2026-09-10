@@ -96,6 +96,22 @@ export const api = {
 
   pushShopify: (draftId: string) => post<{ adminUrl: string; id: number }>("/shopify/push", { draftId }),
 
+  etsyAppStatus: () => req<{ configured: boolean; url: string; reachable: boolean }>("/etsy-app/status"),
+  pairEtsyApp: (url?: string) => post<{ url: string; connected: boolean }>("/etsy-app/pair", { url }),
+  pushEtsyApp: (draftId: string, dryRun = false) =>
+    post<{
+      ok?: boolean;
+      dryRun?: boolean;
+      draftId?: number;
+      updated?: boolean;
+      openUrl?: string;
+      title?: string;
+      images?: number;
+      variants?: number;
+      message?: string;
+      wouldCreate?: { title?: string; price?: number | null; images?: number; variants?: number };
+    }>("/etsy-app/push", { draftId, dryRun }),
+
   usage: (range?: { from?: string; to?: string }) =>
     req<UsageDashboard>("/usage" + qs(range)),
   manusUsage: (range?: { from?: string; to?: string }) =>

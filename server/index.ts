@@ -42,6 +42,14 @@ import {
   shopifyOAuthCallback,
 } from "./shopify.ts";
 import {
+  pushToEtsyApp,
+  pairEtsyApp,
+  etsyAppStatus,
+  etsyAppConfigured,
+  etsyAppBaseUrl,
+  EtsyAppError,
+} from "./etsyApp.ts";
+import {
   TAXONOMY,
   TAXONOMY_PATHS,
   TAXONOMY_ATTR_COUNT,
@@ -167,7 +175,11 @@ const wrap =
   (req: express.Request, res: express.Response) => {
     fn(req, res).catch((e) => {
       const status =
-        e instanceof OneboundError || e instanceof LlmError || e instanceof ShopifyError || e instanceof ManusError
+        e instanceof OneboundError ||
+        e instanceof LlmError ||
+        e instanceof ShopifyError ||
+        e instanceof ManusError ||
+        e instanceof EtsyAppError
           ? e.status
           : 500;
       if (status >= 500) console.error(e);
@@ -211,6 +223,8 @@ async function currentSettings(): Promise<Settings> {
     shopifyRedirectUri: `${env.appPublicUrl}/api/shopify/oauth/callback`,
     shopifyApiVersion: env.shopifyApiVersion,
     autoPushShopify: getSetting("auto_push_shopify") === "1",
+    etsyAppUrl: etsyAppBaseUrl(),
+    etsyAppConnected: etsyAppConfigured(),
     previewReferenceUrl: env.previewReferenceUrl,
     uiLang: (getSetting("ui_lang") as "tr" | "en") ?? "tr",
     brandUrl: getSetting("brand_url") ?? "",
@@ -279,6 +293,13 @@ app.post(
       setSetting("shopify_client_secret", "");
     }
     if (typeof p.autoPushShopify === "boolean") setSetting("auto_push_shopify", p.autoPushShopify ? "1" : "0");
+    if (typeof p.etsyAppUrl === "string")
+      setSetting("etsy_app_url", p.etsyAppUrl.trim().replace(/\/+$/, "").slice(0, 300));
+    if (typeof p.etsyAppKey === "string" && p.etsyAppKey.trim()) setSetting("etsy_app_key", p.etsyAppKey.trim());
+    if (p.clearEtsyApp === true) {
+      setSetting("etsy_app_url", "");
+      setSetting("etsy_app_key", "");
+    }
     if (p.uiLang === "tr" || p.uiLang === "en") setSetting("ui_lang", p.uiLang);
     if (typeof p.brandUrl === "string") setSetting("brand_url", p.brandUrl.trim().slice(0, 300));
     if (typeof p.brandBrief === "string") setSetting("brand_brief", p.brandBrief.slice(0, 12000));
@@ -1470,6 +1491,30 @@ app.post(
     const draft = getDraft(req.body?.draftId);
     if (!draft?.product || !draft.listing) return res.status(400).json({ error: "Ürün veya listeleme eksik." });
     const out = await pushToShopify(draft.product, draft.listing);
+    res.json(out);
+  }),
+);
+
+/* ------------------------------ Etsy app ----------------------------- */
+
+app.get("/api/etsy-app/status", wrap(async (_req, res) => res.json(await etsyAppStatus())));
+
+app.post("/api/etsy-app/pair", wrap(async (req, res) => res.json(await pairEtsyApp(req.body?.url))));
+
+/** Send this Etsy draft to the Etsy Command Center as a local draft. */
+app.post(
+  "/api/etsy-app/push",
+  wrap(async (req, res) => {
+    const draft = getDraft(req.body?.draftId);
+    if (!draft?.product || !draft.listing) return res.status(400).json({ error: "Ürün veya listeleme eksik." });
+    if (draft.listing.channel !== "etsy")
+      return res.status(400).json({ error: "Bu taslak Etsy için üretilmemiş — kanalı Etsy seçip içerik üret." });
+    // never carry Shopify-only material across
+    const listing: typeof draft.listing = {
+      ...draft.listing,
+      fields: draft.listing.fields.filter((f) => f.key !== "seo_description"),
+    };
+    const out = await pushToEtsyApp(draft.product, listing, { dryRun: Boolean(req.body?.dryRun) });
     res.json(out);
   }),
 );

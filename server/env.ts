@@ -51,6 +51,10 @@ export const env = {
   shopifyClientSecret: process.env.SHOPIFY_CLIENT_SECRET || process.env.SHOPIFY_API_SECRET || "",
   shopifyApiVersion: process.env.SHOPIFY_API_VERSION || "2025-01",
 
+  // "Etsy Command Center" companion app — receives an Etsy draft on one click.
+  etsyAppUrl: (process.env.ETSY_APP_URL || "http://localhost:4317").replace(/\/+$/, ""),
+  etsyAppKey: process.env.ETSY_APP_KEY || "",
+
   previewReferenceUrl:
     process.env.PREVIEW_REFERENCE_URL || "https://keyartisan.net/products/cool-harry-potter-theme-keycap-set",
   // where the browser reaches this app (front-end origin) — used to build the

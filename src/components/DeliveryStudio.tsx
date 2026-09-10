@@ -476,6 +476,30 @@ export default function DeliveryStudio({
     }
   }
 
+  async function pushEtsy() {
+    setBusy("push-etsy");
+    try {
+      // self-healing pairing: the pair endpoint just re-reads the companion app's
+      // contract and stores its current key, so doing it every time keeps a
+      // regenerated key from breaking the button. If the app is down it throws
+      // here and we let the push below report the real reason.
+      try {
+        await api.pairEtsyApp();
+        qc.invalidateQueries({ queryKey: ["settings"] });
+      } catch {
+        /* fall through */
+      }
+      const r = await api.pushEtsyApp(draft.id);
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      toast(r.message || t("delivery.pushEtsyAppDone"), "ok");
+      if (r.openUrl) window.open(r.openUrl, "_blank");
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <div
       className="grid"
@@ -1230,9 +1254,14 @@ export default function DeliveryStudio({
                   {t("delivery.dlAll")}
                 </button>
               </div>
-              {hasShopify && (
+              {channel === "shopify" && hasShopify && (
                 <button className="btn" onClick={push} disabled={!!busy}>
                   {busy === "push" ? <span className="spin" /> : t("delivery.pushShopify")}
+                </button>
+              )}
+              {channel === "etsy" && (
+                <button className="btn" onClick={pushEtsy} disabled={!!busy}>
+                  {busy === "push-etsy" ? <span className="spin" /> : t("delivery.pushEtsyApp")}
                 </button>
               )}
             </>
