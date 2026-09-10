@@ -565,7 +565,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           imageUrls: [url],
           targetLanguage: tLang,
           instruction: tInstruction || undefined,
-          imageSpec: effectiveSpec || undefined,
+          // no size knob for translation — the server guarantees shortest edge 800–1000 px, max quality
           agentProfile: manusProfile,
         },
         op,
@@ -1237,48 +1237,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                   placeholder={t("ws.trInstructionPh")}
                 />
               </label>
-              <label className="field">
-                {t("ws.imgSpec")}
-                <select value={imageSpec} onChange={(e) => setImageSpec(e.target.value)}>
-                  {IMAGE_SPECS.map((s) => (
-                    <option key={s.v} value={s.v}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {imageSpec === "__custom__" && (
-                <div className="row" style={{ alignItems: "center" }}>
-                  <label className="row tiny muted" style={{ gap: 4, margin: 0 }}>
-                    W
-                    <input
-                      type="number"
-                      min={64}
-                      max={6000}
-                      value={customW}
-                      onChange={(e) => setCustomW(Math.max(1, Number(e.target.value) || 0))}
-                      style={{ width: 76 }}
-                    />
-                  </label>
-                  <span className="tiny muted">×</span>
-                  <label className="row tiny muted" style={{ gap: 4, margin: 0 }}>
-                    H
-                    <input
-                      type="number"
-                      min={64}
-                      max={6000}
-                      value={customH}
-                      onChange={(e) => setCustomH(Math.max(1, Number(e.target.value) || 0))}
-                      style={{ width: 76 }}
-                    />
-                  </label>
-                  <select value={customQ} onChange={(e) => setCustomQ(e.target.value as any)}>
-                    <option value="standard">standard</option>
-                    <option value="high">high</option>
-                    <option value="maximum">maximum</option>
-                  </select>
-                </div>
-              )}
+              <p className="tiny muted" style={{ margin: "2px 0 0" }}>{t("ws.trSizeNote")}</p>
               <label className="field">
                 {t("ws.manusProfile")}
                 <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)}>

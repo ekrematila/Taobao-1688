@@ -458,6 +458,7 @@ const tr = {
   "ws.trInstruction":
     "Ek komut (opsiyonel) — varsayılan: yazıları çevir; satıcı markası, filigran ve ürünle alakasız yazıları kaldır; ürüne ve arka plana dokunma",
   "ws.trInstructionPh": "örn. tüm ölçü birimlerini mm olarak bırak",
+  "ws.trSizeNote": "Çevrilen görsel her zaman yüksek kalite, en kısa kenarı 800–1000 px olacak şekilde kaydedilir.",
   "ws.trSelected": "Seçili görselleri düzelt",
   "ws.trAll": "Tümünü düzelt",
   "ws.trNone": "Düzeltmeye gerek yok",
@@ -1563,6 +1564,7 @@ const en: Record<keyof typeof tr, string> = {
   "ws.trInstruction":
     "Extra instruction (optional) — default: translate the text; remove the seller brand, watermark and any product-unrelated text; leave the product and background untouched",
   "ws.trInstructionPh": "e.g. keep all measurements in mm",
+  "ws.trSizeNote": "Translated images are always saved at high quality with the shortest edge at 800–1000 px.",
   "ws.trSelected": "Clean up selected images",
   "ws.trAll": "Clean up all",
   "ws.trNone": "No cleanup needed",

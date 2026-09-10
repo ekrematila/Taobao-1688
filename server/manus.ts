@@ -698,7 +698,7 @@ export async function translateImage(opts: {
       (productContext ? ` (seller context: ${productContext.slice(0, 400)})` : "") +
       " so terminology is right.",
     "2 — Find every Chinese OVERLAY block: headlines, sub-headlines, callouts, spec labels, banner text, arrow captions, comparison captions, badge text.",
-    `3 — Translate each into ${targetLanguage} ONLY, tight and natural, correct niche terms. Glossary you MUST honour: ${KEYCAP_GLOSSARY}`,
+    `3 — Translate each into ${targetLanguage} ONLY, tight and natural, correct niche terms. Apply this glossary EXACTLY (not a loose paraphrase): ${KEYCAP_GLOSSARY} So: "OEM"/"OEM高度" → "OEM Profile" (never "OEM Height"); "热升华"/"五面热升华" → "dye-sublimation" (never "thermal sublimation"); "原厂高度"/"原厂" → "Cherry Profile".`,
     `4 — Re-set each block IN PLACE per RULE #1 above. Match the original font SIZE. If the ${targetLanguage} is physically longer than the box (it usually is), shrink the font and tighten tracking until it fits the SAME box — never enlarge/move the box, never push other elements, never spill outside a frame / bracket ("「」"/"【】") / underline / pill / ribbon it sat inside. If the original text was itself clipped at an edge, clip the translation the SAME way in the SAME place.`,
     "5 — REMOVE (not translate) and cleanly reconstruct behind: seller / shop-name text and shop-type tags (\"…店\", \"旗舰店\", \"专卖店\", \"官方\", personal names like \"徐老师…\") and the seller's logo / wordmark / avatar badge; watermarks (single, stamp, or tiled — all of it); off-topic text (URLs, WeChat/QQ/phone, marketplace names Taobao/Tmall/1688/Pinduoduo, 'scan to buy', QR codes, anti-copy notices).",
     `6 — ${NO_CJK_DIRECTIVE} No Chinese may remain anywhere in the overlay/caption text.`,
