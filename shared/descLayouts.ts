@@ -250,31 +250,121 @@ export function renderImportBody(
  *  makes the CTA delegated + resilient to a theme re-rendering the description.
  *  `document`-delegated (never bound at run time) + a `window.__bmInit` guard so
  *  it is safe if injected more than once. No `//` comments (one-lined for CSV). */
-const BM_SCRIPT =
-  `<script>(function(){if(window.__bmInit)return;window.__bmInit=1;` +
-  `function findAtc(){return document.querySelector('form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] [type="submit"], button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, #ProductSubmitButton, .btn--add-to-cart, .add-to-cart, .product-form__cart-submit')||document.querySelector('.shopify-payment-button__button');}` +
-  `function glow(el){if(!el)return;el.classList.remove('bm-atc-glow');void el.offsetWidth;el.classList.add('bm-atc-glow');setTimeout(function(){el.classList.remove('bm-atc-glow');},2600);}` +
-  `function afterScrollSettles(cb){var done=false;function fire(){if(done)return;done=true;cb();}` +
-  `if('onscrollend' in window){var cap=setTimeout(fire,1600);window.addEventListener('scrollend',function h(){window.removeEventListener('scrollend',h);clearTimeout(cap);fire();},{once:true});return;}` +
-  `var last=window.pageYOffset,still=0;var iv=setInterval(function(){var y=window.pageYOffset;if(Math.abs(y-last)<2){still+=90;if(still>=220){clearInterval(iv);fire();}}else{still=0;last=y;}},90);setTimeout(function(){clearInterval(iv);fire();},2000);}` +
-  `document.addEventListener('click',function(e){var t=e.target;` +
-  `var z=t.closest&&t.closest('.bm [data-bm-zoom]');` +
-  `if(z){var im=z.tagName==='IMG'?z:z.querySelector('img');var lb=document.querySelector('.bm-lightbox');` +
-  `if(im&&lb){var li=lb.querySelector('[data-bm-lightbox-img]')||lb.querySelector('img');if(li){li.src=im.currentSrc||im.src;lb.classList.add('is-open');}}return;}` +
-  `if((t.closest&&t.closest('.bm-lightbox [data-bm-close]'))||(t.classList&&t.classList.contains('bm-lightbox'))){var o=document.querySelector('.bm-lightbox.is-open');if(o)o.classList.remove('is-open');return;}` +
-  `var cta=t.closest&&t.closest('[data-bm-goto-atc]');if(!cta)return;e.preventDefault();` +
-  `var atc=findAtc();if(!atc)return;atc.scrollIntoView({behavior:'smooth',block:'center'});afterScrollSettles(function(){glow(atc);});` +
-  `});` +
-  `document.addEventListener('keydown',function(e){if(e.key==='Escape'){var o=document.querySelector('.bm-lightbox.is-open');if(o)o.classList.remove('is-open');}});` +
-  `})();</script>`;
+/** Locate the storefront's REAL "Add to Cart" button. HARD rule: never a
+ *  Shop Pay / dynamic-checkout / "Buy now" / "Buy with …" button. Ordered
+ *  probe, then a text-based last resort; only returns null on a page that
+ *  genuinely has no add-to-cart control. Shared by BM_SCRIPT and PD_SCRIPT. */
+const FIND_ATC_FN = `
+  function findAtc(){
+    var list = [
+      'form[action*="/cart/add"] button[name="add"]',
+      'form[action*="/cart/add"] [type="submit"]',
+      'button[name="add"]',
+      '#AddToCart',
+      '#ProductSubmitButton',
+      '.product-form__submit',
+      '.product-form__cart-submit',
+      '.btn--add-to-cart',
+      '.add-to-cart'
+    ];
+    function bad(el){
+      if(!el) return true;
+      if(el.closest && el.closest('.shopify-payment-button')) return true;
+      var t = (el.textContent || '').trim().toLowerCase();
+      return t.indexOf('shop pay') !== -1 || t.indexOf('buy now') !== -1 || t.indexOf('buy with') !== -1;
+    }
+    for(var i = 0; i < list.length; i++){
+      var els = document.querySelectorAll(list[i]);
+      for(var j = 0; j < els.length; j++){
+        if(!bad(els[j])) return els[j];
+      }
+    }
+    var all = document.querySelectorAll('button, [type="submit"], a');
+    for(var k = 0; k < all.length; k++){
+      var e2 = all[k];
+      if(bad(e2)) continue;
+      var t2 = (e2.textContent || '').trim().toLowerCase();
+      if(t2.indexOf('add to cart') !== -1 || t2.indexOf('add to bag') !== -1) return e2;
+    }
+    return null;
+  }`;
+
+const BM_SCRIPT = `<script>
+(function(){
+  if(window.__bmInit) return; window.__bmInit = 1;
+${FIND_ATC_FN}
+  function glow(el){
+    if(!el) return;
+    el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
+    setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
+  }
+  function afterScrollSettles(cb){
+    var done = false;
+    function fire(){ if(done) return; done = true; cb(); }
+    if('onscrollend' in window){
+      var cap = setTimeout(fire, 1600);
+      window.addEventListener('scrollend', function h(){ window.removeEventListener('scrollend', h); clearTimeout(cap); fire(); }, {once:true});
+      return;
+    }
+    var last = window.pageYOffset, still = 0;
+    var iv = setInterval(function(){
+      var y = window.pageYOffset;
+      if(Math.abs(y - last) < 2){ still += 90; if(still >= 220){ clearInterval(iv); fire(); } }
+      else { still = 0; last = y; }
+    }, 90);
+    setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var z = t.closest && t.closest('.bm [data-bm-zoom]');
+    if(z){
+      var im = z.tagName === 'IMG' ? z : z.querySelector('img');
+      var lb = document.querySelector('.bm-lightbox');
+      if(im && lb){ var li = lb.querySelector('[data-bm-lightbox-img]') || lb.querySelector('img'); if(li){ li.src = im.currentSrc || im.src; lb.classList.add('is-open'); } }
+      return;
+    }
+    if((t.closest && t.closest('.bm-lightbox [data-bm-close]')) || (t.classList && t.classList.contains('bm-lightbox'))){
+      var o = document.querySelector('.bm-lightbox.is-open'); if(o) o.classList.remove('is-open'); return;
+    }
+    var cta = t.closest && t.closest('[data-bm-goto-atc]');
+    if(!cta) return;
+    e.preventDefault();
+    var atc = findAtc();
+    if(!atc) return;
+    atc.scrollIntoView({behavior:'smooth', block:'center'});
+    afterScrollSettles(function(){ glow(atc); });
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ var o = document.querySelector('.bm-lightbox.is-open'); if(o) o.classList.remove('is-open'); }
+  });
+})();
+</script>`;
 
 /** No-JS guard: if Shopify strips the `<script>`, `.bm-reveal` would stay invisible. */
 const BM_NOSCRIPT = `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>`;
 
+/** Light readability pass for an injected `<style>…</style>` blob: one rule per
+ *  line, declarations indented. Whitespace-only — CSS semantics are unchanged,
+ *  and the CSV/import path re-collapses it via `oneLine()`. Used so the standalone
+ *  `.html` download and preview source are human-readable, not one dense line. */
+const fmtStyle = (block: string): string =>
+  block.replace(/^(<style[^>]*>)([\s\S]*?)(<\/style>)$/i, (_m, o: string, css: string, c: string) => {
+    const body = css
+      .replace(/\s*\{\s*/g, " {\n")
+      .replace(/;\s*/g, ";\n")
+      .replace(/\s*\}\s*/g, "}\n")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => (l.endsWith("{") || l === "}" ? l : "  " + l))
+      .join("\n");
+    return `${o}\n${body}\n${c}`;
+  });
+
 /** The v2-only `.bm` rules (reveal / zoom / lightbox / FAQ / CTA). Injected by
  *  `ensureBmScaffold` when the block's own `<style>` predates v2 (the fallback
  *  card, or an older model block). */
-const BM_STYLE_EXTRA =
+const BM_STYLE_EXTRA = fmtStyle(
   `<style>@media (prefers-reduced-motion:reduce){.bm *{animation-duration:.01ms!important;transition-duration:.01ms!important}}` +
   `.bm-reveal{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:none}` +
   `.bm-media .bm-stage{position:relative;cursor:zoom-in}.bm-media img{transition:transform .5s cubic-bezier(.25,.8,.3,1);cursor:zoom-in;background:var(--sky,#eaeefc)}.bm-media img:hover{transform:scale(1.03)}` +
@@ -288,7 +378,8 @@ const BM_STYLE_EXTRA =
   `.bm-cta{margin-top:18px;padding:16px;border-radius:14px;text-align:center;background:linear-gradient(135deg,var(--acc,#4f57c4),var(--acc2,#98a0ea))}.bm-cta p{color:#eef0ff;font-size:12.5px;margin:0 0 10px}.bm-cta button,.bm-cta a{display:inline-flex!important;align-items:center;gap:7px;background:#fff;color:var(--acc,#4f57c4);font-weight:700;font-size:13.5px;padding:10px 20px;border-radius:99px;border:0;text-decoration:none;cursor:pointer}` +
   // NOTE: no @keyframes for .bm-atc-glow here — its single definition lives in
   // FAQ_CTA_GUARANTEE (always appended), so there is never a duplicate/override.
-  `</style>`;
+  `</style>`,
+);
 
 const BM_LIGHTBOX =
   `<div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button>` +
@@ -320,21 +411,42 @@ function bmMediaInner(imgs: DescImg[]): string {
  *  the elements at script-run time) so it keeps working even if the theme moves
  *  or re-renders the description block after the page loads.
  *  We NEVER trust a model-authored `<script>` for this — see `ensurePdScaffold`. */
-const PD_SCRIPT =
-  `<script>(function(){if(window.__pdInit)return;window.__pdInit=1;` +
-  `document.addEventListener('click',function(e){` +
-  `var q=e.target&&e.target.closest&&e.target.closest('div.pd-faq-q');` +
-  `if(q){var it=q.closest('.pd-faq-item');if(it)it.classList.toggle('pd-open');return;}` +
-  `var btn=e.target&&e.target.closest&&e.target.closest('[data-pd-goto-atc]');` +
-  `if(!btn)return;e.preventDefault();` +
-  `var atc=document.querySelector('form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] [type="submit"], button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, #ProductSubmitButton, .btn--add-to-cart, .add-to-cart, .product-form__cart-submit')||document.querySelector('.shopify-payment-button__button');` +
-  `if(!atc)return;atc.scrollIntoView({behavior:'smooth',block:'center'});` +
-  `var run=function(){atc.classList.remove('pd-atc-glow');void atc.offsetWidth;atc.classList.add('pd-atc-glow');setTimeout(function(){atc.classList.remove('pd-atc-glow');},2600);};` +
-  `var done=false;function fire(){if(done)return;done=true;run();}` +
-  `if('onscrollend' in window){var cap=setTimeout(fire,1600);window.addEventListener('scrollend',function h(){window.removeEventListener('scrollend',h);clearTimeout(cap);fire();},{once:true});}` +
-  `else{var last=window.pageYOffset,still=0;var iv=setInterval(function(){var y=window.pageYOffset;if(Math.abs(y-last)<2){still+=90;if(still>=220){clearInterval(iv);fire();}}else{still=0;last=y;}},90);setTimeout(function(){clearInterval(iv);fire();},2000);}` +
-  `});` +
-  `})();</script>`;
+const PD_SCRIPT = `<script>
+(function(){
+  if(window.__pdInit) return; window.__pdInit = 1;
+${FIND_ATC_FN}
+  function afterScrollSettles(cb){
+    var done = false;
+    function fire(){ if(done) return; done = true; cb(); }
+    if('onscrollend' in window){
+      var cap = setTimeout(fire, 1600);
+      window.addEventListener('scrollend', function h(){ window.removeEventListener('scrollend', h); clearTimeout(cap); fire(); }, {once:true});
+      return;
+    }
+    var last = window.pageYOffset, still = 0;
+    var iv = setInterval(function(){
+      var y = window.pageYOffset;
+      if(Math.abs(y - last) < 2){ still += 90; if(still >= 220){ clearInterval(iv); fire(); } }
+      else { still = 0; last = y; }
+    }, 90);
+    setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
+  }
+  document.addEventListener('click', function(e){
+    var q = e.target && e.target.closest && e.target.closest('div.pd-faq-q');
+    if(q){ var it = q.closest('.pd-faq-item'); if(it) it.classList.toggle('pd-open'); return; }
+    var btn = e.target && e.target.closest && e.target.closest('[data-pd-goto-atc]');
+    if(!btn) return;
+    e.preventDefault();
+    var atc = findAtc();
+    if(!atc) return;
+    atc.scrollIntoView({behavior:'smooth', block:'center'});
+    afterScrollSettles(function(){
+      atc.classList.remove('pd-atc-glow'); void atc.offsetWidth; atc.classList.add('pd-atc-glow');
+      setTimeout(function(){ atc.classList.remove('pd-atc-glow'); }, 2600);
+    });
+  });
+})();
+</script>`;
 
 /** Fallback CSS for the "Diğer" FAQ/CTA contract — inserted right after the
  *  block's OWN `<style>` opening tag, so any matching rule the model wrote
@@ -349,7 +461,7 @@ const PD_SCRIPT =
  *  model rule (e.g. `.x.pd-open.pd-faq-a` missing the descendant space, or a
  *  `transition:max-height.45s` typo) cannot stop the accordion opening. Covers
  *  both toggle-class conventions: `.pd-open` (pd-*) and `.is-open` (.bm). */
-const FAQ_CTA_GUARANTEE =
+const FAQ_CTA_GUARANTEE = fmtStyle(
   `<style>` +
   // 1) reveal blocks are ALWAYS visible — Shopify strips <script>, so a JS-gated
   //    opacity:0 reveal would leave the whole description invisible. Bulletproof.
@@ -383,7 +495,8 @@ const FAQ_CTA_GUARANTEE =
   `.bm-spec .bm-r,.bm-spec>div:not(.bm-sub){display:flex!important;flex-wrap:wrap;justify-content:space-between!important;gap:6px 18px!important;align-items:baseline;padding:10px 14px}` +
   `.bm-spec .bm-k{flex:0 0 auto;max-width:44%;font-weight:500}` +
   `.bm-spec .bm-v{flex:1 1 auto;text-align:right;font-weight:600}` +
-  `</style>`;
+  `</style>`,
+);
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
  *  the runtime `<script>`. We NEVER trust a model-authored `<script>` here either

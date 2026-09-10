@@ -81,14 +81,14 @@ function bodyImgPairs(p: NormalisedProduct): import("@shared/descLayouts.ts").De
 }
 
 /** Shopify body HTML — the STYLED render, for the live preview and the
- *  standalone `.html` download. Not for CSV/API import (see importBodyHtml). */
+ *  standalone `.html` download. Kept human-readable (indented, one tag/rule per
+ *  line) so it can be copied out and debugged. NOT for CSV/API import — that
+ *  path (`importBodyHtml`) stays on one physical line for the CSV parser. */
 export function shopifyBodyHtml(p: NormalisedProduct, l: GeneratedListing): string {
-  return oneLineHtml(
-    renderDescriptionHtml(l.layout, field(l, "description"), bodyImgPairs(p), {
-      name: field(l, "title") || p.titleTranslated || p.title,
-      props: p.props,
-    }),
-  );
+  return renderDescriptionHtml(l.layout, field(l, "description"), bodyImgPairs(p), {
+    name: field(l, "title") || p.titleTranslated || p.title,
+    props: p.props,
+  });
 }
 
 /** Sanitiser-safe Body (HTML) for a Shopify/Woo import (shared with the API push). */

@@ -496,7 +496,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 <div class="bm-cta">
 <p>Give your setup a soft, huggable upgrade ✨</p>
-<button type="button" data-bm-goto-atc onclick="var a=document.querySelector('form[action*=cart] button[type=submit],form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart')||document.querySelector('.shopify-payment-button__button');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;">🛒 Add to Cart</button>
+<button type="button" data-bm-goto-atc onclick="(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;})();">🛒 Add to Cart</button>
 </div>
 <div class="bm-trust">
 <span>🚚 Ships worldwide</span>
@@ -517,12 +517,36 @@ export const STACKED_DESC_EXAMPLE = `<style>
 (function(){
   if(window.__bmInit) return; window.__bmInit = 1;
   function findAtc(){
-    // the real "Add to Cart" first; the Shop-Pay / dynamic-checkout button is only a last resort
-    return document.querySelector(
-      'form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] [type="submit"], ' +
-      'button[name="add"], .product-form__submit, [data-add-to-cart], #AddToCart, #ProductSubmitButton, ' +
-      '.btn--add-to-cart, .add-to-cart, .product-form__cart-submit'
-    ) || document.querySelector('.shopify-payment-button__button');
+    // HARD RULE: never a Shop Pay / dynamic-checkout / "Buy now" / "Buy with" button.
+    var list = [
+      'form[action*="/cart/add"] button[name="add"]',
+      'form[action*="/cart/add"] [type="submit"]',
+      'button[name="add"]',
+      '#AddToCart',
+      '#ProductSubmitButton',
+      '.product-form__submit',
+      '.product-form__cart-submit',
+      '.btn--add-to-cart',
+      '.add-to-cart'
+    ];
+    function bad(el){
+      if(!el) return true;
+      if(el.closest && el.closest('.shopify-payment-button')) return true;
+      var t = (el.textContent || '').trim().toLowerCase();
+      return t.indexOf('shop pay') !== -1 || t.indexOf('buy now') !== -1 || t.indexOf('buy with') !== -1;
+    }
+    for(var i = 0; i < list.length; i++){
+      var els = document.querySelectorAll(list[i]);
+      for(var j = 0; j < els.length; j++){ if(!bad(els[j])) return els[j]; }
+    }
+    var all = document.querySelectorAll('button, [type="submit"], a');
+    for(var k = 0; k < all.length; k++){
+      var e2 = all[k];
+      if(bad(e2)) continue;
+      var t2 = (e2.textContent || '').trim().toLowerCase();
+      if(t2.indexOf('add to cart') !== -1 || t2.indexOf('add to bag') !== -1) return e2;
+    }
+    return null;
   }
   function glow(el){
     if(!el) return;
@@ -929,7 +953,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <section class="pd-ck__section">
 <div class="pd-ck__cta">
 <p>Give your setup a soft, huggable upgrade ✨</p>
-<button type="button" data-pd-goto-atc onclick="var a=document.querySelector('form[action*=cart] button[type=submit],form[action*=cart] [type=submit],button[name=add],.product-form__submit,[data-add-to-cart],#AddToCart,.btn--add-to-cart')||document.querySelector('.shopify-payment-button__button');if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('pd-atc-glow');void a.offsetWidth;a.classList.add('pd-atc-glow');setTimeout(function(){a.classList.remove('pd-atc-glow');},2600);},650);}return false;">🛒 Add to Cart</button>
+<button type="button" data-pd-goto-atc onclick="(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('pd-atc-glow');void a.offsetWidth;a.classList.add('pd-atc-glow');setTimeout(function(){a.classList.remove('pd-atc-glow');},2600);},650);}return false;})();">🛒 Add to Cart</button>
 </div>
 </section>
 
