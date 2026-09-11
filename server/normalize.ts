@@ -173,6 +173,14 @@ export function normaliseItem(
 ): NormalisedProduct | undefined {
   const item = json?.item ?? json?.items?.item ?? json;
   if (!item || typeof item !== "object") return undefined;
+  // Defense-in-depth: OneBound's own failure sentinel is `item: { format_check:
+  // "fail" }` with none of the real product fields — `callOnebound()` should
+  // already have rejected this via `error_code`, but never build a draft off
+  // a payload with no usable identity (that's what silently produced titles
+  // like the raw pasted URL/ID instead of a real product title).
+  if (item.format_check === "fail" || !(item.title || item.num_iid || item.numIid || item.offerId)) {
+    return undefined;
+  }
 
   const numIid = firstString(item.num_iid, item.numIid, item.offerId, item.id, fallbackId);
   const roleFor: Record<string, ProductImage["role"]> = {

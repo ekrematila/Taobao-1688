@@ -86,8 +86,12 @@ export interface RawCall {
   json: unknown;
 }
 
-export async function callOnebound(input: ApiCallInput): Promise<RawCall> {
-  const { url, redacted } = buildRequest(input);
+/**
+ * One HTTP round-trip + response-validity check. Split out so `callOnebound`
+ * can retry just this part on a transient provider-side failure, without
+ * rebuilding (and re-validating) the request each time.
+ */
+async function callOnce(url: string, redacted: string): Promise<RawCall> {
   const started = Date.now();
   let res: Response;
   try {
@@ -104,14 +108,48 @@ export async function callOnebound(input: ApiCallInput): Promise<RawCall> {
     throw new OneboundError("OneBound JSON olmayan bir yanıt döndürdü (muhtemelen kota/anahtar hatası).");
   }
 
-  // OneBound puts an error object at the top level on failure.
-  const err = (json as any)?.error || (json as any)?.error_code;
-  const hasPayload =
-    (json as any)?.item || (json as any)?.items || (json as any)?.items_list || (json as any)?.seller_info;
-  if (err && !hasPayload) {
-    const reason = (json as any)?.reason || (json as any)?.error || "bilinmeyen hata";
+  // OneBound's OWN success/failure signal is `error_code`: "0000" = success,
+  // anything else = a real failure (e.g. "5000" = "data error"). This is the
+  // authoritative check — trust it whenever the field is present.
+  //
+  // The old check (`item`/`items`/... truthy => "has payload => not an error")
+  // was fooled by OneBound's own failure shape: on a real error it still
+  // returns `item: { format_check: "fail" }` — a non-empty OBJECT, so it read
+  // as truthy and the error was silently swallowed. That created a "successful"
+  // draft with no real title/price/images (title fell back to the raw pasted
+  // URL) instead of surfacing the failure so the operator could just retry.
+  const j = json as any;
+  const errorCode = j?.error_code !== undefined ? String(j.error_code) : undefined;
+  const isError =
+    errorCode !== undefined
+      ? errorCode !== "" && errorCode !== "0000"
+      : // no error_code field at all (a few endpoints omit it) — fall back to
+        // the old heuristic: an error message with no usable payload.
+        Boolean(j?.error) && !(j?.item || j?.items || j?.items_list || j?.seller_info);
+  if (isError) {
+    const reason = j?.reason || j?.error || `error_code ${errorCode}` || "bilinmeyen hata";
     throw new OneboundError(`Sağlayıcı veri döndüremedi: ${reason}`, 502);
   }
 
   return { requestUrl: redacted, status: res.status, ms, json };
+}
+
+/**
+ * One retry, after a short delay, ONLY for a provider-side failure (502 from
+ * `callOnce` — bad/missing input never reaches here, `buildRequest` throws
+ * those synchronously before any network call). OneBound occasionally answers
+ * a perfectly valid product with a transient `error_code: "5000"` ("data
+ * error") that a second, identical call resolves cleanly — confirmed: the
+ * exact num_iid that produced this error came back with a full, valid item
+ * moments later with nothing else changed.
+ */
+export async function callOnebound(input: ApiCallInput): Promise<RawCall> {
+  const { url, redacted } = buildRequest(input);
+  try {
+    return await callOnce(url, redacted);
+  } catch (e) {
+    if (!(e instanceof OneboundError) || e.status !== 502) throw e;
+    await new Promise((r) => setTimeout(r, 900));
+    return callOnce(url, redacted);
+  }
 }
