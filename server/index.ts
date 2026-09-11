@@ -816,7 +816,7 @@ app.post(
 app.post(
   "/api/ai/translate-images",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, targetLanguage, instruction, imageSpec, speed, agentProfile } = req.body ?? {};
+    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
@@ -905,7 +905,6 @@ app.post(
               targetLanguage: target,
               productContext: context,
               instruction,
-              imageSpec,
               speed,
               agentProfile,
               ctx,

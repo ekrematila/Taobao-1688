@@ -673,41 +673,35 @@ export async function translateImage(opts: {
   targetLanguage: string; // "English", "Türkçe", ...
   productContext?: string; // e.g. normalised title + category props
   instruction?: string; // optional extra user command
-  imageSpec?: string; // e.g. "~1500x1500 px, high quality"
   speed?: ManusSpeed;
   agentProfile?: string;
   ctx?: JobCtx;
 }): Promise<ImageTranslateOut> {
-  const { imageUrl, targetLanguage, productContext, instruction, imageSpec, speed, agentProfile, ctx } = opts;
+  const { imageUrl, targetLanguage, productContext, instruction, speed, agentProfile, ctx } = opts;
   const { data, mime } = await imageToBase64(imageUrl);
   const spd = speedConfig(speed, agentProfile);
   const sourceBytes = Math.round((data.length * 3) / 4);
   const model = await pickImageModel(sourceBytes);
 
+  // Kept deliberately short and single-purpose — one job only: find Chinese
+  // overlay text and translate it, in the same style, touching nothing else.
+  // No output-size/quality demands here (that was pure overhead for Manus and
+  // is handled anyway by `normaliseShortestEdge` after the image comes back).
   const prompt = [
-    `GOAL — return this exact product image as if a NATIVE ${targetLanguage} graphic designer had made it from the start. The ONLY thing that changes is the language of the overlay text (Chinese → ${targetLanguage}). Everything else — the product, the background, the photo, every colour and pixel that is not overlay text — is LOCKED and comes back visually identical.`,
-    `METHOD — this is an INPAINT / masked local edit, not a re-generation. Keep the source pixels; repaint ONLY the rectangles that contain overlay text or a watermark. A viewer flipping between input and output must see ONLY the text change language — nothing else.`,
-    `IMAGE MODEL — prefer "${model}" if available; otherwise your best image-editing model. You MUST return the edited image.`,
-    "",
-    `#1 RULE — SAME STYLE, SAME VIBE. Whatever the Chinese text looks like, the ${targetLanguage} text must look the SAME. If the Chinese headline is a BOLD DISPLAY / condensed / heavy poster font, the ${targetLanguage} headline is ALSO bold display / condensed / heavy — never a thin default sans. If the Chinese is a soft rounded kawaii style, match that. If it is 3D / bevelled / neon / chrome / outlined / gradient / brush-script / pixel / hand-lettered — reproduce THAT treatment on the ${targetLanguage} text. Same font weight, same UPPER/lowercase, same italic, same fill colour or gradient, same outline / stroke / drop-shadow / glow / bevel, same letter-spacing, same alignment, same baseline, same position, same box. Reference: a Chinese "蓝莓牛奶" set in a bold condensed blue face becomes an equally bold condensed blue "BLUEBERRY MILK", NOT plain grey text. A flat, thin, default-font result is a FAILED job.`,
-    `#2 RULE — FULLY ERASE the original glyphs. No ghosting, no faint Chinese characters showing through behind the new text, no blur smear, no double-exposure. Rebuild whatever was behind the removed text so it looks untouched, THEN lay the ${targetLanguage} text on top cleanly.`,
-    "#3 RULE — the product's OWN printed characters (key legends like Tab/Shift/Enter, sculpted art, real manufacturer marks physically on the product) stay as they are — do not translate or touch them. Only OVERLAY text added on top of the photo is translated.",
-    "",
-    "STEPS:",
-    "1 — Identify the niche" +
-      (productContext ? ` (seller context: ${productContext.slice(0, 400)})` : "") +
-      " so terminology is right.",
-    "2 — Find every Chinese OVERLAY block: headlines, sub-headlines, callouts, spec labels, banner text, arrow captions, comparison captions, badge text.",
-    `3 — Translate each into ${targetLanguage} ONLY, tight and natural, correct niche terms. Apply this glossary EXACTLY (not a loose paraphrase): ${KEYCAP_GLOSSARY} So: "OEM"/"OEM高度" → "OEM Profile" (never "OEM Height"); "热升华"/"五面热升华" → "dye-sublimation" (never "thermal sublimation"); "原厂高度"/"原厂" → "Cherry Profile".`,
-    `4 — Re-set each block IN PLACE per RULE #1 above. Match the original font SIZE. If the ${targetLanguage} is physically longer than the box (it usually is), shrink the font and tighten tracking until it fits the SAME box — never enlarge/move the box, never push other elements, never spill outside a frame / bracket ("「」"/"【】") / underline / pill / ribbon it sat inside. If the original text was itself clipped at an edge, clip the translation the SAME way in the SAME place.`,
-    "5 — REMOVE (not translate) and cleanly reconstruct behind: seller / shop-name text and shop-type tags (\"…店\", \"旗舰店\", \"专卖店\", \"官方\", personal names like \"徐老师…\") and the seller's logo / wordmark / avatar badge; watermarks (single, stamp, or tiled — all of it); off-topic text (URLs, WeChat/QQ/phone, marketplace names Taobao/Tmall/1688/Pinduoduo, 'scan to buy', QR codes, anti-copy notices).",
-    `6 — ${NO_CJK_DIRECTIVE} No Chinese may remain anywhere in the overlay/caption text.`,
-    "7 — Return the edited image as a file attachment. Reply with the single token NO_CHANGE_NEEDED (its own final line, nothing attached) ONLY if the image has NO Chinese overlay AND NO watermark/seller mark. If there is ANY Chinese overlay text you MUST translate and return the image. Do not write that token anywhere else.",
-    instruction ? `\nOperator instruction (still obey the rules above): ${instruction}` : "",
-    `\nOUTPUT SIZE — keep the SAME aspect ratio; scale so the SHORTEST side is 800–1000 px; export at MAXIMUM quality (PNG or high-quality JPEG). Do not pad, do not crop differently, do not add margin.` +
-      (imageSpec ? ` (${imageSpec})` : ""),
-    `\n${spd.hint}`,
-  ].join("\n");
+    `Look at this product photo. Find any Chinese text that was ADDED ON TOP of the photo (headlines, captions, labels, banner text, badges) and translate it into ${targetLanguage}, in the EXACT SAME visual style it already has — same font weight/look, same colour or gradient, same outline/shadow/glow, same size, same position. Fully erase the original glyphs first (no ghosting) before placing the ${targetLanguage} text.`,
+    `REMOVE (do not translate) shop/seller names, watermarks, and off-topic marketplace text (Taobao/Tmall/1688/Pinduoduo, WeChat/QQ/phone numbers, QR codes, "scan to buy") — cleanly reconstruct whatever was behind them.`,
+    `If what looks like Chinese is actually part of the product's OWN physical design (printed or molded onto the product itself, not text overlaid on the photo — e.g. a keycap's own legend), leave the product exactly as it is. Do not translate or touch it.`,
+    `Everything that is not overlay text — the product, the background, every other pixel — must come back visually identical.`,
+    `IMAGE MODEL — prefer "${model}" if available; otherwise your best image-editing model.`,
+    productContext ? `Product context (for correct terminology): ${productContext.slice(0, 400)}` : "",
+    `Glossary — apply exactly: ${KEYCAP_GLOSSARY}`,
+    NO_CJK_DIRECTIVE,
+    instruction ? `Operator instruction: ${instruction}` : "",
+    "Return the edited image as a file attachment. If the photo has NO Chinese overlay text at all, reply with just the single token NO_CHANGE_NEEDED instead of an image.",
+    spd.hint,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   ctx?.setStatus(`Görsel çevriliyor (${model})…`);
   const res = await runManusTask(
