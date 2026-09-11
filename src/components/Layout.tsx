@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import Guide from "./Guide";
 import JobsDrawer from "./JobsDrawer";
 import CommandPalette from "./CommandPalette";
+import TunnelBadge from "./TunnelBadge";
 
 type Theme = "system" | "light" | "dark";
 
@@ -36,6 +37,7 @@ export default function Layout({ theme, setTheme }: { theme: Theme; setTheme: (t
         <div className="spacer" />
 
         <div className="sidefoot">
+          <TunnelBadge />
           <button className="footrow" onClick={() => window.dispatchEvent(new CustomEvent("tps:openPalette"))}>
             <span>🔎 {t("cmd.open")}</span>
           </button>

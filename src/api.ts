@@ -54,6 +54,7 @@ export const api = {
   me: () => req<{ needsAuth: boolean; authed: boolean }>("/me"),
   login: (password: string) => post<{ authed: boolean }>("/login", { password }),
   logout: () => post("/logout"),
+  tunnelUrl: () => req<{ url: string | null }>("/tunnel-url"),
 
   settings: () => req<Settings>("/settings"),
   examples: () =>

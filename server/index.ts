@@ -1,6 +1,6 @@
 import express from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
@@ -153,6 +153,21 @@ app.post("/api/logout", (_req, res) => {
 });
 app.get("/api/me", (req, res) => {
   res.json({ needsAuth: Boolean(env.appPassword), authed: authed(req) });
+});
+
+// The live Cloudflare quick-tunnel URL, if `tools/start-tunnel.ps1` has one
+// running — it writes the current address to `tools/tunnel-url.txt` each time
+// it (re)starts. The UI polls this so the address shown in-app always matches
+// reality, including after a restart hands out a brand new *.trycloudflare.com
+// address (those are never stable across runs).
+app.get("/api/tunnel-url", (_req, res) => {
+  try {
+    const p = join(ROOT, "tools", "tunnel-url.txt");
+    const url = existsSync(p) ? readFileSync(p, "utf8").trim() : "";
+    res.json({ url: url || null });
+  } catch {
+    res.json({ url: null });
+  }
 });
 
 // Gate everything else under /api.
