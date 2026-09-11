@@ -17,7 +17,9 @@ data/media/
 .DS_Store
 Thumbs.db
 
-# tunnel tool — downloaded binary + generated files, never commit
+# tunnel tool — downloaded binaries + generated files/credentials, never commit
 tools/cloudflared.exe
+tools/ngrok.exe
+tools/ngrok.yml
 tools/tunnel-url.txt
 tools/logs/

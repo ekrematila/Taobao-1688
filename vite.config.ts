@@ -18,10 +18,18 @@ export default defineConfig({
     // Cloudflare Tunnel) pointed at this port isn't blocked with "This host is
     // not allowed". `.loca.lt` = localtunnel, `.trycloudflare.com` = Cloudflare's
     // anonymous quick tunnel (`tools/start-tunnel.ps1`), `.pinggy.net` /
-    // `.pinggy-free.link` = the SSH-based Pinggy tunnel used when Cloudflare's
-    // anonymous-tunnel endpoint is unreachable (`tools/start-tunnel-pinggy.sh`).
-    // Add another tunnel service's domain the same way if you switch tools.
-    allowedHosts: [".loca.lt", ".trycloudflare.com", ".pinggy.net", ".pinggy-free.link"],
+    // `.pinggy-free.link` = the SSH-based Pinggy fallback (`tools/start-
+    // tunnel-pinggy.ps1`, 60-minute free-tier limit), `.ngrok-free.dev` /
+    // `.ngrok-free.app` / `.ngrok.app` / `.ngrok.io` = ngrok (`tools/start-
+    // tunnel-ngrok.ps1`, no forced time limit but needs a free account +
+    // authtoken — the long-lived option once Cloudflare's own endpoint is
+    // reachable again is a real named Cloudflare Tunnel instead of any of
+    // these). Add another tunnel service's domain the same way if you switch
+    // tools again.
+    allowedHosts: [
+      ".loca.lt", ".trycloudflare.com", ".pinggy.net", ".pinggy-free.link",
+      ".ngrok-free.dev", ".ngrok-free.app", ".ngrok.app", ".ngrok.io",
+    ],
     proxy: {
       "/api": {
         target: `http://localhost:${API_PORT}`,
