@@ -57,34 +57,59 @@ if (-not $hasPassword) {
 #    NOTE: cloudflared's own `--logfile` flag does NOT reliably capture the
 #    "quick Tunnel has been created" line on Windows -- use PowerShell's own
 #    stdout/stderr redirection instead, which does.
+#
+#    A real quick-tunnel hostname always has 3+ hyphen-separated words (e.g.
+#    "raises-electric-anderson-smoke.trycloudflare.com") -- requiring that
+#    stops a failed request's own error text ("...api.trycloudflare.com...")
+#    from being mistaken for a real address, which is what happened here
+#    ("Method Not Allowed" opened in the browser instead of the app).
 $outFile = Join-Path $logsDir "TaobaoTunnel.out.log"
-if (Test-Path $logFile) { Remove-Item $logFile -Force }
-if (Test-Path $outFile) { Remove-Item $outFile -Force }
-Write-Host "Tunel baslatiliyor (Cloudflare quick tunnel)..."
-Start-Process -FilePath $cloudflaredPath `
-    -ArgumentList "tunnel", "--url", "http://localhost:5173" `
-    -RedirectStandardOutput $outFile `
-    -RedirectStandardError $logFile `
-    -WindowStyle Hidden
+$urlPattern = "(https://[a-z0-9]+(?:-[a-z0-9]+){2,}\.trycloudflare\.com)"
+$failurePattern = "failed to request quick Tunnel|context deadline exceeded"
+
+function Start-OneAttempt {
+    if (Test-Path $logFile) { Remove-Item $logFile -Force }
+    if (Test-Path $outFile) { Remove-Item $outFile -Force }
+    $proc = Start-Process -FilePath $cloudflaredPath `
+        -ArgumentList "tunnel", "--url", "http://localhost:5173" `
+        -RedirectStandardOutput $outFile `
+        -RedirectStandardError $logFile `
+        -WindowStyle Hidden -PassThru
+
+    for ($i = 0; $i -lt 30; $i++) {
+        Start-Sleep -Seconds 1
+        $content = ""
+        foreach ($f in @($logFile, $outFile)) {
+            if (Test-Path $f) { $content += (Get-Content $f -Raw -ErrorAction SilentlyContinue) }
+        }
+        if ($content -match $urlPattern) { return @{ ok = $true; url = $matches[1] } }
+        if ($content -match $failurePattern) {
+            try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
+            return @{ ok = $false; retry = $true }
+        }
+        if ($proc.HasExited) { return @{ ok = $false; retry = $true } }
+    }
+    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
+    return @{ ok = $false; retry = $false }
+}
 
 $url = $null
-for ($i = 0; $i -lt 30; $i++) {
-    Start-Sleep -Seconds 1
-    $content = ""
-    foreach ($f in @($logFile, $outFile)) {
-        if (Test-Path $f) { $content += (Get-Content $f -Raw -ErrorAction SilentlyContinue) }
-    }
-    if ($content) {
-        if ($content -match "(https://[a-z0-9-]+\.trycloudflare\.com)") {
-            $url = $matches[1]
-            break
-        }
-    }
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    if ($attempt -eq 1) { Write-Host "Tunel baslatiliyor (Cloudflare quick tunnel)..." }
+    else { Write-Host "Tekrar deneniyor ($attempt/3)..." }
+    $result = Start-OneAttempt
+    if ($result.ok) { $url = $result.url; break }
+    if (-not $result.retry) { break }
+    # A quick failure right after another one is more likely Cloudflare's own
+    # anonymous-tunnel rate limit than a one-off network blip -- hammering it
+    # again immediately only makes that worse, so back off for real.
+    Start-Sleep -Seconds 20
 }
 
 Write-Host ""
+$urlFile = Join-Path $toolsDir "tunnel-url.txt"
 if ($url) {
-    Set-Content -Path (Join-Path $toolsDir "tunnel-url.txt") -Value $url
+    Set-Content -Path $urlFile -Value $url
     Write-Host "============================================================"
     Write-Host " Open     : $url"
     if ($hasPassword) {
@@ -98,5 +123,9 @@ if ($url) {
     Write-Host "Tuneli kapatmak icin bu pencereyi kapatin (cloudflared arka planda calisiyor olsa da,"
     Write-Host "islemi durdurmak icin: Get-Process cloudflared | Stop-Process)"
 } else {
-    Write-Host "Adres bulunamadi. Log dosyasina bakin: $logFile"
+    # Never leave a stale/wrong address behind for the app's own tunnel badge to show.
+    if (Test-Path $urlFile) { Remove-Item $urlFile -Force }
+    Write-Host "Tunel su an kurulamadi (Cloudflare'in kendi sunucusuna ulasilamadi/zaman asimi)."
+    Write-Host "Bu genelde gecicidir -- birkac dakika sonra bu scripti tekrar calistirmayi deneyin."
+    Write-Host "Log dosyasina bakin: $logFile"
 }
