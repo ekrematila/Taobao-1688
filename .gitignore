@@ -16,3 +16,8 @@ data/media/
 *.log
 .DS_Store
 Thumbs.db
+
+# tunnel tool — downloaded binary + generated files, never commit
+tools/cloudflared.exe
+tools/tunnel-url.txt
+tools/logs/

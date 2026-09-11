@@ -36,13 +36,16 @@ if (-not $devUp) {
     Write-Host ""
 }
 
-# 3) warn if no password is set -- the tunnel URL is hard to guess but NOT secret
+# 3) read the actual password so we can print it directly (like the EtsyApp
+#    tunnel does: "Open: <url>  Password: <pass>") -- the URL is hard to guess
+#    but is NOT secret, so this is the real access-control boundary
 $envPath = Join-Path $appDir ".env"
-$hasPassword = $false
+$appPassword = ""
 if (Test-Path $envPath) {
     $line = Select-String -Path $envPath -Pattern '^APP_PASSWORD=(.+)' -ErrorAction SilentlyContinue
-    if ($line) { $hasPassword = $true }
+    if ($line) { $appPassword = $line.Matches[0].Groups[1].Value.Trim() }
 }
+$hasPassword = [bool]$appPassword
 if (-not $hasPassword) {
     Write-Host ""
     Write-Host "UYARI: .env icinde APP_PASSWORD bos. Bu adres internete acik olacak ve sifresiz olur."
@@ -50,18 +53,28 @@ if (-not $hasPassword) {
     Write-Host ""
 }
 
-# 4) start the tunnel in the background and watch its log for the URL
+# 4) start the tunnel in the background and watch its log for the URL.
+#    NOTE: cloudflared's own `--logfile` flag does NOT reliably capture the
+#    "quick Tunnel has been created" line on Windows -- use PowerShell's own
+#    stdout/stderr redirection instead, which does.
+$outFile = Join-Path $logsDir "TaobaoTunnel.out.log"
 if (Test-Path $logFile) { Remove-Item $logFile -Force }
+if (Test-Path $outFile) { Remove-Item $outFile -Force }
 Write-Host "Tunel baslatiliyor (Cloudflare quick tunnel)..."
 Start-Process -FilePath $cloudflaredPath `
-    -ArgumentList "tunnel", "--url", "http://localhost:5173", "--logfile", $logFile `
+    -ArgumentList "tunnel", "--url", "http://localhost:5173" `
+    -RedirectStandardOutput $outFile `
+    -RedirectStandardError $logFile `
     -WindowStyle Hidden
 
 $url = $null
 for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
-    if (Test-Path $logFile) {
-        $content = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+    $content = ""
+    foreach ($f in @($logFile, $outFile)) {
+        if (Test-Path $f) { $content += (Get-Content $f -Raw -ErrorAction SilentlyContinue) }
+    }
+    if ($content) {
         if ($content -match "(https://[a-z0-9-]+\.trycloudflare\.com)") {
             $url = $matches[1]
             break
@@ -73,12 +86,11 @@ Write-Host ""
 if ($url) {
     Set-Content -Path (Join-Path $toolsDir "tunnel-url.txt") -Value $url
     Write-Host "============================================================"
-    Write-Host " Adres   : $url"
+    Write-Host " Open     : $url"
     if ($hasPassword) {
-        Write-Host " Kullanici: keyartisan"
-        Write-Host " Sifre    : .env dosyanizdaki APP_PASSWORD degeri"
+        Write-Host " Password : $appPassword"
     } else {
-        Write-Host " (Sifre YOK -- yukaridaki uyariyi okuyun)"
+        Write-Host " Password : (YOK -- yukaridaki uyariyi okuyun)"
     }
     Write-Host "============================================================"
     Write-Host ""
