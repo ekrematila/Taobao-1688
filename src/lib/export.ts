@@ -22,6 +22,15 @@ function withClean<T extends ProductImage>(list: T[]): T[] {
   return list.map((i) => (i.url.includes("#dup-") ? { ...i, url: cleanImgUrl(i.url) } : i));
 }
 
+/** One row per unique file. A photo can legitimately carry BOTH the gallery
+ *  and variant role (the same image belongs in two workspace zones), which
+ *  would otherwise put it in the export twice — a real Shopify/Etsy listing
+ *  only wants it once. */
+function dedupeByUrl<T extends ProductImage>(list: T[]): T[] {
+  const seen = new Set<string>();
+  return list.filter((i) => (seen.has(i.url) ? false : (seen.add(i.url), true)));
+}
+
 function csvCell(v: unknown): string {
   // normalise line endings inside a cell so a quoted field never mixes bare LF
   // with the file's CRLF row separator (that desyncs strict CSV parsers — it's
@@ -42,11 +51,11 @@ export function oneLineHtml(html: string): string {
 
 /** photos for a listing: gallery + variant + description-role images */
 function photoImgs(p: NormalisedProduct): ProductImage[] {
-  return withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant" || i.role === "description"));
+  return dedupeByUrl(withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant" || i.role === "description")));
 }
 /** the main product-card photos only (no in-description images) */
 function mainImgs(p: NormalisedProduct): ProductImage[] {
-  return withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant"));
+  return dedupeByUrl(withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant")));
 }
 /** images for the Shopify HTML body — always visual: description strips, then gallery, capped 20 */
 function descImgs(p: NormalisedProduct): ProductImage[] {

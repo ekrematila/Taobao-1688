@@ -692,7 +692,6 @@ export async function translateImage(opts: {
     `REMOVE (do not translate) shop/seller names, watermarks, and off-topic marketplace text (Taobao/Tmall/1688/Pinduoduo, WeChat/QQ/phone numbers, QR codes, "scan to buy") — cleanly reconstruct whatever was behind them.`,
     `If what looks like Chinese is actually part of the product's OWN physical design (printed or molded onto the product itself, not text overlaid on the photo — e.g. a keycap's own legend), leave the product exactly as it is. Do not translate or touch it.`,
     `Everything that is not overlay text — the product, the background, every other pixel — must come back visually identical.`,
-    `IMAGE MODEL — prefer "${model}" if available; otherwise your best image-editing model.`,
     productContext ? `Product context (for correct terminology): ${productContext.slice(0, 400)}` : "",
     `Glossary — apply exactly: ${KEYCAP_GLOSSARY}`,
     NO_CJK_DIRECTIVE,
@@ -703,7 +702,7 @@ export async function translateImage(opts: {
     .filter(Boolean)
     .join("\n");
 
-  ctx?.setStatus(`Görsel çevriliyor (${model})…`);
+  ctx?.setStatus("Görsel çevriliyor…");
   const res = await runManusTask(
     [
       { type: "text", text: prompt },

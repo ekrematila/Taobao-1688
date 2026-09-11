@@ -759,7 +759,9 @@ app.post(
     const urls: string[] =
       Array.isArray(imageUrls) && imageUrls.length
         ? imageUrls
-        : draft.product.images.filter((im) => im.role !== "unused").map((im) => im.url);
+        : // a photo can legitimately carry BOTH the gallery and variant role now
+          // (same image, two zones) — dedupe by URL so it isn't Manus-processed twice.
+          [...new Set(draft.product.images.filter((im) => im.role !== "unused").map((im) => im.url))];
     const target = targetLanguage || "English";
     const context = `${draft.product.titleTranslated || draft.product.title}. ${Object.entries(draft.product.props)
       .slice(0, 8)
@@ -822,7 +824,9 @@ app.post(
     if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
     const urls: string[] = Array.isArray(imageUrls) && imageUrls.length
       ? imageUrls
-      : draft.product.images.map((im) => im.url);
+      : // a photo can legitimately carry BOTH the gallery and variant role now
+        // (same image, two zones) — dedupe by URL so it isn't translated twice.
+        [...new Set(draft.product.images.map((im) => im.url))];
     const target = targetLanguage || "English";
     const context = `${draft.product.titleTranslated || draft.product.title}. ${Object.entries(draft.product.props)
       .slice(0, 8)

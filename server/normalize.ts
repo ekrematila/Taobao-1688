@@ -43,10 +43,19 @@ type ImgSource = "main" | "variant" | "description";
  *  - main   -> gallery (pic_url + item_imgs)
  *  - variant-> variant (prop_imgs / sku pics)
  *  - description -> description (imgs pulled from the desc HTML)
- * First-seen source wins, so a gallery photo reused in the description stays gallery.
+ *
+ * Main and variant are collected INDEPENDENTLY — the source data unambiguously
+ * says which field a URL came from, so a photo the seller reused as BOTH a
+ * gallery shot (in `item_imgs`) AND a colour swatch (in `prop_imgs`/`sku_pic`)
+ * appears in BOTH zones, not just one (operator rule: "aynı görsel olsa bile
+ * doğru yerlere gelmeli" — the same image still goes everywhere it belongs).
+ * A URL is deduped WITHIN each of those two sets (no repeated tile in one
+ * zone), but never ACROSS them. Description images are the one place first-
+ * seen-wins still applies: a photo already placed in gallery/variant doesn't
+ * also get a redundant third tile just because it's re-embedded in the long
+ * HTML description.
  */
 function collectImages(item: any): { url: string; source: ImgSource }[] {
-  const seen = new Map<string, ImgSource>();
   const norm = (v: unknown): string => {
     let url = "";
     if (typeof v === "string") url = v;
@@ -54,9 +63,16 @@ function collectImages(item: any): { url: string; source: ImgSource }[] {
     return fixUrl(url);
   };
 
-  // 1) Variant / SKU images first. These ALWAYS belong in the variant zone even
-  // when the same file also shows up in item_imgs — otherwise the "first-seen
-  // wins" rule below drops them into the main gallery (the bug users hit).
+  const mainUrls = new Set<string>();
+  const addMain = (v: unknown) => {
+    const u = norm(v);
+    if (u) mainUrls.add(u);
+  };
+  addMain(item.pic_url);
+  addMain(item.mainImage);
+  addMain(item.main_image);
+  for (const im of item.item_imgs || item.images || item.mainImages || []) addMain(im);
+
   const variantUrls = new Set<string>();
   for (const im of item.prop_imgs?.prop_img || item.prop_imgs || []) {
     const u = norm(im);
@@ -66,25 +82,24 @@ function collectImages(item: any): { url: string; source: ImgSource }[] {
     const u = norm(s?.sku_pic || s?.pic || "");
     if (u) variantUrls.add(u);
   }
-  for (const u of variantUrls) seen.set(u, "variant");
 
-  const add = (v: unknown, source: ImgSource) => {
-    const url = norm(v);
-    if (!url) return;
-    if (source !== "variant" && variantUrls.has(url)) return; // variant wins
-    if (!seen.has(url)) seen.set(url, source);
+  const out: { url: string; source: ImgSource }[] = [];
+  for (const u of mainUrls) out.push({ url: u, source: "main" });
+  for (const u of variantUrls) out.push({ url: u, source: "variant" });
+
+  const claimed = new Set<string>([...mainUrls, ...variantUrls]);
+  const descSeen = new Set<string>();
+  const addDesc = (v: unknown) => {
+    const u = norm(v);
+    if (!u || claimed.has(u) || descSeen.has(u)) return;
+    descSeen.add(u);
+    out.push({ url: u, source: "description" });
   };
-
-  add(item.pic_url, "main");
-  add(item.mainImage, "main");
-  add(item.main_image, "main");
-  for (const im of item.item_imgs || item.images || item.mainImages || []) add(im, "main");
-
   const desc: string = firstString(item.desc, item.description, item.desc_short, item.detail);
-  for (const m of desc.matchAll(/<img[^>]+src=["']?([^"' >]+)/gi)) add(m[1], "description");
-  for (const m of desc.matchAll(/(https?:)?\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi)) add(m[0], "description");
+  for (const m of desc.matchAll(/<img[^>]+src=["']?([^"' >]+)/gi)) addDesc(m[1]);
+  for (const m of desc.matchAll(/(https?:)?\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi)) addDesc(m[0]);
 
-  return [...seen].map(([url, source]) => ({ url, source }));
+  return out;
 }
 
 function variantNameFromSku(s: any): string {
