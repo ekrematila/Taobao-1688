@@ -13,6 +13,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Vite 5+ rejects any request whose Host header isn't localhost/127.0.0.1
+    // unless it's listed here — needed so a public tunnel (localtunnel/ngrok/
+    // Cloudflare Tunnel) pointed at this port isn't blocked with "This host is
+    // not allowed". `.loca.lt` covers localtunnel's random subdomain; add your
+    // own tunnel's domain the same way if you switch tools.
+    allowedHosts: [".loca.lt"],
     proxy: {
       "/api": {
         target: `http://localhost:${API_PORT}`,
