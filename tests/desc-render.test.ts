@@ -34,14 +34,14 @@ test("the .pd example gets PD_SCRIPT and native <details> FAQ", () => {
 });
 
 test("both examples use a native <details> FAQ and an inline-onclick CTA (survives <script> stripping)", () => {
-  for (const [layout, ex] of [
-    ["stacked-plain", STACKED_DESC_EXAMPLE],
-    ["grid-2", OTHER_DESC_EXAMPLE],
+  for (const [layout, ex, faqCount] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE, 7],
+    ["grid-2", OTHER_DESC_EXAMPLE, 6],
   ] as const) {
     const out = renderDescriptionHtml(layout, ex, imgs);
-    assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"/g) || []).length, 6);
+    assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"/g) || []).length, faqCount);
     assert.equal((out.match(/faq-item"[^>]* open>/g) || []).length, 1, "first FAQ item open");
-    assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"[^>]*name="(?:bm|pd)-faq"/g) || []).length, 6, "details use name= for native single-open");
+    assert.equal((out.match(/<details class="(?:bm|pd)-faq-item"[^>]*name="(?:bm|pd)-faq"/g) || []).length, faqCount, "details use name= for native single-open");
     assert.ok(/data-(?:bm|pd)-goto-atc onclick="/.test(out), "CTA carries an inline onclick fallback");
     assert.ok(!/<button[^>]*class="[^"]*faq-q/.test(out), "no legacy <button> FAQ toggle");
   }
@@ -181,6 +181,64 @@ test("badge hover never uses transform/box-shadow (the row scrolls horizontally 
   assert.ok(m, "badge hover rule present");
   assert.ok(!/transform|box-shadow/.test(m![0]), "no transform/box-shadow on badge hover");
   assert.ok(/flex-wrap:nowrap/.test(out.replace(/\s+/g, "")), "badge row never wraps to a 2nd line");
+});
+
+test("Compatible Layouts example rows always get a real gap, even if the model's CSS dropped it", () => {
+  // Reproduces a real bug: the model's own regenerated `.bm-compat-eg .bm-eg`
+  // CSS sometimes drops `gap`, gluing the bold size label directly to the
+  // keyboard-model list ("60%Anne Pro 2 · Ducky One 3 Mini · RK61").
+  const strippedGap = STACKED_DESC_EXAMPLE.replace(
+    /\.bm-compat-eg \.bm-eg\{[^}]*\}/,
+    ".bm-compat-eg .bm-eg{display:flex}",
+  );
+  const out = renderDescriptionHtml("stacked-plain", strippedGap, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-compat-eg\.bm-eg\{display:flex!important[^}]*gap:8px!important/.test(flat), "gap forced even with model's gap-less rule");
+});
+
+test("trust badges always get a hover affordance, even if the model's CSS forgot one", () => {
+  const noHover = STACKED_DESC_EXAMPLE.replace(/\.bm-trust span:hover\{[^}]*\}/, "");
+  const out = renderDescriptionHtml("stacked-plain", noHover, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-trustspan:hover\{transform:translateY\(-2px\)!important/.test(flat), "trust badge hover forced");
+});
+
+test("forceCtaOnclick isn't truncated by a `>` inside the existing onclick it's replacing", () => {
+  // Reproduces a real bug: the tag-matching regex used to be a naive `[^>]*`,
+  // which stops at the FIRST literal `>` it sees — and the onclick it's about
+  // to replace (both the model's own and the reference example's) always
+  // contains `indexOf(...)>-1` comparisons. That truncated the "tag" match
+  // mid-attribute and corrupted the button markup instead of swapping the
+  // onclick cleanly. The forced onclick must always be the FULL canonical
+  // string, unbroken by any `>` in what it's replacing.
+  for (const [layout, ex, initFlag] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE, "__bmInit"],
+    ["grid-2", OTHER_DESC_EXAMPLE, "__pdInit"],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const m = out.match(/data-(?:bm|pd)-goto-atc onclick="([^"]*)"/);
+    assert.ok(m, "CTA carries an onclick");
+    assert.ok(m![1].length > 1000, `onclick must be the full canonical string, not truncated (got ${m![1].length} chars)`);
+    assert.ok(m![1].includes(initFlag), "full onclick includes the init guard");
+    assert.doesNotThrow(() => new Function(m![1]), "forced onclick parses as valid JS");
+    assert.ok(!out.slice(m!.index! + m![0].length, m!.index! + m![0].length + 30).includes("onclick="), "no leftover duplicated onclick text after the tag");
+  }
+});
+
+test("the Add-to-Cart inline onclick steps aside once BM_SCRIPT/PD_SCRIPT has run (no double-fire glow reset)", () => {
+  // Reproduces a real bug: the inline onclick and the script's own delegated
+  // [data-*-goto-atc] click listener used to BOTH run on every click, each
+  // scheduling its own scroll+glow — the second call reset (removed/re-added)
+  // the glow class mid-animation, which read as the glow "cutting off".
+  for (const [layout, ex, initFlag] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE, "__bmInit"],
+    ["grid-2", OTHER_DESC_EXAMPLE, "__pdInit"],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const m = out.match(/data-(?:bm|pd)-goto-atc onclick="([^"]*)"/);
+    assert.ok(m, "CTA carries an onclick");
+    assert.ok(m![1].includes(`if(window.${initFlag})return false`), "inline onclick defers to the script once it has initialised");
+  }
 });
 
 test("the readable render keeps the CSS/JS parseable and the import render is one line", () => {

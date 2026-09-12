@@ -330,15 +330,41 @@ const FIND_ATC_FN = `
  * nothing is ever logged anywhere. A model-authored `<script>` gets the same
  * treatment already (see `ensureBmScaffold`/`ensurePdScaffold`); this closes
  * the same hole for the inline attribute.
+ *
+ * `if(window.__bmInit)return false;` guard: this inline onclick and BM_SCRIPT's
+ * own delegated `[data-bm-goto-atc]` click listener used to BOTH run on every
+ * click (the inline attribute fires first, then the click bubbles to
+ * document where BM_SCRIPT is also listening) — two independent scroll+glow
+ * calls racing each other, the second one resetting (`classList.remove` then
+ * re-`add`) the first glow animation mid-cycle. That reset is exactly what
+ * reads as the Add-to-Cart glow "cutting off"/restarting partway through.
+ * BM_SCRIPT sets `window.__bmInit = 1` synchronously as soon as it runs, so
+ * once the script is present this inline handler steps aside entirely and
+ * the script's own (scrollend-aware) handler is the ONLY one that fires.
+ * This inline copy still runs its own complete scroll+glow fallback when the
+ * `<script>` tag was stripped (Shopify apps sometimes do that) and
+ * `window.__bmInit` never gets set at all.
  */
 const BM_CTA_ONCLICK =
-  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;})();`;
-const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow");
+  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;})();`;
+const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow").replace(/__bmInit/g, "__pdInit");
 
 /** Force the CTA hook's onclick to the canonical, known-valid string — replaces
- *  whatever the model wrote (or adds it, if the model left it off). */
+ *  whatever the model wrote (or adds it, if the model left it off).
+ *
+ *  The attribute-matching group used to be a naive `[^>]*`, which breaks the
+ *  instant the EXISTING onclick it's about to replace contains a literal `>`
+ *  character — and it always does: both the model's own onclick and the
+ *  reference example's carry `indexOf(...)>-1` comparisons. `[^>]*` stops at
+ *  that `>`, so the regex matched only a truncated fragment of the real tag
+ *  and treated the rest of the onclick body as if it were text outside the
+ *  tag, corrupting the button markup instead of cleanly swapping the
+ *  attribute. `(?:"[^"]*"|'[^']*'|[^'">])*` treats a fully-quoted attribute
+ *  value as one atomic unit (so a `>` inside quotes can't end the match
+ *  early) and still stops at the real, unquoted `>` that closes the tag. */
 function forceCtaOnclick(html: string, attr: "data-bm-goto-atc" | "data-pd-goto-atc", onclick: string): string {
-  const re = new RegExp(`<(button|a)\\b([^>]*\\b${attr}\\b[^>]*)>`, "i");
+  const ATTRS = `(?:"[^"]*"|'[^']*'|[^'">])*`;
+  const re = new RegExp(`<(button|a)\\b(${ATTRS}\\b${attr}\\b${ATTRS})>`, "i");
   return html.replace(re, (_m, tag, attrs) => {
     const cleaned = attrs.replace(/\s+onclick\s*=\s*(?:"[^"]*"|'[^']*')/gi, "");
     return `<${tag}${cleaned} onclick="${onclick}">`;
@@ -663,6 +689,16 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // renders as a plain unstyled line breaking up the card.
   `.bm-spec .bm-sub{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold,#3f8cd9);background:var(--sky,#eef6fc);border-bottom:1px solid var(--line2,#c9dcee)}` +
   `.bm-spec .bm-sub:not(:first-child){border-top:1px solid var(--line2,#c9dcee)}` +
+  // 4b) "Compatible Layouts" example row: force a real gap between the bold
+  //     size label and the keyboard-model list even if the model's own
+  //     regenerated CSS for `.bm-compat-eg .bm-eg` drops it (observed in
+  //     production: "60%Anne Pro 2 · Ducky One 3 Mini · RK61" glued together
+  //     with zero space, even though the stored reference example has the gap).
+  `.bm-compat-eg .bm-eg{display:flex!important;flex-wrap:wrap!important;align-items:baseline!important;gap:8px!important}` +
+  // 4c) trust badges (Ships worldwide / Secure checkout / Support…) need a
+  //     real hover affordance even when the model's own CSS forgot one.
+  `.bm-trust span{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s cubic-bezier(.4,0,.2,1)!important}` +
+  `.bm-trust span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,63,140,217),.28)!important;background:#fff!important}` +
   // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
   `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
