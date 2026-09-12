@@ -33,6 +33,28 @@ test("the .pd example gets PD_SCRIPT and native <details> FAQ", () => {
   assert.ok(/<details class="pd-faq-item"/.test(out), "FAQ is native <details>");
 });
 
+test("the bare-text fallback card's mobile 'Product Details' panel is never permanently empty", () => {
+  // Reproduces a real bug: when the model writes only plain semantic HTML
+  // (no <style> block), renderDescBody falls back to renderBmSticky(), which
+  // used to gate the whole content panel behind a checkbox + a
+  // grid-template-rows:0fr→1fr CSS animation trick on mobile. On at least
+  // some real mobile browsers that never applied the 1fr state — tapping the
+  // "Product Details" bar did nothing, and the panel stayed permanently
+  // empty (0-height, opacity:0), with no way to ever see the content.
+  const plainHtml =
+    "<p>A genuinely great product with several standout features that make it worth buying today.</p>" +
+    "<ul><li>Feature one really shines here</li><li>Feature two also works great</li></ul>";
+  const out = renderDescriptionHtml("stacked-plain", plainHtml, imgs);
+  // uses the native <details> disclosure now, not a checkbox
+  assert.ok(!/class="bm-toggle"/.test(out), "no more checkbox-driven toggle");
+  assert.ok(/<details class="bm-acc" open>/.test(out), "fallback panel is a native <details>, open by default");
+  assert.ok(/<summary class="bm-bar">/.test(out), "the tap target is a real <summary>");
+  // content must never be zero-height/invisible by default (no JS/CSS gate to fail)
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(!/grid-template-rows:0fr[;}]/.test(flat), "no more 0fr-collapsed panel that can get stuck");
+  assert.ok(out.includes("Specifications"), "real content is present in the output");
+});
+
 test("both examples use a native <details> FAQ and an inline-onclick CTA (survives <script> stripping)", () => {
   for (const [layout, ex, faqCount] of [
     ["stacked-plain", STACKED_DESC_EXAMPLE, 7],

@@ -1320,7 +1320,7 @@ function renderBmSticky(baseIn: string, imgs: DescImg[], meta?: DescMeta): strin
 .bm div,.bm span,.bm ul,.bm li,.bm p,.bm h2,.bm h3{float:none !important}
 .bm ul{list-style:none !important; padding:0 !important; margin:0 !important}
 
-.bm-toggle{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+.bm-acc{display:block; border:0; margin:0; padding:0}
 .bm-bar{display:none}
 .bm-c1,.bm-c2{display:block}
 .bm-inner{display:block}
@@ -1404,31 +1404,38 @@ function renderBmSticky(baseIn: string, imgs: DescImg[], meta?: DescMeta): strin
 .bm-note b{color:#2b3170}
 
 @media (max-width:899px){
+  /* Native details/summary disclosure instead of a checkbox plus a
+     grid-template-rows:0fr-to-1fr animation trick: that trick depends on the
+     browser both supporting an animatable fr unit AND matching a
+     checked-sibling-then-descendant selector correctly, and on at least
+     some real mobile browsers it silently never applies the 1fr state --
+     the bar renders, tapping it does nothing visible, and the panel stays
+     permanently empty (0-height, opacity 0). A details element is a plain
+     built-in disclosure widget with no such gap: the browser opens and
+     closes its content natively, with no animation or grid feature to fail
+     on. The open attribute is set by default so content is ALWAYS visible
+     out of the box (same never-default-to-hidden rule already used for the
+     reveal classes elsewhere) -- the bar still lets a shopper collapse it,
+     but a device that only partially supports the CSS below just shows a
+     permanently-expanded panel, never a permanently-empty one. */
   .bm-bar{
     display:flex !important; align-items:center; justify-content:space-between; gap:12px;
-    width:100%; margin:0; padding:15px 17px; cursor:pointer; user-select:none;
+    width:100%; margin:0; padding:15px 17px; cursor:pointer; user-select:none; list-style:none;
     -webkit-tap-highlight-color:transparent; border:1px solid var(--line); border-radius:14px;
     background:linear-gradient(135deg,#eaf0ff,#f1effb);
     font-size:15.5px; font-weight:700; color:#2b3170; line-height:1.2;
   }
+  .bm-bar::-webkit-details-marker{display:none}
+  .bm-bar::marker{content:""}
   .bm-bar i{
     flex:0 0 auto; width:9px; height:9px; margin-right:4px;
     border-right:2px solid var(--acc); border-bottom:2px solid var(--acc);
-    transform:rotate(45deg); transition:transform .35s cubic-bezier(.25,.8,.3,1);
+    transform:rotate(-135deg); transition:transform .35s cubic-bezier(.25,.8,.3,1);
   }
-  .bm-toggle:checked ~ .bm-bar i{transform:rotate(-135deg)}
-  .bm-toggle:focus-visible ~ .bm-bar{outline:2px solid var(--acc); outline-offset:2px}
-  .bm-c1,.bm-c2{
-    display:grid; grid-template-rows:0fr; transition:grid-template-rows .45s cubic-bezier(.25,.8,.3,1);
-  }
-  .bm-inner{overflow:hidden; min-height:0; opacity:0; transition:opacity .3s ease .05s}
-  .bm-toggle:checked ~ .bm-c1,
-  .bm-toggle:checked ~ .bm-grid .bm-c2{grid-template-rows:1fr}
-  .bm-toggle:checked ~ .bm-c1 .bm-inner,
-  .bm-toggle:checked ~ .bm-grid .bm-inner{opacity:1}
+  .bm-acc:not([open]) > .bm-bar i{transform:rotate(45deg)}
+  .bm-bar:focus-visible{outline:2px solid var(--acc); outline-offset:2px}
   .bm-c1 .bm-hero{margin:12px 0 0}
-  .bm-grid{grid-template-columns:1fr; gap:0; margin-top:12px}
-  .bm-toggle:checked ~ .bm-grid{gap:12px}
+  .bm-grid{grid-template-columns:1fr; gap:12px; margin-top:12px}
   .bm-c2{grid-column:1; grid-row:1; position:static; top:auto}
   .bm-media{grid-column:1; grid-row:2}
   .bm-info{max-height:none; overflow:visible; padding:18px 16px}
@@ -1447,8 +1454,8 @@ function renderBmSticky(baseIn: string, imgs: DescImg[], meta?: DescMeta): strin
 }
 </style>
 
-<input class="bm-toggle" type="checkbox" id="bmDetails">
-<label class="bm-bar" for="bmDetails">${BM_EMOJI} Product Details <i></i></label>
+<details class="bm-acc" open>
+<summary class="bm-bar">${BM_EMOJI} Product Details <i></i></summary>
 
 <div class="bm-c1">
   <div class="bm-inner">
@@ -1485,6 +1492,7 @@ function renderBmSticky(baseIn: string, imgs: DescImg[], meta?: DescMeta): strin
   <div class="bm-media">${imgTags}</div>
 
 </div>
+</details>
 </div>`;
   // recolour to the product's palette (default indigo stays if pal is null)
   const out = pal
