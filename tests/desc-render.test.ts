@@ -138,6 +138,17 @@ test("Specifications always gets a bordered/hoverable card, even if the model sh
   assert.ok(/\.bm-spec\.bm-r:hover\{background:var\(--sky/.test(flat), "spec row hover is forced");
 });
 
+test("Specifications group sub-headers get a real pill style, even with no CSS for .bm-sub at all", () => {
+  // Reproduces a real complaint: the model wrote grouped <span class="bm-sub">
+  // markup but never gave it any CSS, so it rendered as bare unstyled text
+  // breaking up the card instead of a proper section header.
+  const noSubCss = STACKED_DESC_EXAMPLE.replace(/\.bm-spec \.bm-sub\{[^}]*\}/g, "");
+  const out = renderDescriptionHtml("stacked-plain", noSubCss, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-spec\.bm-sub\{[^}]*background:var\(--sky/.test(flat), "sub-header pill background is forced");
+  assert.ok(/\.bm-spec\.bm-sub\{[^}]*text-transform:uppercase/.test(flat), "sub-header label styling is forced");
+});
+
 test("FAQ questions always carry a visible +/- indicator, even if the model's own icon markup fails", () => {
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   const flat = out.replace(/\s+/g, "");

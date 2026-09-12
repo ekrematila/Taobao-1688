@@ -643,6 +643,12 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm-spec .bm-r:hover,.bm-spec>div:not(.bm-sub):hover{background:var(--sky,#f2f6fb)}` +
   `.bm-spec .bm-k{flex:0 0 auto;max-width:44%;font-weight:500}` +
   `.bm-spec .bm-v{flex:1 1 auto;text-align:right;font-weight:600}` +
+  // grouped sub-headers (optional — only present when the model grouped the
+  // rows) get a real pill treatment too, not bare text: the model sometimes
+  // writes the <span class="bm-sub"> markup but no CSS at all for it, which
+  // renders as a plain unstyled line breaking up the card.
+  `.bm-spec .bm-sub{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold,#3f8cd9);background:var(--sky,#eef6fc);border-bottom:1px solid var(--line2,#c9dcee)}` +
+  `.bm-spec .bm-sub:not(:first-child){border-top:1px solid var(--line2,#c9dcee)}` +
   // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
   `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
