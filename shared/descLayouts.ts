@@ -707,6 +707,21 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-grid{grid-template-columns:1fr!important}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +   // images first on mobile
   `.bm .bm-c2{grid-column:1!important;grid-row:2!important}` +
+  // 6) The golden reference example ships a mobile "Product Details" toggle
+  //    (an `.bm-toggle` checkbox + `.bm-bar` label collapsing `.bm-c1`/`.bm-c2`
+  //    via `grid-template-rows:0fr` -> `:checked{grid-template-rows:1fr}`) that
+  //    the model is told to copy verbatim into every real generation. That
+  //    trick depends on the browser both supporting an animatable `fr` unit
+  //    AND matching the `:checked` general-sibling chain correctly — on real
+  //    mobile browsers it can silently never reach the `1fr` state, leaving
+  //    the ENTIRE info panel (hero, highlights, specs, FAQ, CTA — everything)
+  //    permanently collapsed and empty with no way to open it. Force it
+  //    always-expanded regardless of the checkbox state and hide the
+  //    now-decorative bar, the same "never default to hidden" guarantee
+  //    already applied to `.bm-reveal`/`.bm-atc-glow` elsewhere.
+  `.bm .bm-bar{display:none!important}` +
+  `.bm .bm-c1,.bm .bm-c2{grid-template-rows:1fr!important}` +
+  `.bm .bm-inner{opacity:1!important;overflow:visible!important;min-height:0!important}` +
   `}` +
   `</style>`,
 );

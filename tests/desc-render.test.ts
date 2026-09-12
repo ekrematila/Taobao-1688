@@ -55,6 +55,25 @@ test("the bare-text fallback card's mobile 'Product Details' panel is never perm
   assert.ok(out.includes("Specifications"), "real content is present in the output");
 });
 
+test("the main .bm example's mobile 'Product Details' toggle can never leave the whole info panel empty", () => {
+  // The BIGGER version of the bug above: the golden reference example itself
+  // (what the model is told to copy near-verbatim into every real
+  // generation, not just the rare bare-text fallback) ships the exact same
+  // checkbox + grid-template-rows:0fr->1fr mobile collapse trick, gating the
+  // ENTIRE info panel (hero, highlights, specs, FAQ, CTA) behind it. Since
+  // that trick can silently fail to reach 1fr on a real mobile browser, a
+  // real generated listing can end up with its whole description panel
+  // permanently collapsed and empty on mobile with no way to open it —
+  // exactly what a user screenshot showed. FAQ_CTA_GUARANTEE must neutralize
+  // this regardless of what the model's own CSS says, the same way it already
+  // forces the FAQ indicator, spec card, and glow.
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm\.bm-bar\{display:none!important\}/.test(flat), "the toggle bar is force-hidden on mobile");
+  assert.ok(/\.bm\.bm-c1,\.bm\.bm-c2\{grid-template-rows:1fr!important\}/.test(flat), "the info panel is force-expanded on mobile regardless of the checkbox");
+  assert.ok(/\.bm\.bm-inner\{opacity:1!important/.test(flat), "inner content is force-visible on mobile regardless of the checkbox");
+});
+
 test("both examples use a native <details> FAQ and an inline-onclick CTA (survives <script> stripping)", () => {
   for (const [layout, ex, faqCount] of [
     ["stacked-plain", STACKED_DESC_EXAMPLE, 7],
