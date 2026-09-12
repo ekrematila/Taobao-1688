@@ -24,7 +24,7 @@ import {
 } from "@shared/listingFormat.ts";
 import { detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { readExample } from "./examples.ts";
-import { runManusTask, manusConfigured } from "./manus.ts";
+import { runManusTask, manusConfigured, imageToBase64 } from "./manus.ts";
 import type {
   AdviceResult,
   CategoryResearchResult,
@@ -58,6 +58,7 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
   const slotN = Math.max(2, Math.min(10, descImgN || 4));
   return [
     "AÇIKLAMA DÜZENİ (Diğer HTML düzenler) — `description` ALANI, sana verilen ÖRNEKLER dosyasındaki (`Shopify Aciklamalar.txt` — 5 tam ürün bloğu: PIIFOX Eva, Ancient Chinese, MU02, Super Mario, Harry Potter) gibi TAM, KENDİNE YETEN, STİLLENDİRİLMİŞ bir HTML bloğu olacak. ASLA düz/sade metin verme; her şey HTML içinde olsun.",
+    "DİL — KESİN: yazdığın HTML'in HER KELİMESİ hedef dilde olacak (aksi belirtilmedikçe İngilizce) — tek bir Türkçe kelime bile olamaz. Bu talimatlar Türkçe ama SENİN çıktın değil.",
     "GERÇEK ÜRÜN FOTOĞRAFLARI ekli — `--pd-accent` ve genel paleti BUNLARA BAKARAK seç, başlık/tema metninden tahmin etme. Fotoğrafta olmayan bir rengi (ör. turuncu) sadece 'cozy'/'winter' gibi kelimeler yüzünden kullanma.",
     `GÖRSEL SLOTLARI (ÇOK ÖNEMLİ): her \`<div class="pd-media"></div>\` TEK BİR görsel içindir — ASLA birden fazla görseli aynı slota/aynı sütuna alt alta yığma, bu KESİNLİKLE YASAK. Sana yaklaşık ${descImgN || "birkaç"} açıklama görseli verilecek; TOPLAM yaklaşık ${slotN} tekli \`pd-media\` slotu oluştur ve bunları FARKLI görsel düzenlerine dağıt: (a) 2'li/3'lü IZGARA — birkaç \`pd-media\` div'ini kendi \`display:grid;grid-template-columns:...\` sınıfınla sarmala; (b) TEK GENİŞ SİNEMATİK kesit — bir \`pd-media\` div'ine ekstra bir sınıf ekleyip (ör. \`pd-media--wide\`) o sınıfla \`img{height:...;object-fit:cover}\` tanımla; (c) VARYANT KARTI görseli — varsa her varyant kartının içine kendi \`pd-media\`'sı. Slotları ANLAMLI bir bölüm başlığının hemen ardına koy (ör. Features'tan sonra ızgara, Spotlight'ta sinematik, her varyant kartında biri) — asla tek bir yerde art arda yığma. Kendin ASLA \`<img>\` YAZMA — sistemimiz her slota gerçek ürün görselini kendi düzeninle uyumlu şekilde yerleştirir.`,
     "GÖRSEL YALNIZLIK YASAĞI: hiçbir `pd-media` slotu TEK BAŞINA (kare/1:1'e yakın oranlı) bir bölümün TÜM genişliğini/alanını kaplamasın. Her tekli görsel ya (a) bir ızgarada en az bir görsel daha ile yan yana dursun, ya da (b) yanında/altında alakalı bir metin bloğuyla (özellik açıklaması, başlık, rozet) 2 sütunlu bir düzende dursun. Tam genişlikte, tek başına, yanında hiçbir şey olmayan kare bir fotoğraf YASAK — SADECE `pd-media--wide` gibi kasıtlı geniş sinematik kesitler (o zaten tek başına bir bölüm olarak tasarlanmış olur) bu kuralın dışındadır.",
@@ -80,7 +81,7 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
     "ATC GLOW `.pd-atc-glow` için kural/keyframe YAZMA (sistem ekler). Glow SADECE box-shadow + hafif scale; border-radius/padding/boyut/font/background DEĞİŞTİRMEZ; 2.6s sonra class kaldırılır (buton eski haline döner).",
     "RENK: `.pd-<önek>{}` dışında sabit hex/rgb YAZMA — her renk `var(--pd-…)`. Ürün turuncu/mercan değilse turuncu/mercan ton kullanma.",
     "İLK CÜMLE KISA: 'with this keycap set' yeter, 'with this PBT dye-sublimated keycap set' gibi uzun tamlama YAZMA. 'board' yerine 'keyboard'/'mechanical keyboard' ile başla (board sonraki cümlelerde serbest).",
-    "KUTU İÇERİĞİ KISA: 'keycap set, keycap puller, ve sürpriz kuponlu thank-you card' + tek satır care. Uzun 'before you order'/'packaging' blokları EKLEME.",
+    "KUTU İÇERİĞİ KISA: 'keycap set, keycap puller, and a surprise-coupon thank-you card' + tek satır care (bu ÖRNEK cümle TAMAMEN İNGİLİZCE — çeviri değil, olduğu gibi hedef dile uyarla). Uzun 'before you order'/'packaging' blokları EKLEME.",
     "KATEGORİ BİLİRKİŞİLİĞİ: keycap/mekanik klavye kategorisini iyi bil; yazdığın her şey doğru olsun. dye-sub PBT legend'ler shine-through DEĞİLDİR — 'shadow-light'/'translucent legends' gibi uydurma terim kullanma. Verilen KATEGORİ ARAŞTIRMASI varsa ona uy; şüpheliysen o iddiayı yazma.",
     "SPECS tablosu DETAYLI, DÜZGÜN, ŞIK — mantıklı kümelerle (Material & manufacturing / Profile & fit / Layout & compatibility / Care), etiket-değer AYRI hücrelerde (bitişik 'MaterialPBT' YASAK), yalnız GERÇEK veri; bilinmeyen değer için o satırı yazma. YASAK: 'Brand'/'Marka' satırı (satıcı markası spec tablosunda HİÇ geçmesin); keycap/aksesuarsa 'Keyboard included' gibi 'klavye dahil mi' satırı da YASAK.",
     "ÜLKE BAYRAĞI EMOJİSİ YASAK (🇳🇱 🇯🇵 🏴 vb.) — hiçbir yerde kullanma.",
@@ -98,14 +99,15 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
 function shopifyDescRuleStacked(isKeycapSet: boolean): string {
   return [
   "AÇIKLAMA DÜZENİ (Alt alta görsel) — `description` ALANI, sana verilen `.bm` örneğinin (v3) BİREBİR YAPISINI izleyen TAM BİR HTML BELGESİ OLACAK. ASLA düz/sade metin verme.",
+  "DİL — KESİN: çıktının HER KELİMESİ hedef dilde olacak (aksi belirtilmedikçe / dil değiştirilmedikçe İNGİLİZCE). Bu talimatlar sana Türkçe açıklanıyor ama bu talimatların İÇİNDE geçen örnek cümle/kelimeler (tırnak içindeki ' ... ' ya da HTML örnekleri) SANA GÖSTERİLEN HEDEF DİLDEDİR — onları oldukları dilde (İngilizce) aynen kullan, Türkçeye çevirme VE Türkçe bırakma; talimat metninin kendisi (madde başlıkları, açıklamalar) elbette Türkçe kalabilir ama SEN yazdığın HTML'in içinde tek bir Türkçe kelime bile olamaz — 'sürpriz', 'mağaza', 'iletişim' gibi kelimeler İNGİLİZCE karşılıklarıyla (surprise, store, contact) yazılsın.",
   "GERÇEK ÜRÜN FOTOĞRAFLARI ekli — palet seçimini BUNLARA BAKARAK yap, başlık/tema metninden TAHMİN ETME. Fotoğrafta hangi renk(ler) baskınsa `.bm{}` paletini ona göre seç (ör. fotoğrafta mavi+açık sarı varsa mavi+sarı tonlarında vars kullan; turuncu/mercan YOKSA turuncu/mercan/kehribar KULLANMA — 'winter'/'cozy' gibi kelimeler turuncu KULLANMANI GEREKTİRMEZ, gerçek renk fotoğrafta ne ise odur).",
   "KATEGORİ ESNEKLİĞİ — KESİN: bu şablon SADECE bir keycap-seti/klavye ISKELETİ üzerine kuruludur ama HER ürün kategorisinde (çanta, mouse, deskmat, vb.) kullanılır. Aşağıdaki 'Compatible Layouts', 'ISO/ANSI', 'Profil sculpt' kuralları SADECE ürün gerçekten keycap seti/klavye/klavye aksesuarıysa geçerlidir. BAŞKA bir kategori ise (çanta, mouse, deskmat, oyuncak, aksesuar…) o kuralları YOK SAY, klavye/keycap kelimesi HİÇ KULLANMA, ve o bölümlerin yerine ÜRÜNE GERÇEKTEN UYAN içerik yaz (aşağıda 4. maddede anlatılıyor). Ürünün GERÇEK kategorisini ürün türü/başlık/özelliklerden anla; kategori dışı varsayım yapma.",
   '1) `<style>…</style>` bloğu: örnekteki TÜM `.bm*` seçicileri, animasyonlar, jitter-önleyici teknik, `.bm-reveal`, `.bm-stage`, `.bm-lightbox`, `.bm-faq`, `.bm-cta`, `.bm-compat-eg`, `prefers-reduced-motion` ve mobil `@media` kuralları AYNEN kalsın. RENK/TEMA: SADECE `.bm{}` bloğundaki değişkenleri (`--ink --head --body --soft --gold --gold2 --acc-rgb --lav --sky --milk --line --line2`) ürünün BASKIN rengine göre yeniden ata. `.bm{}` DIŞINDA HİÇBİR YERDE sabit hex/rgb YAZMA — her renk `var(--…)` olacak (örnek zaten böyle). Ürün turuncu/mercan/kırmızı DEĞİLSE turuncu/mercan/kırmızı ton KULLANMA (mavi ürün → mavi vars: `--gold:#3f8cd9; --acc-rgb:63,140,217; --sky:#e6f2fb; --lav:#eef6fc; --ink:#1f3350` gibi). `.bm-hero::before/::after` `content:"EMOJI"` glifini tema emojisiyle değiştir.',
   '2) `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>` satırını `</style>`\'dan hemen sonra koy.',
   '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner> <div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 4-6 KISA (2-3 kelime) emoji\'li `<span>` rozet — HER ZAMAN TEK SATIRA sığmalı, taşmamalı: `.bm-badges{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}` + `.bm-badges::-webkit-scrollbar{display:none}` yaz (rozet metni kısa tutulursa masaüstünde zaten kayma gerekmez, dar ekranda gerekirse yatay kaydırma olur — asla 2. satıra sarmasın, asla kutunun dışına taşmasın). Rozet `:hover`\'ında SADECE `background`/`border-color` değişsin — `transform`/`box-shadow` YAZMA (satır `overflow-x:auto` olduğu için taşan bir gölge/kaldırma efekti kutunun kenarında ÇİRKİN KIRPILIR).',
   isKeycapSet
-    ? '4) `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 3-4 cümle (anahtarlar `<strong>`) — İLK CÜMLE KISA olsun ("with this keycap set" yeter, "with this PBT dye-sublimated keycap set" gibi uzun tamlama YAZMA) ve "board" yerine "keyboard"/"mechanical keyboard" ile başla (board\'u sonraki cümlelerde kullanabilirsin); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi (`<strong>` vurgulu); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Compatible Layouts</h3>`+`<div class="bm-layouts">` + `<div class="bm-layouts bm-layouts-keys">` (aşağıdaki İKİ SATIR kuralı) + `<p class="bm-layouts-note">` not; `<h3>Specifications</h3>`+`<div class="bm-spec">` (aşağıdaki SPECIFICATIONS kuralı — `<span class="bm-sub">…</span>` mantıklı kümelerle gruplanmış 12-16 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>`, GERÇEK veriler); `<h3>Why PBT Over ABS</h3>` (veya ürüne uygun bir "neden bu / X vs Y" başlığı)+`<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 5-7 tane NATIVE `<details class="bm-faq-item" name="bm-faq">` (HEPSİNDE `name="bm-faq"` — native tek-açık akordeon; ilkinde ayrıca `open`) → `<summary class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>CEVAP</p></div></details>` (JS YOK — `<button>` + `is-open` DEĞİL; Shopify `<script>`\'i siler, JS akordeon AÇILMAZ); `<div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, sürpriz kuponlu thank-you card.<br><b>💬 Compatibility questions?</b> mağazayla iletişime geçin.</div>` (KISA — "Before you order"/"Packaging" bloğu EKLEME); `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc onclick="…">🛒 Add to Cart</button></div>` — `onclick` içine ÖRNEK açıklamadaki CTA butonunun `onclick`\'ini AYNEN kopyala (Shop Pay / "Buy now" / "Buy with" butonlarını eleyip gerçek Add to Cart\'ı bulan uzun IIFE; ona kaydırıp arkasını 2 kez / 2.6s parlatır); `<div class="bm-trust">` 3 `<span>` güven rozeti (kutu + hover stilini örnekteki CSS verir).'
-    : '4) KEYCAP/KLAVYE DEĞİL — `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 3-4 cümle (anahtarlar `<strong>`, İLK CÜMLE KISA); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi; `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>`; `<h3>` (ürüne uygun bir başlık — ör. "Details & Fit" / "Size &amp; Colors" / "What\'s Included") + `<div class="bm-layouts">` içinde ürüne GERÇEKTEN uyan çipler (ör. gerçek boyut/renk/ölçü seçenekleri — 60%/TKL gibi klavye çipi YAZMA, UYDURMA seçenek de YAZMA, sadece gerçek veri varsa bu bölümü kullan, yoksa bu H3\'ü ATLA) + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` (aşağıdaki SPECIFICATIONS kuralı, GERÇEK veriler); `<h3>` ürüne uygun bir "neden bu ürün / X vs Y" başlığı (ör. "Why Genuine Leather Over Faux", "Why This Fabric Lasts Longer" — ürünün GERÇEK malzeme/kalite farkına göre, PBT/ABS UYDURMA) + `<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>` ürüne uygun bir FAQ başlığı (ör. "Sizing &amp; Care", klavye/keycap kelimesi GEÇMESİN) + `<div class="bm-faq">` 5-7 tane NATIVE `<details class="bm-faq-item" name="bm-faq">` (HEPSİNDE `name="bm-faq"`, ilkinde ayrıca `open`) → `<summary class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>CEVAP</p></div></details>` (JS YOK); `<div class="bm-note"><b>📦 In the box:</b> ürünün GERÇEK içeriği (uydurma keycap/puller YAZMA).<br><b>💬 Sorularınız mı var?</b> mağazayla iletişime geçin.</div>` (KISA); `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc onclick="…">🛒 Add to Cart</button></div>` — `onclick` içine ÖRNEK açıklamadaki CTA butonunun `onclick`\'ini AYNEN kopyala; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
+    ? '4) `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 3-4 cümle (anahtarlar `<strong>`) — İLK CÜMLE KISA olsun ("with this keycap set" yeter, "with this PBT dye-sublimated keycap set" gibi uzun tamlama YAZMA) ve "board" yerine "keyboard"/"mechanical keyboard" ile başla (board\'u sonraki cümlelerde kullanabilirsin); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi (`<strong>` vurgulu); `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>` (`<span class="ico">EMOJI</span><span class="tx"><b>Başlık</b><span class="t">fayda</span></span>`); `<h3>Compatible Layouts</h3>`+`<div class="bm-layouts">` + `<div class="bm-layouts bm-layouts-keys">` (aşağıdaki İKİ SATIR kuralı) + `<p class="bm-layouts-note">` not; `<h3>Specifications</h3>`+`<div class="bm-spec">` (aşağıdaki SPECIFICATIONS kuralı — `<span class="bm-sub">…</span>` mantıklı kümelerle gruplanmış 12-16 `<div class="bm-r"><span class="bm-k">Etiket</span><span class="bm-v">Değer</span></div>`, GERÇEK veriler); `<h3>Why PBT Over ABS</h3>` (veya ürüne uygun bir "neden bu / X vs Y" başlığı)+`<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>Compatibility &amp; Care</h3>`+`<div class="bm-faq">` 5-7 tane NATIVE `<details class="bm-faq-item" name="bm-faq">` (HEPSİNDE `name="bm-faq"` — native tek-açık akordeon; ilkinde ayrıca `open`) → `<summary class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>CEVAP</p></div></details>` (JS YOK — `<button>` + `is-open` DEĞİL; Shopify `<script>`\'i siler, JS akordeon AÇILMAZ); `<div class="bm-note"><b>📦 In the box:</b> keycap set, keycap puller, and a surprise-coupon thank-you card.<br><b>💬 Compatibility questions?</b> message the store.</div>` (KISA — "Before you order"/"Packaging" bloğu EKLEME); `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc onclick="…">🛒 Add to Cart</button></div>` — `onclick` içine ÖRNEK açıklamadaki CTA butonunun `onclick`\'ini AYNEN kopyala (Shop Pay / "Buy now" / "Buy with" butonlarını eleyip gerçek Add to Cart\'ı bulan uzun IIFE; ona kaydırıp arkasını 2 kez / 2.6s parlatır); `<div class="bm-trust">` 3 `<span>` güven rozeti (kutu + hover stilini örnekteki CSS verir).'
+    : '4) KEYCAP/KLAVYE DEĞİL — `.bm-grid>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 3-4 cümle (anahtarlar `<strong>`, İLK CÜMLE KISA); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi; `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>`; `<h3>` (ürüne uygun bir başlık — ör. "Details & Fit" / "Size &amp; Colors" / "What\'s Included") + `<div class="bm-layouts">` içinde ürüne GERÇEKTEN uyan çipler (ör. gerçek boyut/renk/ölçü seçenekleri — 60%/TKL gibi klavye çipi YAZMA, UYDURMA seçenek de YAZMA, sadece gerçek veri varsa bu bölümü kullan, yoksa bu H3\'ü ATLA) + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` (aşağıdaki SPECIFICATIONS kuralı, GERÇEK veriler); `<h3>` ürüne uygun bir "neden bu ürün / X vs Y" başlığı (ör. "Why Genuine Leather Over Faux", "Why This Fabric Lasts Longer" — ürünün GERÇEK malzeme/kalite farkına göre, PBT/ABS UYDURMA) + `<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>` ürüne uygun bir FAQ başlığı (ör. "Sizing &amp; Care", klavye/keycap kelimesi GEÇMESİN) + `<div class="bm-faq">` 5-7 tane NATIVE `<details class="bm-faq-item" name="bm-faq">` (HEPSİNDE `name="bm-faq"`, ilkinde ayrıca `open`) → `<summary class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>CEVAP</p></div></details>` (JS YOK); `<div class="bm-note"><b>📦 In the box:</b> ürünün GERÇEK içeriği (uydurma keycap/puller YAZMA).<br><b>💬 Questions?</b> message the store.</div>` (KISA); `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc onclick="…">🛒 Add to Cart</button></div>` — `onclick` içine ÖRNEK açıklamadaki CTA butonunun `onclick`\'ini AYNEN kopyala; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
   '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya `data-bm-zoom`\'lu olarak dizer, `.bm-lightbox` düğümünü + `<script>`\'i ekler. KENDİN `<script>` YAZMA — yazsan bile SİLİNİR. FAQ = native `<details>` (JS gerektirmez), CTA = `data-bm-goto-atc` + yukarıdaki inline `onclick` (JS silinse bile çalışır).',
   "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz.",
   "UZUNLUK — KESİN: operatör bir karakter/satır bandı verdiyse çıktı O BANDIN İÇİNDE olMAK ZORUNDA (bu hedef `<style>` + CSS + şablon + tüm görünür metin dahil TÜM HTML'i sayar). Bandın ALTINDA bir çıktı KABUL EDİLMEZ — kısa kaldıysan FAQ (6-8'e çıkar), spec satırı, highlight, `bm-compare` satırı, `bm-trivia`, rozet ve `bm-lede`/`bm-note` paragraflarını GERÇEK bilgiyle genişleterek banda çık; bandın üstündeysen dolguyu kes. Dolgu/tekrar cümle YOK ama band alt sınırına MUTLAKA ulaş.",
@@ -157,6 +159,7 @@ function shopifyDescRuleStacked(isKeycapSet: boolean): string {
 function manusDescRuleCompact(isStacked: boolean, isKeycapSet: boolean): string {
   if (isStacked) {
     return [
+      "DİL — KESİN: yazdığın HTML'in HER KELİMESİ hedef dilde olacak, tek bir Türkçe kelime bile olamaz (bu talimatlar Türkçe ama SENİN çıktın değil).",
       "HTML açıklama = TAM stilize belge, `.bm` iskeletine uy (sistem `<style>`/`<script>`'in kritik kısımlarını sonradan garanti eder, sen ana yapıyı ve içeriği ver).",
       "Kök `<div class=\"bm\">` içinde SIRAYLA: bm-hero (bm-eyebrow + h2 + sub + bm-badges 4-6 KISA rozet, `flex-wrap:nowrap` + `overflow-x:auto` ile HER ZAMAN tek satır, asla sarma) · bm-lede + bm-trivia · Highlights (`<ul class=\"bm-feat\">`, her `<li>`: `<span class=\"ico\">emoji</span><span class=\"tx\"><b>başlık</b><span class=\"t\">fayda</span></span>`, 5-6 tane)."
         + (isKeycapSet
@@ -172,6 +175,7 @@ function manusDescRuleCompact(isStacked: boolean, isKeycapSet: boolean): string 
       .join(" ");
   }
   return [
+    "DİL — KESİN: yazdığın HTML'in HER KELİMESİ hedef dilde olacak, tek bir Türkçe kelime bile olamaz (bu talimatlar Türkçe ama SENİN çıktın değil).",
     "HTML açıklama = TAM stilize belge, kendi `.pd-<kısa-tema>` sınıf öneki ile (mağaza temasıyla çakışmasın).",
     "Bölümler SIRAYLA: rozet şeridi · HERO (başlık+slogan+emoji) · INTRO (2-3 paragraf) + görsel ızgarası · FEATURES (4-8 madde, ikonlu) · SPOTLIGHT (tek geniş görsel) · varsa VARYANT kartları"
       + (isKeycapSet ? " · Technical Specifications tablosu (Profile/Key Count/Layout/Sizes/Switch Type/Material) + Compatibility Notice kutusu · Universal Compatibility rozet listesi" : "")
@@ -419,9 +423,15 @@ export async function ask(
     maxTokens?: number;
     signal?: AbortSignal;
     draftId?: string;
-    /** Real product photo URLs — lets the model pick a palette from what it
-     *  actually SEES instead of guessing off the title/theme text alone. */
-    images?: string[];
+    /** Real product photos (already downloaded + base64-encoded) — lets the
+     *  model pick a palette from what it actually SEES instead of guessing
+     *  off the title/theme text alone. NOT a URL: Anthropic's servers fetch
+     *  `type:"url"` images themselves, and Alibaba's CDN 403s that (it only
+     *  serves images to requests carrying a Taobao Referer header, which a
+     *  server-to-server fetch from Anthropic never sends) — the caller must
+     *  download the image itself (see `imageToBase64` in manus.ts, which
+     *  already does this) and pass the bytes here instead. */
+    images?: { data: string; mime: string }[];
   } = {},
 ) {
   system = stripLoneSurrogates(system);
@@ -435,9 +445,21 @@ export async function ask(
   // Images (if any) go BEFORE the text, per Anthropic's own guidance — the
   // model reads them as visual context for what follows rather than an
   // afterthought tacked onto the end.
+  const SUPPORTED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
   const userContent: Anthropic.MessageParam["content"] = opts.images?.length
     ? [
-        ...opts.images.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })),
+        ...opts.images.map((img) => ({
+          type: "image" as const,
+          source: {
+            type: "base64" as const,
+            media_type: (SUPPORTED_IMAGE_MIME.has(img.mime) ? img.mime : "image/jpeg") as
+              | "image/jpeg"
+              | "image/png"
+              | "image/gif"
+              | "image/webp",
+            data: img.data,
+          },
+        })),
         { type: "text" as const, text: user },
       ]
     : user;
@@ -617,19 +639,25 @@ export async function generateListing(
   // Real product photos for the model to actually LOOK at — palette matching
   // ("if the product is blue and yellow, don't invent an orange theme") is
   // unreliable when the model only ever sees the title/theme text and has to
-  // guess. `url` may be a local /api/media edit only this server can reach;
-  // `srcUrl` is the permanent public marketplace original. Capped at 2 — this
-  // is about giving a colour cue, not a full visual analysis.
-  const publicImgUrl = (im: { url: string; srcUrl?: string }): string | null => {
-    if (/^https?:\/\//i.test(im.url)) return im.url;
-    if (im.srcUrl && /^https?:\/\//i.test(im.srcUrl)) return im.srcUrl;
-    return null;
-  };
-  const mainImageUrls = product.images
-    .filter((im) => im.role === "gallery")
-    .map(publicImgUrl)
-    .filter((u): u is string => !!u)
-    .slice(0, 2);
+  // guess. `imageToBase64` (from manus.ts) already knows how to fetch these:
+  // a local `/api/media/...` edit (read straight from disk) or a real
+  // marketplace URL (with the Taobao Referer header Alibaba's CDN requires —
+  // Anthropic's `type:"url"` image source fetches server-to-server with no
+  // such header and gets 403'd, which is why this downloads the bytes itself
+  // instead of just handing over the URL). Capped at 2 — this is about
+  // giving a colour cue, not a full visual analysis; one failed download is
+  // skipped rather than failing the whole generation.
+  const galleryImages = product.images.filter((im) => im.role === "gallery").slice(0, 2);
+  const mainImages: { data: string; mime: string }[] = [];
+  for (const im of galleryImages) {
+    const src = im.url || im.srcUrl;
+    if (!src) continue;
+    try {
+      mainImages.push(await imageToBase64(src));
+    } catch (e) {
+      console.error("[generateListing] could not download a product photo for vision input, skipping:", e);
+    }
+  }
 
   // the source listing may still describe variants/options they REMOVED.
   const sv = productForSpecs(product, input.productNote);
@@ -916,7 +944,7 @@ export async function generateListing(
       maxTokens: maxTok,
       signal,
       draftId: input.draftId,
-      images: mainImageUrls,
+      images: mainImages,
     });
     usage = { inputTokens: usage.inputTokens + r.usage.inputTokens, outputTokens: usage.outputTokens + r.usage.outputTokens, costUsd: usage.costUsd + r.usage.costUsd };
     model = r.model;
@@ -1052,7 +1080,7 @@ export async function generateListing(
           maxTokens: descMaxTokens,
           signal,
           draftId: input.draftId,
-          images: mainImageUrls,
+          images: mainImages,
         });
         d2 = cleanDescValue(String(extractJson(r2.text).description ?? ""));
         du = r2.usage;
