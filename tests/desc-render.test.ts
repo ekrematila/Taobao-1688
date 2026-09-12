@@ -95,6 +95,39 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
+test("Specifications always gets a bordered/hoverable card, even if the model shipped bare rows", () => {
+  // Reproduces a real complaint: the model sometimes drops the .bm-spec card
+  // look entirely (no border, no background, no row hover) and ships plain
+  // unstyled text rows instead. The card look must be forced regardless.
+  const bare = STACKED_DESC_EXAMPLE.replace(
+    /\.bm-spec\{[^}]*\}/,
+    ".bm-spec{display:block}", // model "forgot" the border/background/radius
+  );
+  const out = renderDescriptionHtml("stacked-plain", bare, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-spec\{[^}]*border:1pxsolid/.test(flat), "spec card border is forced");
+  assert.ok(/\.bm-spec\{[^}]*background:var\(--milk/.test(flat), "spec card background is forced");
+  assert.ok(/\.bm-spec\.bm-r:hover\{background:var\(--sky/.test(flat), "spec row hover is forced");
+});
+
+test("FAQ questions always carry a visible +/- indicator, even if the model's own icon markup fails", () => {
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/summary\.bm-faq-q::after,summary\.pd-faq-q::after\{content:"\+"/.test(flat), "closed state shows +");
+  assert.ok(
+    /details\.bm-faq-item\[open\]>summary\.bm-faq-q::after,details\.pd-faq-item\[open\]>summary\.pd-faq-q::after\{content:"\\2212"/.test(flat),
+    "open state shows the minus sign",
+  );
+});
+
+test("badge hover never uses transform/box-shadow (the row scrolls horizontally and would clip it)", () => {
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const m = out.match(/\.bm-badges span:hover\{[^}]*\}/);
+  assert.ok(m, "badge hover rule present");
+  assert.ok(!/transform|box-shadow/.test(m![0]), "no transform/box-shadow on badge hover");
+  assert.ok(/flex-wrap:nowrap/.test(out.replace(/\s+/g, "")), "badge row never wraps to a 2nd line");
+});
+
 test("the readable render keeps the CSS/JS parseable and the import render is one line", () => {
   for (const [layout, ex] of [
     ["stacked-plain", STACKED_DESC_EXAMPLE],

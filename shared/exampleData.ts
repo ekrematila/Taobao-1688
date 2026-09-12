@@ -225,10 +225,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-badges span{
   display:inline-block; flex:0 0 auto; font-size:12.5px; color:var(--head); background:#fff; border:1px solid var(--line);
   padding:6px 12px; border-radius:99px; white-space:nowrap;
-  backface-visibility:hidden; -webkit-backface-visibility:hidden;
-  transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
+  transition:background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-badges span:hover{transform:translateY(-2px); box-shadow:0 8px 16px -6px rgba(var(--acc-rgb),.32); background:var(--sky); border-color:var(--line2); cursor:default}
+/* no transform/box-shadow here on purpose: the row scrolls horizontally
+   (overflow-x:auto) and a translateY + shadow hover gets visually clipped by
+   that scroll container's edge — background/border-only hover never clips. */
+.bm-badges span:hover{background:var(--sky); border-color:var(--line2); cursor:default}
 @keyframes bmPop{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
 /* ---- DESKTOP LAYOUT (kesin kural): images ALWAYS left, text/info ALWAYS right ---- */
 .bm-grid{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:18px; align-items:start; transition:gap .45s cubic-bezier(.25,.8,.3,1)}

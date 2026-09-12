@@ -546,6 +546,14 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm-faq-q:hover,.pd-faq-q:hover{filter:brightness(.97)}` +
   `details.bm-faq-item[open]>.bm-faq-a,details.pd-faq-item[open]>.pd-faq-a{animation:tpsFaqIn .28s ease}` +
   `@keyframes tpsFaqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}` +
+  // 2c) a guaranteed +/- indicator on the question row itself, independent of
+  //     whatever inner span/pseudo-element markup the model attempted for its
+  //     own `.bm-plus` icon (observed in production: the model's own version
+  //     sometimes doesn't render at all, leaving the row with no open/close
+  //     affordance). Drawn with plain text content, not absolutely-positioned
+  //     bars, so it can never fail to show up.
+  `summary.bm-faq-q::after,summary.pd-faq-q::after{content:"+";margin-left:auto;padding-left:12px;flex:0 0 auto;font-size:1.2em;font-weight:300;line-height:1;transition:transform .35s cubic-bezier(.4,0,.2,1)}` +
+  `details.bm-faq-item[open]>summary.bm-faq-q::after,details.pd-faq-item[open]>summary.pd-faq-q::after{content:"\\2212"}` +
   // 2b) legacy fallback: a model still emitting <div class="…-faq-item"> with a JS
   //     toggle class. Honour the toggle class if present; otherwise (no JS to set
   //     it) show the answer rather than trapping it closed forever.
@@ -555,17 +563,27 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //    + a tiny scale(): it must NEVER touch the store button's border-radius / padding
   //    / size / font / background, and the class is removed from the DOM after 2.6s so
   //    the button returns pixel-for-pixel to its pre-click look.
+  // Kept soft on purpose: an earlier version used a solid 4px ring + a bright
+  // 26px/.45-opacity blur, which read as a harsh neon halo rather than a
+  // gentle pulse. A single soft blur at lower opacity, no hard ring, and a
+  // smaller scale reads as smooth instead of sharp.
   `@keyframes bmAtcGlow{` +
   `0%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
-  `25%{box-shadow:0 0 0 4px rgba(63,140,217,.24),0 0 26px 6px rgba(63,140,217,.45);transform:scale(1.02)}` +
+  `25%{box-shadow:0 0 16px 4px rgba(63,140,217,.32);transform:scale(1.015)}` +
   `50%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
-  `75%{box-shadow:0 0 0 4px rgba(63,140,217,.24),0 0 26px 6px rgba(63,140,217,.45);transform:scale(1.02)}` +
+  `75%{box-shadow:0 0 16px 4px rgba(63,140,217,.32);transform:scale(1.015)}` +
   `100%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}}` +
   `.pd-atc-glow,.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}` +
   `@media (prefers-reduced-motion:reduce){.pd-atc-glow,.bm-atc-glow{animation-duration:.01ms!important}}` +
   // 4) spec rows: force the clean two-column look + a real gap even if the model's
-  //    nesting is off (the "MaterialPBT plastic" no-separator bug).
-  `.bm-spec .bm-r,.bm-spec>div:not(.bm-sub){display:flex!important;flex-wrap:wrap;justify-content:space-between!important;gap:6px 18px!important;align-items:baseline;padding:10px 14px}` +
+  //    nesting is off (the "MaterialPBT plastic" no-separator bug). Also force the
+  //    card container itself (border/background/rounded corners) plus a per-row
+  //    hover and a separator between rows — observed in production: the model
+  //    sometimes drops the card look entirely and ships bare, unstyled text rows.
+  `.bm-spec{border:1px solid var(--line,#e2e2e2)!important;border-radius:12px!important;overflow:hidden;background:var(--milk,#fafafa)!important}` +
+  `.bm-spec .bm-r,.bm-spec>div:not(.bm-sub){display:flex!important;flex-wrap:wrap;justify-content:space-between!important;gap:6px 18px!important;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line,#e2e2e2);transition:background .25s cubic-bezier(.4,0,.2,1)}` +
+  `.bm-spec .bm-r:last-child,.bm-spec>div:not(.bm-sub):last-child{border-bottom:0}` +
+  `.bm-spec .bm-r:hover,.bm-spec>div:not(.bm-sub):hover{background:var(--sky,#f2f6fb)}` +
   `.bm-spec .bm-k{flex:0 0 auto;max-width:44%;font-weight:500}` +
   `.bm-spec .bm-v{flex:1 1 auto;text-align:right;font-weight:600}` +
   // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
