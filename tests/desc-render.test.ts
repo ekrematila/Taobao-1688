@@ -66,6 +66,35 @@ test("the Add-to-Cart finder never targets a Shop Pay / dynamic-checkout button"
   }
 });
 
+test("a model-authored onclick with broken syntax is replaced, not trusted", () => {
+  // Reproduces a real failure: Claude sometimes writes its own shorter CTA
+  // onclick instead of copying the example's verbatim, and drops the `()`
+  // after `function` (`function{` instead of `function(){}`) — a silent
+  // syntax error that makes the browser refuse to parse the attribute at
+  // all, so clicking Add to Cart does literally nothing and nothing is ever
+  // logged. The system must force its own known-valid onclick regardless of
+  // what the model wrote.
+  const broken = STACKED_DESC_EXAMPLE.replace(
+    /onclick="[^"]*"/,
+    // deliberately malformed: `function{` three times, `glow;` (not called),
+    // and no trailing `()` invoking the outer IIFE.
+    `onclick="(function{var atc=document.querySelector('button[name=add]');if(!atc)return;var glow=function{atc.classList.add('bm-atc-glow');};setTimeout(function{glow;},650);})"`,
+  );
+  for (const [layout, ex] of [
+    ["stacked-plain", broken],
+    ["grid-2", OTHER_DESC_EXAMPLE.replace(/onclick="[^"]*"/, `onclick="(function{return true;})"`)],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const m = out.match(/data-(?:bm|pd)-goto-atc onclick="([^"]*)"/);
+    assert.ok(m, "CTA still carries an onclick attribute");
+    // must NOT contain the broken `function{` pattern — the forced replacement won
+    assert.ok(!/function\{/.test(m![1]), "broken function{ syntax was not carried through");
+    // the forced-in onclick must be syntactically valid JavaScript
+    assert.doesNotThrow(() => new Function(m![1]), "forced onclick parses as valid JS");
+    assert.ok(m![1].includes("findAtc") || m![1].includes("function bad("), "carries the real ban-list finder, not the model's broken one");
+  }
+});
+
 test("the readable render keeps the CSS/JS parseable and the import render is one line", () => {
   for (const [layout, ex] of [
     ["stacked-plain", STACKED_DESC_EXAMPLE],

@@ -213,9 +213,17 @@ export const STACKED_DESC_EXAMPLE = `<style>
 }
 .bm-hero h2{margin:0 0 8px; font-size:27px; line-height:1.25; color:var(--head); font-weight:700; position:relative}
 .bm-hero .sub{margin:0 0 15px; font-size:14px; color:var(--soft); position:relative}
-.bm-badges{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; position:relative}
+/* ALWAYS one line: never wraps to a 2nd row, and any overflow at very narrow
+   widths becomes a contained horizontal scroll instead of spilling out of the
+   card or breaking onto ugly extra lines. Keep badge TEXT short (2-3 words). */
+.bm-badges{
+  display:flex; flex-wrap:nowrap; gap:8px; justify-content:center; position:relative;
+  overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px;
+}
+.bm-badges::-webkit-scrollbar{display:none}
 .bm-badges span{
-  display:inline-block; font-size:12.5px; color:var(--head); background:#fff; border:1px solid var(--line);
+  display:inline-block; flex:0 0 auto; font-size:12.5px; color:var(--head); background:#fff; border:1px solid var(--line);
   padding:6px 12px; border-radius:99px; white-space:nowrap;
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1), border-color .3s cubic-bezier(.4,0,.2,1);
@@ -281,7 +289,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
   transform:rotate(0deg); transform-origin:50% 50%; will-change:transform;
   transition:transform .3s cubic-bezier(.4,0,.2,1), background .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-feat li:hover .ico{transform:rotate(-15deg); background:#fff}
+.bm-feat li:hover .ico{transform:rotate(15deg); background:#fff}
 .bm-feat .tx{flex:1 1 auto; min-width:0}
 .bm-feat b{display:block; color:var(--head); font-size:13.8px; margin-bottom:1px}
 .bm-feat .t{display:block; color:var(--soft); font-size:13px; line-height:1.45}

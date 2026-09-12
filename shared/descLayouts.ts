@@ -289,6 +289,34 @@ const FIND_ATC_FN = `
     return null;
   }`;
 
+/**
+ * Canonical, verified-syntactically-valid inline `onclick` for the Add-to-Cart
+ * hook — forced onto `[data-bm-goto-atc]`/`[data-pd-goto-atc]` by
+ * `forceCtaOnclick()` regardless of what the model wrote there.
+ *
+ * Why this exists: the model is told to copy the example's onclick VERBATIM,
+ * but it doesn't reliably do that — observed in production it sometimes writes
+ * its own shorter version and drops the `()` after `function` (`function{`
+ * instead of `function(){`), which is a silent syntax error: the browser
+ * can't parse the attribute at all, so the button does nothing on click and
+ * nothing is ever logged anywhere. A model-authored `<script>` gets the same
+ * treatment already (see `ensureBmScaffold`/`ensurePdScaffold`); this closes
+ * the same hole for the inline attribute.
+ */
+const BM_CTA_ONCLICK =
+  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;})();`;
+const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow");
+
+/** Force the CTA hook's onclick to the canonical, known-valid string — replaces
+ *  whatever the model wrote (or adds it, if the model left it off). */
+function forceCtaOnclick(html: string, attr: "data-bm-goto-atc" | "data-pd-goto-atc", onclick: string): string {
+  const re = new RegExp(`<(button|a)\\b([^>]*\\b${attr}\\b[^>]*)>`, "i");
+  return html.replace(re, (_m, tag, attrs) => {
+    const cleaned = attrs.replace(/\s+onclick\s*=\s*(?:"[^"]*"|'[^']*')/gi, "");
+    return `<${tag}${cleaned} onclick="${onclick}">`;
+  });
+}
+
 const BM_SCRIPT = `<script>
 (function(){
   if(window.__bmInit) return; window.__bmInit = 1;
@@ -559,6 +587,7 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
   let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
+  out = forceCtaOnclick(out, "data-bm-goto-atc", BM_CTA_ONCLICK);
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   if (!/\.bm-lightbox\{/i.test(out)) {
     out = /<\/style>/i.test(out) ? out.replace(/<\/style>/i, `</style>${BM_STYLE_EXTRA}`) : BM_STYLE_EXTRA + out;
@@ -595,6 +624,7 @@ function ensurePdScaffold(html: string): string {
   out = out.replace(/<a\b([^>]*\bdata-pd-goto-atc\b[^>]*)>/gi, (_m, attrs) =>
     `<a${attrs.replace(/\s+href\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")}>`,
   );
+  out = forceCtaOnclick(out, "data-pd-goto-atc", PD_CTA_ONCLICK);
   // FAQ_CTA_GUARANTEE is its own `<style>` element — append it as a SIBLING at the
   // end (its `!important` rules win regardless of position); never nest it inside
   // the model's `<style>` (that produces `<style><style>` and the browser prints
