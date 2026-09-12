@@ -189,7 +189,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
    always; the transition only smooths a class change if JS is present. */
 .bm-reveal{opacity:1; transform:none; transition:opacity .55s ease, transform .55s ease}
 .bm-reveal.bm-show{opacity:1; transform:none}
-.bm-toggle{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+.bm-acc{display:block}
 .bm-bar{display:none}
 .bm-c1,.bm-c2{display:block}
 .bm-inner{display:block}
@@ -415,38 +415,59 @@ export const STACKED_DESC_EXAMPLE = `<style>
    is never duplicated or overridden. Do not redeclare @keyframes for it here. */
 
 @media (max-width:899px){
+  /* Native <details>/<summary> disclosure (see .bm-acc on the wrapper below) —
+     no checkbox, no grid-template-rows animation trick. The browser shows or
+     hides everything except <summary> on its own the instant [open] toggles,
+     so there is nothing here that can silently fail to expand. Only the
+     chevron rotation and the bar's look are custom CSS; the actual show/hide
+     is native and cannot get stuck empty. */
   .bm-bar{
-    display:flex !important; align-items:center; justify-content:space-between; gap:12px;
-    width:100%; margin:0; padding:15px 17px; cursor:pointer; user-select:none;
+    display:flex !important; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; margin:0; padding:14px 16px; cursor:pointer; user-select:none; list-style:none;
     -webkit-tap-highlight-color:transparent; border:1px solid var(--line); border-radius:14px;
     background:linear-gradient(135deg,var(--sky),var(--lav));
-    font-size:15.5px; font-weight:700; color:var(--head); line-height:1.2;
+    font-size:14px; font-weight:700; color:var(--head); line-height:1.4;
   }
-  .bm-bar i{flex:0 0 auto; width:9px; height:9px; margin-right:4px; border-right:2px solid var(--gold); border-bottom:2px solid var(--gold); transform:rotate(45deg); transition:transform .35s cubic-bezier(.25,.8,.3,1)}
-  .bm-toggle:checked ~ .bm-bar i{transform:rotate(-135deg)}
-  .bm-toggle:focus-visible ~ .bm-bar{outline:2px solid var(--gold); outline-offset:2px}
-  .bm-c1,.bm-c2{display:grid; grid-template-rows:0fr; transition:grid-template-rows .45s cubic-bezier(.25,.8,.3,1)}
-  .bm-inner{overflow:hidden; min-height:0; opacity:0; transition:opacity .3s ease .05s}
-  .bm-toggle:checked ~ .bm-c1,.bm-toggle:checked ~ .bm-grid .bm-c2{grid-template-rows:1fr}
-  .bm-toggle:checked ~ .bm-c1 .bm-inner,.bm-toggle:checked ~ .bm-grid .bm-inner{opacity:1}
+  .bm-bar::-webkit-details-marker{display:none}
+  .bm-bar::marker{content:""}
+  .bm-bar i{flex:0 0 auto; width:9px; height:9px; margin-left:6px; border-right:2px solid var(--gold); border-bottom:2px solid var(--gold); transform:rotate(-135deg); transition:transform .35s cubic-bezier(.25,.8,.3,1)}
+  .bm-acc:not([open]) > .bm-bar i{transform:rotate(45deg)}
+  .bm-bar:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
   .bm-c1 .bm-hero{margin:12px 0 0}
-  .bm-grid{grid-template-columns:1fr; gap:0; margin-top:12px}
-  .bm-toggle:checked ~ .bm-grid{gap:12px}
+  .bm-grid{grid-template-columns:1fr; gap:12px; margin-top:12px}
   /* single column — order is IMAGES FIRST, then the text/info block */
   .bm-media{grid-column:1; grid-row:1; position:static}
   .bm-c2{grid-column:1; grid-row:2; position:static; top:auto}
   .bm-info{padding:18px 16px}
   .bm-hero{padding:22px 15px 18px}
-  .bm-hero h2{font-size:21px}
-  .bm-hero .sub{font-size:13px}
+  /* the floating decorative emoji is sized for a wide desktop hero card — at
+     mobile width it can grow to cover a third of the card and visually sits
+     right on top of the badges row underneath it; shrink and tuck it into the
+     corners instead. */
+  .bm-hero::before,.bm-hero::after{font-size:26px; opacity:.12}
+  .bm-hero::before{top:2px; left:2%}
+  .bm-hero::after{bottom:2px; right:3%; font-size:30px}
+  .bm-hero h2{font-size:20px}
+  .bm-hero .sub{font-size:12.5px}
+  /* badge text must always be fully readable on mobile — wrap instead of
+     relying on a horizontal-scroll gesture a shopper may never discover,
+     which read as truncated/cut-off text ("140 Key", "PBT Dye-S…"). */
+  .bm-badges{flex-wrap:wrap !important; overflow:visible !important; padding-bottom:0}
   .bm-badges span{font-size:11.5px; padding:5px 10px}
+  /* the compare table's first column no longer forces a single line — on a
+     narrow screen that starved the 2 data columns of width and pushed them
+     past the card edge instead of wrapping. */
+  .bm-compare{font-size:12px; table-layout:fixed; width:100%}
+  .bm-compare td:first-child{white-space:normal}
+  .bm-compare th,.bm-compare td{padding:9px 8px; overflow-wrap:break-word; word-break:break-word}
 }
-@media (max-width:420px){.bm-hero h2{font-size:19px} .bm-bar{font-size:14.5px; padding:14px 15px}}
-@media (max-width:380px){.bm-spec .bm-r{flex-direction:column; align-items:flex-start; gap:2px} .bm-spec .bm-v{text-align:left}}
+@media (max-width:420px){.bm-hero h2{font-size:19px} .bm-bar{font-size:13.5px; padding:13px 14px}}
+@media (max-width:380px){.bm-spec .bm-r{flex-direction:column; align-items:flex-start; gap:2px} .bm-spec .bm-v{text-align:left} .bm-compare{font-size:11.3px}}
 </style>
 <noscript><style>.bm-reveal{opacity:1 !important; transform:none !important}</style></noscript>
 <div class="bm">
-<input class="bm-toggle" type="checkbox" id="bmDetails"> <label class="bm-bar" for="bmDetails">🐰 Product Details <i></i></label>
+<details class="bm-acc" open>
+<summary class="bm-bar">🐰 Product Details — full specs, compatibility &amp; FAQ inside<i></i></summary>
 <div class="bm-c1"><div class="bm-inner">
 <div class="bm-hero bm-reveal">
 <span class="bm-eyebrow">Chiikawa Usagi Collection</span>
@@ -551,6 +572,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-media"></div>
 <div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button><img src="" alt="Zoomed product image" data-bm-lightbox-img></div>
 </div>
+</details>
 <script>
 /* Progressive enhancement only. The description works with NO JavaScript:
    reveals are visible by default, the FAQ is a native <details>, and the CTA

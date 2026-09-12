@@ -55,23 +55,79 @@ test("the bare-text fallback card's mobile 'Product Details' panel is never perm
   assert.ok(out.includes("Specifications"), "real content is present in the output");
 });
 
-test("the main .bm example's mobile 'Product Details' toggle can never leave the whole info panel empty", () => {
-  // The BIGGER version of the bug above: the golden reference example itself
-  // (what the model is told to copy near-verbatim into every real
-  // generation, not just the rare bare-text fallback) ships the exact same
+test("the main .bm example's mobile 'Product Details' panel is a real, working native <details> toggle", () => {
+  // The BIGGER version of the earlier bug: the golden reference example
+  // itself (what the model is told to copy near-verbatim into every real
+  // generation, not just the rare bare-text fallback) used to ship a
   // checkbox + grid-template-rows:0fr->1fr mobile collapse trick, gating the
-  // ENTIRE info panel (hero, highlights, specs, FAQ, CTA) behind it. Since
-  // that trick can silently fail to reach 1fr on a real mobile browser, a
-  // real generated listing can end up with its whole description panel
-  // permanently collapsed and empty on mobile with no way to open it —
-  // exactly what a user screenshot showed. FAQ_CTA_GUARANTEE must neutralize
-  // this regardless of what the model's own CSS says, the same way it already
-  // forces the FAQ indicator, spec card, and glow.
+  // ENTIRE info panel (hero, highlights, specs, FAQ, CTA) behind it. That
+  // trick could silently fail to reach 1fr on a real mobile browser, leaving
+  // the panel permanently collapsed and empty with no way to open it —
+  // exactly what a user screenshot showed. It's now a native
+  // <details class="bm-acc" open>/<summary class="bm-bar"> disclosure, which
+  // needs no CSS to show/hide correctly — the browser handles that itself.
+  // The one remaining gap: the summary bar is hidden on desktop (mobile-only
+  // affordance), so if the model ever wrote the <details> WITHOUT `open`, a
+  // desktop shopper would have no bar to click and see nothing. Guarantee
+  // desktop always shows the panel regardless of the [open] attribute.
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  assert.ok(/<details class="bm-acc" open>/.test(out), "info panel is wrapped in a native, open-by-default <details>");
+  assert.ok(/<summary class="bm-bar">/.test(out), "the tap target is a real <summary>, not a checkbox+label");
+  assert.ok(!/class="bm-toggle"/.test(out), "no more checkbox-driven toggle");
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>summary\{display:none!important\}/.test(flat), "desktop hides the mobile-only bar");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>\.bm-c1\{display:block!important\}/.test(flat), "desktop force-shows the info panel regardless of [open]");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>\.bm-grid\{display:grid!important\}/.test(flat), "desktop force-shows the grid regardless of [open]");
+  assert.ok(out.includes("querySelectorAll('.bm .bm-acc')") && out.includes("setAttribute('open',''"), "script defensively re-adds open if the model forgot it");
+});
+
+test("a model that ignores the <details> instruction and writes the old checkbox toggle is rewritten anyway", () => {
+  // Reproduces a REAL failure, found by testing a live regeneration on the
+  // actual product store: even right after the reference example and prompt
+  // were updated to the native <details>/<summary> form, Claude's own output
+  // still wrote the legacy `<input class="bm-toggle">…<label class="bm-bar">`
+  // markup — the same "prompt wording isn't enough for a structural change"
+  // lesson as forceCtaOnclick. This must be corrected in code regardless of
+  // what the model wrote, the same way forceCtaOnclick corrects the onclick.
+  const legacyToggle = STACKED_DESC_EXAMPLE.replace(
+    /<details class="bm-acc" open>\s*<summary class="bm-bar">([\s\S]*?)<\/summary>/,
+    '<input class="bm-toggle" type="checkbox" id="bmDetails"> <label class="bm-bar" for="bmDetails">$1</label>',
+  ).replace(/<\/details>\n<script>/, "\n<script>");
+  // sanity: the input fixture actually reproduces the legacy pattern, not a no-op
+  assert.ok(legacyToggle.includes('<input class="bm-toggle"'), "fixture setup: legacy checkbox present");
+  assert.ok(!legacyToggle.includes('<details class="bm-acc"'), "fixture setup: no <details> element left to trivially pass");
+
+  const out = renderDescriptionHtml("stacked-plain", legacyToggle, imgs);
+  assert.ok(/<details class="bm-acc" open><summary class="bm-bar">/.test(out), "rewritten into a native, open-by-default <details>/<summary>");
+  assert.ok(!out.includes('class="bm-toggle"'), "legacy checkbox is gone");
+  assert.ok(!/<label\b[^>]*class="bm-bar"/.test(out), "legacy <label> tag is gone (now a <summary>)");
+  assert.ok(out.includes("Product Details"), "the bar's own text survives the rewrite");
+  // the rewritten <details> must actually wrap the real content (specs, FAQ,
+  // CTA), not just the hero — i.e. it closes after .bm-grid, not right after .bm-c1
+  const accIdx = out.indexOf("bm-acc");
+  const closeIdx = out.indexOf("</details>", accIdx);
+  const gridIdx = out.indexOf('class="bm-grid"', accIdx);
+  assert.ok(gridIdx > accIdx && closeIdx > gridIdx, "<details> wraps both .bm-c1 AND .bm-grid, not just the hero");
+  assert.ok(out.slice(gridIdx, closeIdx).includes("Specifications"), "Specifications lives inside the rewritten <details>");
+});
+
+test("badges wrap (never clip mid-word) and the decorative hero emoji shrinks on mobile", () => {
+  // Reproduces a real screenshot: on a narrow phone, the badge row's
+  // desktop-only nowrap+horizontal-scroll styling read as truncated text
+  // ("140 Key", "PBT Dye-S…") because there was no visible/discoverable way
+  // to scroll it, and the large floating decorative emoji sat visually on
+  // top of the last badge.
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   const flat = out.replace(/\s+/g, "");
-  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm\.bm-bar\{display:none!important\}/.test(flat), "the toggle bar is force-hidden on mobile");
-  assert.ok(/\.bm\.bm-c1,\.bm\.bm-c2\{grid-template-rows:1fr!important\}/.test(flat), "the info panel is force-expanded on mobile regardless of the checkbox");
-  assert.ok(/\.bm\.bm-inner\{opacity:1!important/.test(flat), "inner content is force-visible on mobile regardless of the checkbox");
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm-badges\{flex-wrap:wrap!important/.test(flat), "badges wrap on mobile instead of clipping");
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm-hero::before,\.bm-hero::after\{font-size:26px!important/.test(flat), "decorative hero emoji shrinks on mobile");
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm-comparetd:first-child\{white-space:normal!important/.test(flat), "compare table's first column can wrap on mobile instead of squeezing the other columns off-screen");
+  // dropping first-column nowrap alone wasn't enough: an HTML <table> with no
+  // table-layout:fixed still sizes columns to fit its widest content and can
+  // overflow its container regardless of any single cell's white-space —
+  // verified live: the table pushed ~64px past the card edge on a real phone
+  // width even after this rule alone.
+  assert.ok(/max-width:899px\)\{[\s\S]*?\.bm-compare\{table-layout:fixed!important/.test(flat), "compare table is forced to table-layout:fixed on mobile so columns can't overflow the card");
 });
 
 test("both examples use a native <details> FAQ and an inline-onclick CTA (survives <script> stripping)", () => {
@@ -134,6 +190,25 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
     assert.doesNotThrow(() => new Function(m![1]), "forced onclick parses as valid JS");
     assert.ok(m![1].includes("findAtc") || m![1].includes("function bad("), "carries the real ban-list finder, not the model's broken one");
   }
+});
+
+test("the 'Tap to zoom' tag is never invisible, even if the model writes a compound selector typo", () => {
+  // Reproduces a real bug found on a live regeneration: `.bm-media` sets
+  // font-size:0 (removes whitespace gaps between stacked inline-block
+  // images), and the reference example overrides it back for the zoom tag
+  // with the DESCENDANT combinator `.bm-media .bm-zoomtag{font-size:11.5px}`.
+  // The model regenerated this as `.bm-media.bm-zoomtag` (no space = a
+  // compound selector requiring ONE element with both classes, which never
+  // exists since .bm-zoomtag is a descendant of .bm-media) — a silently dead
+  // rule that left the "🔍 Tap to zoom" label's text at 0 font-size.
+  const brokenSelector = STACKED_DESC_EXAMPLE.replace(
+    ".bm-media .bm-zoomtag{",
+    ".bm-media.bm-zoomtag{", // the exact typo observed in production
+  );
+  assert.notEqual(brokenSelector, STACKED_DESC_EXAMPLE, "fixture setup: the typo was actually introduced");
+  const out = renderDescriptionHtml("stacked-plain", brokenSelector, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-zoomtag\{font-size:11\.5px!important\}/.test(flat), "zoom tag font-size forced regardless of the model's selector");
 });
 
 test("Add-to-Cart glow waits long enough for a long-page smooth scroll to truly finish", () => {

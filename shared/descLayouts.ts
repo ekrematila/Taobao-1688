@@ -376,6 +376,14 @@ const BM_SCRIPT = `<script>
   if(window.__bmInit) return; window.__bmInit = 1;
 ${SYNC_ACCENT_FN}
   syncAccentColor();
+  /* Defense-in-depth: the desktop CSS guarantee already forces the info
+     panel visible regardless of [open], but on MOBILE that panel relies on
+     the model actually having written the open attribute on <details
+     class="bm-acc"> — if it forgot, a mobile shopper would see only the
+     "Product Details" bar with nothing to tap it open with reliably shown
+     underneath. Add it back if missing, same never-default-to-hidden rule
+     as everywhere else in this file. */
+  try{var accs=document.querySelectorAll('.bm .bm-acc');for(var ai=0;ai<accs.length;ai++){if(!accs[ai].hasAttribute('open'))accs[ai].setAttribute('open','');}}catch(e){}
 ${FIND_ATC_FN}
   function glow(el){
     if(!el) return;
@@ -471,7 +479,7 @@ ${FIND_ATC_FN}
 </script>`;
 
 /** No-JS guard: if Shopify strips the `<script>`, `.bm-reveal` would stay invisible. */
-const BM_NOSCRIPT = `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>`;
+const BM_NOSCRIPT = `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}.bm .bm-acc:not([open])>.bm-c1{display:block !important}.bm .bm-acc:not([open])>.bm-grid{display:grid !important}</style></noscript>`;
 
 /** Light readability pass for an injected `<style>…</style>` blob: one rule per
  *  line, declarations indented. Whitespace-only — CSS semantics are unchanged,
@@ -699,6 +707,18 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //     real hover affordance even when the model's own CSS forgot one.
   `.bm-trust span{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s cubic-bezier(.4,0,.2,1)!important}` +
   `.bm-trust span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,63,140,217),.28)!important;background:#fff!important}` +
+  // 4h) the "🔍 Tap to zoom" tag inherits font-size:0 from `.bm-media` (that
+  //     0 is intentional there — it's the classic trick to remove whitespace
+  //     gaps between stacked inline-block images). The reference example
+  //     overrides it back with the DESCENDANT combinator `.bm-media
+  //     .bm-zoomtag{font-size:11.5px}` — observed in production: the model
+  //     regenerated this as the COMPOUND selector `.bm-media.bm-zoomtag`
+  //     (no space = "one element with both classes", which no element ever
+  //     has, since .bm-zoomtag is a descendant of .bm-media, not the same
+  //     node) — a silently dead rule, leaving the tag's text invisible at
+  //     0 font-size. Force it back regardless of which selector the model
+  //     wrote.
+  `.bm-zoomtag{font-size:11.5px!important}` +
   // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
   `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
@@ -707,24 +727,111 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-grid{grid-template-columns:1fr!important}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +   // images first on mobile
   `.bm .bm-c2{grid-column:1!important;grid-row:2!important}` +
-  // 6) The golden reference example ships a mobile "Product Details" toggle
-  //    (an `.bm-toggle` checkbox + `.bm-bar` label collapsing `.bm-c1`/`.bm-c2`
-  //    via `grid-template-rows:0fr` -> `:checked{grid-template-rows:1fr}`) that
-  //    the model is told to copy verbatim into every real generation. That
-  //    trick depends on the browser both supporting an animatable `fr` unit
-  //    AND matching the `:checked` general-sibling chain correctly — on real
-  //    mobile browsers it can silently never reach the `1fr` state, leaving
-  //    the ENTIRE info panel (hero, highlights, specs, FAQ, CTA — everything)
-  //    permanently collapsed and empty with no way to open it. Force it
-  //    always-expanded regardless of the checkbox state and hide the
-  //    now-decorative bar, the same "never default to hidden" guarantee
-  //    already applied to `.bm-reveal`/`.bm-atc-glow` elsewhere.
-  `.bm .bm-bar{display:none!important}` +
-  `.bm .bm-c1,.bm .bm-c2{grid-template-rows:1fr!important}` +
-  `.bm .bm-inner{opacity:1!important;overflow:visible!important;min-height:0!important}` +
+  // 4d) badge text must always be fully readable on mobile — the model's own
+  //     nowrap+scroll badge row (correct on desktop) reads as truncated/cut
+  //     text ("140 Key", "PBT Dye-S…") on a narrow screen with no obvious way
+  //     to discover the horizontal scroll. Let it wrap instead, regardless of
+  //     what the model's own CSS says.
+  `.bm-badges{flex-wrap:wrap!important;overflow:visible!important}` +
+  // 4e) the decorative floating hero emoji is sized for a wide desktop card —
+  //     at mobile width it can grow large enough to sit directly on top of
+  //     the badges row underneath it. Shrink it regardless of the model's own
+  //     sizing.
+  `.bm-hero::before,.bm-hero::after{font-size:26px!important;opacity:.12!important}` +
+  // 4f) the compare table's first column no longer forces a single line — on
+  //     a narrow screen `white-space:nowrap` there starved the two data
+  //     columns of width and pushed them past the card edge.
+  `.bm-compare{table-layout:fixed!important;width:100%!important}` +
+  `.bm-compare td:first-child{white-space:normal!important}` +
+  `.bm-compare td,.bm-compare th{overflow-wrap:break-word!important;word-break:break-word!important}` +
+  // 4g) `forceBmAccDisclosure` (see `ensureBmScaffold`) rewrites a legacy
+  //     checkbox+label toggle into the native <details>/<summary> form, but a
+  //     model that still wrote the OLD collapse CSS alongside it
+  //     (`.bm-c1,.bm-c2{grid-template-rows:0fr}` / `.bm-inner{opacity:0}`,
+  //     now permanently unconditional since the checkbox they were gated on
+  //     is gone) would leave the panel visually collapsed to 0 height even
+  //     though the wrapping `<details>` is genuinely open. Force both back to
+  //     fully visible regardless of what the model's own CSS says — this is
+  //     purely a visibility guarantee and doesn't fight the native
+  //     open/close toggle itself (that hides the WHOLE subtree a level
+  //     higher, at the `<details>` element, independent of these props).
+  `.bm-c1,.bm-c2{grid-template-rows:1fr!important}` +
+  `.bm-inner{opacity:1!important;overflow:visible!important;min-height:0!important}` +
+  `}` +
+  // 6) The golden reference example wraps the whole info panel (hero,
+  //    highlights, specs, FAQ, CTA — everything) in a native
+  //    `<details class="bm-acc">`/`<summary class="bm-bar">` "Product Details"
+  //    disclosure, `open` by default, styled/clickable only inside the mobile
+  //    media query above. A native `<details>` needs no CSS at all to show or
+  //    hide its content correctly — that was the whole point of moving off
+  //    the earlier checkbox + `grid-template-rows:0fr->1fr` trick (which could
+  //    silently never reach the open state on a real mobile browser and leave
+  //    the panel permanently collapsed and empty). The one gap a `<details>`
+  //    still has: on DESKTOP the `.bm-bar` summary is hidden (`display:none`,
+  //    it's a mobile-only affordance) — so if the model ever omits the `open`
+  //    attribute, a desktop shopper would have no bar to click and the panel
+  //    would stay invisible forever with no way to open it. Force it visible
+  //    on desktop regardless of the `[open]` state; mobile is left alone so
+  //    the real native tap-to-collapse/expand behaviour keeps working there.
+  `@media (min-width:900px){` +
+  `.bm .bm-acc>summary{display:none!important}` +
+  `.bm .bm-acc>.bm-c1{display:block!important}` +
+  `.bm .bm-acc>.bm-grid{display:grid!important}` +
   `}` +
   `</style>`,
 );
+
+/**
+ * Rewrite the legacy checkbox + `<label>` "Product Details" toggle into a
+ * native `<details class="bm-acc" open>`/`<summary class="bm-bar">` disclosure.
+ *
+ * The reference example was updated to the `<details>` form specifically
+ * because the checkbox + `grid-template-rows:0fr -> :checked{1fr}` trick can
+ * silently never reach the open state on a real mobile browser, leaving the
+ * whole info panel permanently collapsed and empty. But the model is told to
+ * copy the example "AYNEN" (verbatim) and doesn't reliably do that for a
+ * structural change — observed in production: a fresh generation, run AFTER
+ * the example was updated, still wrote the old
+ * `<input class="bm-toggle">…<label class="bm-bar">` markup. Prompt wording
+ * alone isn't enough here (the same lesson as `forceCtaOnclick`), so this
+ * rewrites whatever the model wrote into the robust native form regardless.
+ *
+ * Finding where to close the new `<details>` needs actual depth-counting
+ * (not a naive "next `</div>`" regex): `.bm-grid` contains an arbitrary,
+ * model-generated amount of nested markup (specs, FAQ, compare table…), so
+ * only counting matched `<div>`/`</div>` pairs from `.bm-grid`'s own opening
+ * tag reliably finds ITS matching close.
+ */
+function forceBmAccDisclosure(html: string): string {
+  const m = html.match(/<input\b[^>]*\bclass\s*=\s*["']bm-toggle["'][^>]*>\s*<label\b[^>]*\bclass\s*=\s*["']bm-bar["'][^>]*>([\s\S]*?)<\/label>/i);
+  if (!m || m.index === undefined) return html;
+  const label = m[1];
+  const afterLabel = html.slice(m.index + m[0].length);
+  const gridStart = afterLabel.search(/<div\b[^>]*\bclass\s*=\s*["']bm-grid["']/i);
+  if (gridStart < 0) return html; // no .bm-grid to anchor the close on — leave the model's markup alone
+  // depth-count from .bm-grid's own opening tag to find ITS matching </div>
+  const tagRe = /<div\b[^>]*>|<\/div>/gi;
+  tagRe.lastIndex = gridStart;
+  let depth = 0;
+  let closeEnd = -1;
+  let tm: RegExpExecArray | null;
+  while ((tm = tagRe.exec(afterLabel))) {
+    if (tm[0].toLowerCase() === "</div>") {
+      depth--;
+      if (depth === 0) {
+        closeEnd = tm.index + tm[0].length;
+        break;
+      }
+    } else {
+      depth++;
+    }
+  }
+  if (closeEnd < 0) return html; // unbalanced — leave the model's markup alone rather than corrupt it
+  const before = html.slice(0, m.index);
+  const middle = afterLabel.slice(0, closeEnd);
+  const after = afterLabel.slice(closeEnd);
+  return `${before}<details class="bm-acc" open><summary class="bm-bar">${label}</summary>${middle}</details>${after}`;
+}
 
 /** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
  *  the runtime `<script>`. We NEVER trust a model-authored `<script>` here either
@@ -733,6 +840,7 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
   let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
+  out = forceBmAccDisclosure(out);
   out = forceCtaOnclick(out, "data-bm-goto-atc", BM_CTA_ONCLICK);
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   if (!/\.bm-lightbox\{/i.test(out)) {
