@@ -58,6 +58,7 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
   const slotN = Math.max(2, Math.min(10, descImgN || 4));
   return [
     "AÇIKLAMA DÜZENİ (Diğer HTML düzenler) — `description` ALANI, sana verilen ÖRNEKLER dosyasındaki (`Shopify Aciklamalar.txt` — 5 tam ürün bloğu: PIIFOX Eva, Ancient Chinese, MU02, Super Mario, Harry Potter) gibi TAM, KENDİNE YETEN, STİLLENDİRİLMİŞ bir HTML bloğu olacak. ASLA düz/sade metin verme; her şey HTML içinde olsun.",
+    "GERÇEK ÜRÜN FOTOĞRAFLARI ekli — `--pd-accent` ve genel paleti BUNLARA BAKARAK seç, başlık/tema metninden tahmin etme. Fotoğrafta olmayan bir rengi (ör. turuncu) sadece 'cozy'/'winter' gibi kelimeler yüzünden kullanma.",
     `GÖRSEL SLOTLARI (ÇOK ÖNEMLİ): her \`<div class="pd-media"></div>\` TEK BİR görsel içindir — ASLA birden fazla görseli aynı slota/aynı sütuna alt alta yığma, bu KESİNLİKLE YASAK. Sana yaklaşık ${descImgN || "birkaç"} açıklama görseli verilecek; TOPLAM yaklaşık ${slotN} tekli \`pd-media\` slotu oluştur ve bunları FARKLI görsel düzenlerine dağıt: (a) 2'li/3'lü IZGARA — birkaç \`pd-media\` div'ini kendi \`display:grid;grid-template-columns:...\` sınıfınla sarmala; (b) TEK GENİŞ SİNEMATİK kesit — bir \`pd-media\` div'ine ekstra bir sınıf ekleyip (ör. \`pd-media--wide\`) o sınıfla \`img{height:...;object-fit:cover}\` tanımla; (c) VARYANT KARTI görseli — varsa her varyant kartının içine kendi \`pd-media\`'sı. Slotları ANLAMLI bir bölüm başlığının hemen ardına koy (ör. Features'tan sonra ızgara, Spotlight'ta sinematik, her varyant kartında biri) — asla tek bir yerde art arda yığma. Kendin ASLA \`<img>\` YAZMA — sistemimiz her slota gerçek ürün görselini kendi düzeninle uyumlu şekilde yerleştirir.`,
     "GÖRSEL YALNIZLIK YASAĞI: hiçbir `pd-media` slotu TEK BAŞINA (kare/1:1'e yakın oranlı) bir bölümün TÜM genişliğini/alanını kaplamasın. Her tekli görsel ya (a) bir ızgarada en az bir görsel daha ile yan yana dursun, ya da (b) yanında/altında alakalı bir metin bloğuyla (özellik açıklaması, başlık, rozet) 2 sütunlu bir düzende dursun. Tam genişlikte, tek başına, yanında hiçbir şey olmayan kare bir fotoğraf YASAK — SADECE `pd-media--wide` gibi kasıtlı geniş sinematik kesitler (o zaten tek başına bir bölüm olarak tasarlanmış olur) bu kuralın dışındadır.",
     "Yapı: ilk satır kendi `<style>…</style>` bloğun (BENZERSİZ bir sınıf ön eki seç, ör. `.pd-<kısa-tema>` — örneklerdeki `.eva` / `.qm` gibi; tüm seçicileri o ön eke göre yaz, mağaza temasıyla çakışmasın; `@import` KULLANMA, sistem fontları yeter). Sarmalayıcının kök sınıfında (ör. `.pd-<önek>`) ürünün BASKIN renginden bir `--pd-accent: #hex;` CSS değişkeni tanımla — CTA parlama efekti bu rengi kullanır. Ardından `<div class=\"pd-<önek>\">…</div>` sarmalayıcı.",
@@ -96,6 +97,7 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
 /** Shopify HTML-description build rule — "Alt alta görsel" (.bm v3). */
 const SHOPIFY_DESC_RULE_STACKED = [
   "AÇIKLAMA DÜZENİ (Alt alta görsel) — `description` ALANI, sana verilen `.bm` örneğinin (v3) BİREBİR YAPISINI izleyen TAM BİR HTML BELGESİ OLACAK. ASLA düz/sade metin verme.",
+  "GERÇEK ÜRÜN FOTOĞRAFLARI ekli — palet seçimini BUNLARA BAKARAK yap, başlık/tema metninden TAHMİN ETME. Fotoğrafta hangi renk(ler) baskınsa `.bm{}` paletini ona göre seç (ör. fotoğrafta mavi+açık sarı varsa mavi+sarı tonlarında vars kullan; turuncu/mercan YOKSA turuncu/mercan/kehribar KULLANMA — 'winter'/'cozy' gibi kelimeler turuncu KULLANMANI GEREKTİRMEZ, gerçek renk fotoğrafta ne ise odur).",
   '1) `<style>…</style>` bloğu: örnekteki TÜM `.bm*` seçicileri, animasyonlar, jitter-önleyici teknik, `.bm-reveal`, `.bm-stage`, `.bm-lightbox`, `.bm-faq`, `.bm-cta`, `.bm-compat-eg`, `prefers-reduced-motion` ve mobil `@media` kuralları AYNEN kalsın. RENK/TEMA: SADECE `.bm{}` bloğundaki değişkenleri (`--ink --head --body --soft --gold --gold2 --acc-rgb --lav --sky --milk --line --line2`) ürünün BASKIN rengine göre yeniden ata. `.bm{}` DIŞINDA HİÇBİR YERDE sabit hex/rgb YAZMA — her renk `var(--…)` olacak (örnek zaten böyle). Ürün turuncu/mercan/kırmızı DEĞİLSE turuncu/mercan/kırmızı ton KULLANMA (mavi ürün → mavi vars: `--gold:#3f8cd9; --acc-rgb:63,140,217; --sky:#e6f2fb; --lav:#eef6fc; --ink:#1f3350` gibi). `.bm-hero::before/::after` `content:"EMOJI"` glifini tema emojisiyle değiştir.',
   '2) `<noscript><style>.bm-reveal{opacity:1 !important;transform:none !important}</style></noscript>` satırını `</style>`\'dan hemen sonra koy.',
   '3) `<div class="bm">` sarmalayıcı: `<input class="bm-toggle" ...>` + `<label class="bm-bar">` (tema emojisi ile) · `.bm-c1>.bm-inner> <div class="bm-hero bm-reveal">` (`.bm-eyebrow` seri/koleksiyon adı · `<h2>` başında+sonunda tema emojisi · `.sub` tek satır özet · `.bm-badges` 4-6 KISA (2-3 kelime) emoji\'li `<span>` rozet — HER ZAMAN TEK SATIRA sığmalı, taşmamalı: `.bm-badges{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}` + `.bm-badges::-webkit-scrollbar{display:none}` yaz (rozet metni kısa tutulursa masaüstünde zaten kayma gerekmez, dar ekranda gerekirse yatay kaydırma olur — asla 2. satıra sarmasın, asla kutunun dışına taşmasın). Rozet `:hover`\'ında SADECE `background`/`border-color` değişsin — `transform`/`box-shadow` YAZMA (satır `overflow-x:auto` olduğu için taşan bir gölge/kaldırma efekti kutunun kenarında ÇİRKİN KIRPILIR).',
@@ -398,6 +400,9 @@ export async function ask(
     maxTokens?: number;
     signal?: AbortSignal;
     draftId?: string;
+    /** Real product photo URLs — lets the model pick a palette from what it
+     *  actually SEES instead of guessing off the title/theme text alone. */
+    images?: string[];
   } = {},
 ) {
   system = stripLoneSurrogates(system);
@@ -408,12 +413,22 @@ export async function ask(
   // {type:"disabled"} thinking is rejected above effort "high" — cap it.
   if (thinking === "off" && EFFORT_ORDER[effort] > EFFORT_ORDER.high) effort = "high";
 
+  // Images (if any) go BEFORE the text, per Anthropic's own guidance — the
+  // model reads them as visual context for what follows rather than an
+  // afterthought tacked onto the end.
+  const userContent: Anthropic.MessageParam["content"] = opts.images?.length
+    ? [
+        ...opts.images.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })),
+        { type: "text" as const, text: user },
+      ]
+    : user;
+
   const base: Anthropic.MessageCreateParamsNonStreaming = {
     model: m,
     max_tokens: opts.maxTokens ?? 8000,
     // cache the (stable) system prompt so repeated generations are ~90% cheaper on input
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: user }],
+    messages: [{ role: "user", content: userContent }],
     output_config: { effort },
     thinking: thinking === "off" ? { type: "disabled" } : { type: "adaptive" },
   };
@@ -580,6 +595,23 @@ export async function generateListing(
     "BAŞLIK SÖZLÜĞÜ (sadece ürüne UYANLARI kullan, uymayanları kullanma; gerekirse benzerlerini araştır): " +
     TITLE_VOCAB.join(", ");
   // spec detection reads the operator's "product details" note when present —
+  // Real product photos for the model to actually LOOK at — palette matching
+  // ("if the product is blue and yellow, don't invent an orange theme") is
+  // unreliable when the model only ever sees the title/theme text and has to
+  // guess. `url` may be a local /api/media edit only this server can reach;
+  // `srcUrl` is the permanent public marketplace original. Capped at 2 — this
+  // is about giving a colour cue, not a full visual analysis.
+  const publicImgUrl = (im: { url: string; srcUrl?: string }): string | null => {
+    if (/^https?:\/\//i.test(im.url)) return im.url;
+    if (im.srcUrl && /^https?:\/\//i.test(im.srcUrl)) return im.srcUrl;
+    return null;
+  };
+  const mainImageUrls = product.images
+    .filter((im) => im.role === "gallery")
+    .map(publicImgUrl)
+    .filter((u): u is string => !!u)
+    .slice(0, 2);
+
   // the source listing may still describe variants/options they REMOVED.
   const sv = productForSpecs(product, input.productNote);
   const kb = detectKeyboardLayout(sv.product);
@@ -865,6 +897,7 @@ export async function generateListing(
       maxTokens: maxTok,
       signal,
       draftId: input.draftId,
+      images: mainImageUrls,
     });
     usage = { inputTokens: usage.inputTokens + r.usage.inputTokens, outputTokens: usage.outputTokens + r.usage.outputTokens, costUsd: usage.costUsd + r.usage.costUsd };
     model = r.model;
@@ -1000,6 +1033,7 @@ export async function generateListing(
           maxTokens: descMaxTokens,
           signal,
           draftId: input.draftId,
+          images: mainImageUrls,
         });
         d2 = cleanDescValue(String(extractJson(r2.text).description ?? ""));
         du = r2.usage;

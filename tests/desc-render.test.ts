@@ -95,6 +95,34 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
+test("FAQ open/close has a timeout fallback so it can never get stuck (transitionend not guaranteed to fire)", () => {
+  for (const [layout, ex] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE],
+    ["grid-2", OTHER_DESC_EXAMPLE],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const js = (out.match(/<script>([\s\S]*?)<\/script>/) || [])[1] || "";
+    // relying SOLELY on transitionend is exactly the bug that left a FAQ item
+    // stuck open/closed forever if the transition never actually ran — every
+    // open/close path needs a setTimeout fallback that finishes the state
+    // change regardless of whether the CSS transition fired.
+    assert.equal((js.match(/setTimeout\(finish,\s*450\)/g) || []).length, 2, "both closeFaq and openFaq have a timeout fallback");
+  }
+});
+
+test("the Add-to-Cart glow colour is synced from the product's own accent, not hardcoded", () => {
+  for (const [layout, ex] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE],
+    ["grid-2", OTHER_DESC_EXAMPLE],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const js = (out.match(/<script>([\s\S]*?)<\/script>/) || [])[1] || "";
+    assert.ok(js.includes("function syncAccentColor()"), "accent-sync function present");
+    assert.ok(/syncAccentColor\(\);\s*\n/.test(js) || js.includes("syncAccentColor();"), "accent-sync is actually called at load");
+    assert.ok(out.includes("rgba(var(--acc-rgb,63,140,217)"), "glow keyframe reads the synced accent variable, not a bare literal");
+  }
+});
+
 test("Specifications always gets a bordered/hoverable card, even if the model shipped bare rows", () => {
   // Reproduces a real complaint: the model sometimes drops the .bm-spec card
   // look entirely (no border, no background, no row hover) and ships plain

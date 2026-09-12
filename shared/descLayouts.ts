@@ -250,6 +250,34 @@ export function renderImportBody(
  *  makes the CTA delegated + resilient to a theme re-rendering the description.
  *  `document`-delegated (never bound at run time) + a `window.__bmInit` guard so
  *  it is safe if injected more than once. No `//` comments (one-lined for CSV). */
+/**
+ * The Add-to-Cart glow's colour lives in the guaranteed stylesheet as
+ * `var(--acc-rgb)` — but the REAL storefront button `findAtc()` locates is
+ * essentially never a descendant of `.bm`/`.pd-*` (custom properties only
+ * cascade down the DOM tree, and the button usually lives in the product
+ * form, elsewhere on the page), so that variable would not resolve there on
+ * its own. This copies whatever accent colour the model picked for THIS
+ * product onto `:root` at load time, so the glow actually matches the
+ * product instead of falling back to a hardcoded default everywhere.
+ * `.bm` uses an R,G,B triplet (`--acc-rgb`) already; `.pd-*` uses a single
+ * hex colour (`--pd-accent`), converted here to the same triplet form.
+ */
+const SYNC_ACCENT_FN = `
+  function syncAccentColor(){
+    try {
+      var scope = document.querySelector('.bm') || document.querySelector('[class*="pd-"]');
+      if(!scope) return;
+      var cs = getComputedStyle(scope);
+      var rgb = (cs.getPropertyValue('--acc-rgb') || '').trim();
+      if(!rgb){
+        var hex = (cs.getPropertyValue('--pd-accent') || '').trim();
+        var m = hex && hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        if(m) rgb = parseInt(m[1],16) + ',' + parseInt(m[2],16) + ',' + parseInt(m[3],16);
+      }
+      if(rgb) document.documentElement.style.setProperty('--acc-rgb', rgb);
+    } catch(e) {}
+  }`;
+
 /** Locate the storefront's REAL "Add to Cart" button. HARD rule: never a
  *  Shop Pay / dynamic-checkout / "Buy now" / "Buy with …" button. Ordered
  *  probe, then a text-based last resort; only returns null on a page that
@@ -320,6 +348,8 @@ function forceCtaOnclick(html: string, attr: "data-bm-goto-atc" | "data-pd-goto-
 const BM_SCRIPT = `<script>
 (function(){
   if(window.__bmInit) return; window.__bmInit = 1;
+${SYNC_ACCENT_FN}
+  syncAccentColor();
 ${FIND_ATC_FN}
   function glow(el){
     if(!el) return;
@@ -343,21 +373,36 @@ ${FIND_ATC_FN}
     setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
   }
   /* FAQ: smooth height open/close + single-open accordion. Falls back to the
-     native <details name> behaviour (still single-open) if this never runs. */
+     native <details name> behaviour (still single-open) if this never runs.
+     Each step ALSO has a setTimeout fallback alongside its transitionend
+     listener — observed in production: if the model's own CSS doesn't carry
+     a working \`transition\` on .bm-faq-a (or anything else stops the
+     transition from firing, e.g. a collapsed ancestor), transitionend never
+     fires, the open/close attribute never finishes updating, and the item
+     gets stuck — it looks like it "won't open again" on the next click. The
+     timeout guarantees the state always finishes settling either way. */
   function closeFaq(item){
-    var b = item.querySelector('.bm-faq-a'); if(!b) return;
+    var b = item.querySelector('.bm-faq-a');
+    if(!b){ item.removeAttribute('open'); return; }
+    var done = false;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); b.style.height = ''; }
     b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
-    b.style.height = '0px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); item.removeAttribute('open'); b.style.height = ''; }, {once:true});
+    b.style.transition = 'height .35s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 450);
   }
   function openFaq(item){
     var group = item.closest('.bm-faq') || document;
     group.querySelectorAll('.bm-faq-item[open]').forEach(function(o){ if(o !== item) closeFaq(o); });
     item.setAttribute('open', '');
-    var b = item.querySelector('.bm-faq-a'); if(!b) return;
-    b.style.height = '0px'; void b.offsetHeight;
+    var b = item.querySelector('.bm-faq-a');
+    if(!b) return;
+    var done = false;
+    function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; }
+    b.style.transition = 'height .35s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
     b.style.height = b.scrollHeight + 'px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); b.style.height = 'auto'; }, {once:true});
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 450);
   }
   document.addEventListener('click', function(e){
     var t = e.target;
@@ -466,6 +511,8 @@ function bmMediaInner(imgs: DescImg[]): string {
 const PD_SCRIPT = `<script>
 (function(){
   if(window.__pdInit) return; window.__pdInit = 1;
+${SYNC_ACCENT_FN}
+  syncAccentColor();
 ${FIND_ATC_FN}
   function afterScrollSettles(cb){
     var done = false;
@@ -485,18 +532,24 @@ ${FIND_ATC_FN}
   }
   function closeFaq(item){
     var b = item.querySelector('.pd-faq-a'); if(!b){ item.removeAttribute('open'); item.classList.remove('pd-open'); return; }
+    var done = false;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); item.classList.remove('pd-open'); b.style.height = ''; }
     b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
     b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); item.removeAttribute('open'); item.classList.remove('pd-open'); b.style.height = ''; }, {once:true});
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 450);
   }
   function openFaq(item){
     var group = item.closest('.pd-ck__faq') || item.parentElement || document;
     group.querySelectorAll('.pd-faq-item[open], .pd-faq-item.pd-open').forEach(function(o){ if(o !== item) closeFaq(o); });
     item.setAttribute('open', ''); item.classList.add('pd-open');
     var b = item.querySelector('.pd-faq-a'); if(!b) return;
+    var done = false;
+    function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; }
     b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
     b.style.height = b.scrollHeight + 'px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); b.style.height = 'auto'; b.style.overflow = ''; }, {once:true});
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 450);
   }
   document.addEventListener('click', function(e){
     var q = e.target && e.target.closest && e.target.closest('.pd-faq-q');
@@ -567,12 +620,16 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // 26px/.45-opacity blur, which read as a harsh neon halo rather than a
   // gentle pulse. A single soft blur at lower opacity, no hard ring, and a
   // smaller scale reads as smooth instead of sharp.
+  // Colour: var(--acc-rgb) — set on :root by SYNC_ACCENT_FN at load time from
+  // whatever accent colour the model actually picked for THIS product (see
+  // that function's own comment for why it can't just cascade normally). The
+  // literal 63,140,217 fallback only fires if that sync never ran at all.
   `@keyframes bmAtcGlow{` +
-  `0%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
-  `25%{box-shadow:0 0 16px 4px rgba(63,140,217,.32);transform:scale(1.015)}` +
-  `50%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}` +
-  `75%{box-shadow:0 0 16px 4px rgba(63,140,217,.32);transform:scale(1.015)}` +
-  `100%{box-shadow:0 0 0 0 rgba(63,140,217,0);transform:scale(1)}}` +
+  `0%{box-shadow:0 0 0 0 rgba(var(--acc-rgb,63,140,217),0);transform:scale(1)}` +
+  `25%{box-shadow:0 0 16px 4px rgba(var(--acc-rgb,63,140,217),.32);transform:scale(1.015)}` +
+  `50%{box-shadow:0 0 0 0 rgba(var(--acc-rgb,63,140,217),0);transform:scale(1)}` +
+  `75%{box-shadow:0 0 16px 4px rgba(var(--acc-rgb,63,140,217),.32);transform:scale(1.015)}` +
+  `100%{box-shadow:0 0 0 0 rgba(var(--acc-rgb,63,140,217),0);transform:scale(1)}}` +
   `.pd-atc-glow,.bm-atc-glow{animation:bmAtcGlow 2.6s ease-in-out 1!important}` +
   `@media (prefers-reduced-motion:reduce){.pd-atc-glow,.bm-atc-glow{animation-duration:.01ms!important}}` +
   // 4) spec rows: force the clean two-column look + a real gap even if the model's
