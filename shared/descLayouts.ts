@@ -356,11 +356,18 @@ ${FIND_ATC_FN}
     el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
     setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
   }
+  /* These descriptions can be long, so the real Add-to-Cart button can be a
+     long smooth-scroll away -- the old 1600ms/2000ms safety caps could fire
+     WHILE the page was still actively scrolling on a long page or a slower
+     device, starting the glow mid-flight (looks like it "cuts off" as the
+     page keeps moving under it). Longer caps cost nothing when scrollend (or
+     the stillness check) fires on its own, which is the normal case -- they
+     only matter as a fallback for the rare page where neither ever fires. */
   function afterScrollSettles(cb){
     var done = false;
     function fire(){ if(done) return; done = true; cb(); }
     if('onscrollend' in window){
-      var cap = setTimeout(fire, 1600);
+      var cap = setTimeout(fire, 4000);
       window.addEventListener('scrollend', function h(){ window.removeEventListener('scrollend', h); clearTimeout(cap); fire(); }, {once:true});
       return;
     }
@@ -370,7 +377,7 @@ ${FIND_ATC_FN}
       if(Math.abs(y - last) < 2){ still += 90; if(still >= 220){ clearInterval(iv); fire(); } }
       else { still = 0; last = y; }
     }, 90);
-    setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
+    setTimeout(function(){ clearInterval(iv); fire(); }, 4000);
   }
   /* FAQ: smooth height open/close + single-open accordion. Falls back to the
      native <details name> behaviour (still single-open) if this never runs.
@@ -514,11 +521,18 @@ const PD_SCRIPT = `<script>
 ${SYNC_ACCENT_FN}
   syncAccentColor();
 ${FIND_ATC_FN}
+  /* These descriptions can be long, so the real Add-to-Cart button can be a
+     long smooth-scroll away -- the old 1600ms/2000ms safety caps could fire
+     WHILE the page was still actively scrolling on a long page or a slower
+     device, starting the glow mid-flight (looks like it "cuts off" as the
+     page keeps moving under it). Longer caps cost nothing when scrollend (or
+     the stillness check) fires on its own, which is the normal case -- they
+     only matter as a fallback for the rare page where neither ever fires. */
   function afterScrollSettles(cb){
     var done = false;
     function fire(){ if(done) return; done = true; cb(); }
     if('onscrollend' in window){
-      var cap = setTimeout(fire, 1600);
+      var cap = setTimeout(fire, 4000);
       window.addEventListener('scrollend', function h(){ window.removeEventListener('scrollend', h); clearTimeout(cap); fire(); }, {once:true});
       return;
     }
@@ -528,7 +542,7 @@ ${FIND_ATC_FN}
       if(Math.abs(y - last) < 2){ still += 90; if(still >= 220){ clearInterval(iv); fire(); } }
       else { still = 0; last = y; }
     }, 90);
-    setTimeout(function(){ clearInterval(iv); fire(); }, 2000);
+    setTimeout(function(){ clearInterval(iv); fire(); }, 4000);
   }
   function closeFaq(item){
     var b = item.querySelector('.pd-faq-a'); if(!b){ item.removeAttribute('open'); item.classList.remove('pd-open'); return; }

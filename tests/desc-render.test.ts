@@ -95,6 +95,22 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
+test("Add-to-Cart glow waits long enough for a long-page smooth scroll to truly finish", () => {
+  // The old 1600ms/2000ms safety caps could fire while the page was still
+  // actively scrolling on a long description, starting the glow mid-flight —
+  // looks like it "cuts off" as the target keeps moving under it.
+  for (const [layout, ex] of [
+    ["stacked-plain", STACKED_DESC_EXAMPLE],
+    ["grid-2", OTHER_DESC_EXAMPLE],
+  ] as const) {
+    const out = renderDescriptionHtml(layout, ex, imgs);
+    const js = (out.match(/<script>([\s\S]*?)<\/script>/) || [])[1] || "";
+    assert.ok(js.includes("setTimeout(fire, 4000)"), "scrollend safety cap extended to 4000ms");
+    assert.ok(js.includes("clearInterval(iv); fire(); }, 4000)"), "polling hard-stop extended to 4000ms");
+    assert.ok(!js.includes("setTimeout(fire, 1600)"), "old too-short scrollend cap is gone");
+  }
+});
+
 test("FAQ open/close has a timeout fallback so it can never get stuck (transitionend not guaranteed to fire)", () => {
   for (const [layout, ex] of [
     ["stacked-plain", STACKED_DESC_EXAMPLE],
