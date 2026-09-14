@@ -218,7 +218,7 @@ export function translateImagesJob(
 export function classifyImagesJob(
   body: { draftId: string; imageUrls?: string[] },
   onProgress: Progress,
-): RunningJob<{ results: { url: string; meaningless: boolean; reason?: string }[] }> {
+): RunningJob<{ results: { url: string; meaningless: boolean; needsCleanup: boolean; reason?: string }[] }> {
   return runJob(() => post("/ai/classify-images", body), onProgress);
 }
 export function editImagesJob(

@@ -679,8 +679,16 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
         removeImages(drop);
         toast(t("ws.autoDropped", { n: drop.length }));
       }
-      const remaining = urls.filter((u) => !drop.includes(u));
-      if (remaining.length) reportTranslateSettled(await translateFanout(remaining));
+      // only spend a Manus task on images the classifier actually saw Chinese
+      // text or a seller watermark/logo on — an already-clean photo would just
+      // burn a task for a guaranteed no-op.
+      const needsCleanup = new Set(clsRes.results.filter((r) => r.needsCleanup).map((r) => r.url));
+      const toClean = urls.filter((u) => !drop.includes(u) && needsCleanup.has(u));
+      if (toClean.length) {
+        reportTranslateSettled(await translateFanout(toClean));
+      } else {
+        toast(t("ws.autoNoCleanupNeeded"));
+      }
       onSaved();
       toast(t("ws.autoDone"), "ok");
     } catch (e) {

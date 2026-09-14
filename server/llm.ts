@@ -816,15 +816,17 @@ export async function generateListing(
         "  - Aynı ana anahtar kelimeleri ve marka sonekini koru; yalnızca öznel sıfatları at ve gerekirse kısalt.",
         "  - Bu öznel kelimeler `description` içinde doğal biçimde geçsin (title_alt'tan çıkarılanları açıklamaya kat).",
         "",
-        "`tags` — TAM 13 etiket, virgülle ayrık, küçük harf, her biri ≤ 20 karakter ve TAM 2 VEYA 3 KELİME (1 veya 4+ kelime ASLA). Kelime ORTADAN KESİLMESİN (\"translucent keycap s\" gibi kırık etiket yok).",
+        "`tags` — TAM 13 etiket, virgülle ayrık, küçük harf, her biri ≤ 20 karakter ve TAM 2 VEYA 3 KELİME (1 veya 4+ kelime ASLA). Kelime ORTADAN KESİLMESİN (bir kelimenin sonu eksik/yarım bırakılmış kırık bir etiket YOK).",
         "  - GERÇEK ARAMA TERİMLERİ olsun — gerçek bir alıcının Etsy'de tam olarak bu ürünü bulmak için yazacağı ifadeler. Aşırı spesifik/uydurma tanımlayıcı (ör. \"shadow-carved\") KULLANMA.",
         kb.isKeycapSet
           ? "  - TERCİH EDİLEN BİÇİM (keycap seti): TEK tema kelimesi + ürün adı. \"cute cat keycaps\" YERİNE: cute keycap set, cute keycaps, cat keycap set, cat keycaps."
           : "  - TERCİH EDİLEN BİÇİM: TEK tema/stil kelimesi + ÜRÜNÜN KENDİ GERÇEK ADI (keycap/klavye ÖRNEKLERİNİ bu ürün keycap değilse ASLA kullanma — ürün ne ise (ör. bag, pin, case, mug, plush) o kelimeyle kur).",
         "  - ASLA çıplak kategori adı olmasın (\"case\", \"bag\", \"keycaps\" gibi tek başına ürün adı YASAK). Her etiket bir tema / stil / kullanım / uyumluluk kelimesi TAŞIMALI — ama bu kelime ÜRÜNÜ GERÇEKTEN TANIMLAMALI, alakasız/yanlış bir kategori kelimesi (ör. bir çanta için \"rucksack\") EKLEME.",
         "  - Marka adı ASLA etikette geçmesin.",
-        "  - YASAK: sayı+adet parçası (\"138 key keycap set\", \"104 keys\"), ürünle ilgisiz/yanlış kategori kelimeleri.",
-        "  - Etiketler ürünle DOĞRUDAN ve DOĞRU biçimde alakalı olmalı; boşa veya yanlış etiket harcama — başka bir niş/ürün türünün (ör. bu ürün keycap değilse \"mechanical keyboard\", \"pbt keycaps\") kelimelerini ASLA sızdırma.",
+        kb.isKeycapSet
+          ? "  - YASAK: sayı+adet parçası (\"138 key keycap set\", \"104 keys\"), ürünle ilgisiz/yanlış kategori kelimeleri."
+          : "  - YASAK: ürünün bir 'parçasını' sayıyla tarif eden ifadeler, ürünle ilgisiz/yanlış kategori kelimeleri.",
+        "  - Etiketler ürünle DOĞRUDAN ve DOĞRU biçimde alakalı olmalı; boşa veya yanlış etiket harcama — bu ürünün GERÇEK kategorisi ne ise SADECE onunla ilgili kelimeler kullan, başka bir niş/ürün türünün kelimelerini (ör. bu ürün klavye/keycap değilse hiçbir şekilde \"keyboard\"/\"keycap\" geçen bir kelime) ASLA sızdırma.",
         "`tags_pool` — aynı kurallarla 50'ye kadar aday etiket. En iyi 13'ü canlı `tags`, tamamı arayüzde. (Uygulama etiketleri alfabetik sıralar: önce seçilenler, sonra seçilmeyenler.)",
         "",
         "`description` — KESİNLİKLE DÜZ METİN. Etsy HTML, markdown, renk, font veya GÖRSEL kabul etmez.",
@@ -888,9 +890,20 @@ export async function generateListing(
   // compact `.bm` (stacked) or `.pd-*` (other) block — NOT the big 5-example
   // file, which was ~75k tokens per call (a real cause of slow generation).
   const descExample = (f: { key: GeneratedField["key"]; examples?: string }): string => {
-    if (f.examples?.trim()) return f.examples.trim();
     if (isShopify && f.key === "description")
       return isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE;
+    // The operator's baked-in tag vocabulary/example file is their OWN shop
+    // history — almost entirely keycap/keyboard phrases (hundreds of them, a
+    // 27KB wall of text for Shopify). Feeding that as the tags "format
+    // example" for a non-keycap product (a bag, a pin, a mug…) visibly leaks
+    // keycap words into that product's tags no matter how firmly the rules
+    // say "don't copy the content" — a wall of hundreds of concrete phrases
+    // overwhelms a one-line instruction. Skip it entirely (default OR
+    // whatever the client passed — the client can't tell the niche either)
+    // whenever this product isn't a keycap set; the ALAKA/relevance rules and
+    // the 2–3-word/real-search-term rules above are enough on their own.
+    if (!kb.isKeycapSet && (f.key === "tags" || f.key === "tags_pool")) return "";
+    if (f.examples?.trim()) return f.examples.trim();
     return readExample(input.channel, f.key);
   };
 
@@ -1025,6 +1038,37 @@ export async function generateListing(
     if (f) f.value = v;
     else fields.push({ key: k, value: v });
   };
+
+  // Hard backstop for a real, repeated leak: this app's rules/examples still
+  // use "keycap"/"keyboard" as the go-to illustrative wording all over the
+  // prompt (it started life as a keycap-shop tool) — even mentioned as a
+  // NEGATIVE example ("don't write a broken tag like 'translucent keycap
+  // s'"), that wording measurably primes the model toward those words on a
+  // completely unrelated product (a bag, a pin…). Rather than chase every
+  // occurrence through the prompt text, strip any tag containing
+  // "keycap"/"keyboard" outright whenever the SOURCE DATA says this genuinely
+  // isn't one (`kb.isKeycapSet`, detected from the real title/props/desc, not
+  // from the prompt) — a deterministic guarantee instead of hoping the
+  // wording is airtight everywhere.
+  if (!kb.isKeycapSet) {
+    const isKeyboardTag = (t: string) => /keycap|keyboard/i.test(t);
+    const splitTags = (v: string) => v.split(",").map((t) => t.trim()).filter(Boolean);
+    const poolF = getF("tags_pool");
+    if (poolF) poolF.value = splitTags(poolF.value).filter((t) => !isKeyboardTag(t)).join(", ");
+    const tagsF = getF("tags");
+    if (tagsF) {
+      const liveTags = splitTags(tagsF.value).filter((t) => !isKeyboardTag(t));
+      // Etsy wants exactly 13 live tags — top back up from the (already
+      // cleaned) pool so filtering a few bad ones doesn't leave it short.
+      if (poolF) {
+        for (const t of splitTags(poolF.value)) {
+          if (liveTags.length >= 13) break;
+          if (!liveTags.includes(t)) liveTags.push(t);
+        }
+      }
+      tagsF.value = liveTags.join(", ");
+    }
+  }
 
   // OPTIONAL 2nd pass for the HTML `description` only — with a DIFFERENT Claude
   // model, or with MANUS (an agent task). Title/tags stay on the main model.
@@ -1313,6 +1357,11 @@ export interface ImageClassification {
    *  intro slide, compatibility diagram, plain text-on-white slide, CTA
    *  graphic) — a candidate for automatic removal. */
   meaningless: boolean;
+  /** true = this photo actually has Chinese overlay text and/or a seller
+   *  watermark/logo baked in — worth spending a Manus translate/cleanup task
+   *  on. false = already clean (no Chinese text, no watermark), so running
+   *  the cleanup job on it would just burn a task for a guaranteed no-op. */
+  needsCleanup: boolean;
   reason?: string;
 }
 
@@ -1343,24 +1392,31 @@ export async function classifyProductImages(
 
   const system = [
     "Bir e-ticaret görsel küratörüsün. Sana SIRAYLA, 0'dan başlayarak indekslenmiş birden fazla görsel gösteriliyor.",
-    "Her görsel için, o görselin GERÇEK FOTOĞRAFLANMIŞ bir ürün/sahne mi (\"photo\"), yoksa esas olarak metin/grafik ağırlıklı bir PAZARLAMA SLAYTI mı (\"banner\") olduğuna karar ver.",
+    "Her görsel için İKİ ayrı karar ver:",
+    "1) \"class\": o görsel GERÇEK FOTOĞRAFLANMIŞ bir ürün/sahne mi (\"photo\"), yoksa esas olarak metin/grafik ağırlıklı bir PAZARLAMA SLAYTI mı (\"banner\")?",
     "\"banner\" örnekleri: sertifika/telif hakkı kartı, paketleme/kutu tanıtım grafiği, 'satın alma bilgilendirme' metin afişi, marka/fabrika tanıtım slaydı, uyumluluk/ölçü diyagramı, düz renkli zemin üzerine sadece başlık yazısı, garanti/iade rozet grid'i, mağaza QR kod/topluluk reklamı, jenerik 'sepete ekle/şimdi satın al' CTA grafiği.",
     "\"photo\": gerçek ürün gerçek bir sahne/arka planda fotoğraflanmış, gerçek doku/ışık/gölge/derinlik görünüyor — üzerinde biraz metin/rozet/logo olsa bile ASIL GÖRSEL İÇERİK gerçek bir fotoğrafsa yine \"photo\" say.",
     "EMİN DEĞİLSEN \"photo\" DE — yanlışlıkla gerçek bir ürün fotoğrafını silmektense pazarlama slaydını tutmak daha güvenli.",
-    'SADECE geçerli JSON dizi döndür: [{ "i": 0, "class": "photo" | "banner", "reason": "kısa neden (Türkçe)" }, ...] — gösterilen HER görsel için bir satır, aynı sırayla.',
+    "2) \"needsCleanup\": bu görselin ÜZERİNDE (üründen ayrı, sonradan eklenmiş) GERÇEKTEN Çince/CJK yazı VAR MI, YA DA satıcı mağaza adı/logosu/filigran VAR MI? İkisi de yoksa false — görsel zaten temiz demektir, boşuna 'true' deme. Ürünün KENDİ üzerine basılı/dökülmüş yazısı (ör. bir tuş kapağının üstündeki harf) bu sayılmaz, sadece SONRADAN EKLENMİŞ kaplama yazı/filigran/logo sayılır. \"banner\" (class=banner) olan bir görsel için needsCleanup önemsiz, false yaz.",
+    'SADECE geçerli JSON dizi döndür: [{ "i": 0, "class": "photo" | "banner", "needsCleanup": true | false, "reason": "kısa neden (Türkçe)" }, ...] — gösterilen HER görsel için bir satır, aynı sırayla.',
   ].join("\n");
-  const user = `${valid.length} görsel gösteriliyor, sırasıyla 0'dan ${valid.length - 1}'e kadar indekslenmiş. Her biri için "photo" mu "banner" mı karar ver.`;
+  const user = `${valid.length} görsel gösteriliyor, sırasıyla 0'dan ${valid.length - 1}'e kadar indekslenmiş. Her biri için "photo"/"banner" VE "needsCleanup" (Çince yazı veya satıcı logosu/filigranı var mı) karar ver.`;
   const { text, usage } = await ask(system, user, "classifyProductImages", {
-    maxTokens: 2500,
+    maxTokens: 3000,
     effort: "low",
     thinking: "off",
     ...opts,
     images: valid.map((im) => ({ data: im.data, mime: im.mime })),
   });
-  const rows = extractJson(text) as { i: number; class: string; reason?: string }[];
+  const rows = extractJson(text) as { i: number; class: string; needsCleanup?: boolean; reason?: string }[];
   const results: ImageClassification[] = valid.map((im, i) => {
     const hit = rows.find((r) => Number(r.i) === i);
-    return { url: im.url, meaningless: hit?.class === "banner", reason: hit?.reason };
+    return {
+      url: im.url,
+      meaningless: hit?.class === "banner",
+      needsCleanup: hit?.class !== "banner" && !!hit?.needsCleanup,
+      reason: hit?.reason,
+    };
   });
   return { results, usage };
 }

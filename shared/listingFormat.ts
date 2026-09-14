@@ -719,6 +719,7 @@ export function isFragmentTag(tag: string): boolean {
  * template and the AI post-processor (Shopify wants ≥40, Etsy 13 + a 20 pool).
  */
 export function buildTagCandidates(p: NormalisedProduct, title: string, productType?: string): string[] {
+  const kb = detectKeyboardLayout(p);
   const noun = productNoun(p, productType);
   const nounShort = noun.split(" ").slice(-1)[0];
   const out: string[] = [];
@@ -744,10 +745,16 @@ export function buildTagCandidates(p: NormalisedProduct, title: string, productT
   const adjs = themeAdjectives(p, 4);
   const phs = propPhrases(p, noun, 5);
   for (const a of adjs) for (const ph of phs) push(`${a} ${ph}`);
-  // real Etsy search vocabulary that overlaps this product's words / theme
+  // real Etsy search vocabulary that overlaps this product's words / theme —
+  // ETSY_TAG_VOCAB and UNIVERSAL_ETSY_TAGS are this tool's own shop history,
+  // overwhelmingly keycap/keyboard phrases. Never let a keycap/keyboard vocab
+  // entry match a non-keycap product just because a generic word like "set"
+  // or "cute" happens to overlap, and never force-include the "universal"
+  // list (it's ALL keycap phrases) on a product that isn't one.
   const words = new Set(textPool(p).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
   for (const v of ETSY_TAG_VOCAB) {
-    if (UNIVERSAL_ETSY_TAGS.includes(v) || v.split(" ").some((w) => words.has(w))) push(v);
+    if (!kb.isKeycapSet && /keycap|keyboard/i.test(v)) continue;
+    if ((kb.isKeycapSet && UNIVERSAL_ETSY_TAGS.includes(v)) || v.split(" ").some((w) => words.has(w))) push(v);
   }
   return [...new Set(out)];
 }
