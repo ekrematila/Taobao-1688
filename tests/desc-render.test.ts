@@ -192,6 +192,25 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
+test("product photos never scale/zoom on hover (only brighten), and the zoom hint is always visible", () => {
+  // User complaint: hovering an image "zoomed" it (jarring), and the
+  // "Tap to zoom" hint appeared to be "stuck behind the image" on mobile —
+  // it wasn't a z-index bug, it was hover-gated opacity:0 that never fires
+  // on a touch device (no real :hover state). Fixed by making the hint
+  // always visible and swapping the hover zoom for a subtle brightness lift,
+  // both forced regardless of what the model's own CSS says.
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/.test(flat), "hover brightens, never scales");
+  assert.ok(/\.bm-zoomtag\{opacity:1!important/.test(flat), "zoom hint forced always-visible, not hover-only");
+});
+
+test("the .bm card is widened on desktop/tablet regardless of the model's own max-width", () => {
+  const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
+  const flat = out.replace(/\s+/g, "");
+  assert.ok(/\.bm\{max-width:1400px!important\}/.test(flat), "root card widened to 1400px on devices with the room for it");
+});
+
 test("the 'Tap to zoom' tag is never invisible, even if the model writes a compound selector typo", () => {
   // Reproduces a real bug found on a live regeneration: `.bm-media` sets
   // font-size:0 (removes whitespace gaps between stacked inline-block

@@ -167,7 +167,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
   font-family:"Trebuchet MS",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,
     "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
   color:var(--ink); line-height:1.62; text-align:left; overflow-wrap:break-word;
-  width:100%; max-width:1160px; margin:0 auto; padding:0; position:relative;
+  width:100%; max-width:1400px; margin:0 auto; padding:0; position:relative;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
 .bm *{box-sizing:border-box; min-width:0; max-width:100%}
@@ -245,26 +245,27 @@ export const STACKED_DESC_EXAMPLE = `<style>
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:transform .5s cubic-bezier(.25,.8,.3,1); cursor:zoom-in; background:var(--sky);
 }
-.bm-media img:hover{transform:scale(1.025)}
+.bm-media img:hover{filter:brightness(1.06)}
 .bm-media .bm-zoomtag{
-  position:absolute; right:10px; bottom:10px; z-index:2;
+  position:absolute; right:10px; bottom:10px; z-index:5;
   font-size:11.5px; font-weight:700; color:var(--head); background:rgba(255,255,255,.92);
   border:1px solid var(--line); padding:9px 14px; border-radius:99px; line-height:1;
-  opacity:0; transform:translateY(6px); transition:opacity .25s ease, transform .25s ease; pointer-events:none;
+  opacity:1; pointer-events:none;
 }
-.bm-media .bm-stage:hover .bm-zoomtag{opacity:1; transform:translateY(0)}
 .bm-lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:26px; background:rgba(20,32,50,.82); backdrop-filter:blur(2px); animation:bmFade .2s ease}
 .bm-lightbox.is-open{display:flex}
 .bm-lightbox img{max-width:min(92vw,900px); max-height:88vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .bm-lightbox .bm-close{
-  position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%;
-  border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.12); color:#fff;
-  font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center;
+  position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.4); background:rgba(20,26,48,.5); color:#fff;
+  font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
-  transform:rotate(0deg); transform-origin:50% 50%; will-change:transform;
-  transition:background .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1);
+  transform:rotate(0deg) scale(1); transform-origin:50% 50%; will-change:transform;
+  transition:background .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1);
 }
-.bm-lightbox .bm-close:hover{background:rgba(255,255,255,.25); transform:rotate(90deg)}
+.bm-lightbox .bm-close:hover{background:rgba(20,26,48,.75); transform:rotate(90deg) scale(1.08); box-shadow:0 6px 20px rgba(0,0,0,.45)}
 @keyframes bmFade{from{opacity:0} to{opacity:1}}
 .bm-info{padding:20px 18px; border:1px solid var(--line); border-radius:var(--r); background:var(--milk)}
 .bm-info h3{margin:0 0 10px; font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gold)}

@@ -10,6 +10,10 @@ export interface ClaudeModel {
 }
 
 // Cached from the Anthropic pricing table. Any id here is selectable in the UI.
+// Keep this in sync with new Anthropic model releases (check the model IDs the
+// runtime environment reports as "most recent" and add them here — never
+// remove an older id outright, since drafts already saved with it must keep
+// working; just make the newest release the clearly-labeled default choice).
 export const CLAUDE_MODELS: ClaudeModel[] = [
   { id: "claude-opus-5", label: "Opus 5 · most capable", inPer1M: 5, outPer1M: 25, tier: "opus" },
   { id: "claude-opus-4-8", label: "Opus 4.8", inPer1M: 5, outPer1M: 25, tier: "opus" },
@@ -17,8 +21,10 @@ export const CLAUDE_MODELS: ClaudeModel[] = [
   { id: "claude-opus-4-6", label: "Opus 4.6", inPer1M: 5, outPer1M: 25, tier: "opus" },
   { id: "claude-sonnet-5", label: "Sonnet 5 · balanced (default)", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", inPer1M: 3, outPer1M: 15, tier: "sonnet" },
-  { id: "claude-haiku-4-5", label: "Haiku 4.5 · cheapest", inPer1M: 1, outPer1M: 5, tier: "haiku" },
-  { id: "claude-fable-5", label: "Fable 5 · top tier", inPer1M: 10, outPer1M: 50, tier: "fable" },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 · cheapest", inPer1M: 1, outPer1M: 5, tier: "haiku" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5 (rolling alias)", inPer1M: 1, outPer1M: 5, tier: "haiku" },
+  { id: "claude-fable-5-1", label: "Fable 5.1 · top tier", inPer1M: 10, outPer1M: 50, tier: "fable" },
+  { id: "claude-fable-5", label: "Fable 5 (previous)", inPer1M: 10, outPer1M: 50, tier: "fable" },
 ];
 
 export function claudePricing(id: string): { inPer1M: number; outPer1M: number } {

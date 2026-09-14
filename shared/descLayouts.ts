@@ -505,10 +505,10 @@ const fmtStyle = (block: string): string =>
 const BM_STYLE_EXTRA = fmtStyle(
   `<style>@media (prefers-reduced-motion:reduce){.bm *{animation-duration:.01ms!important;transition-duration:.01ms!important}}` +
   `.bm-reveal{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:none}` +
-  `.bm-media .bm-stage{position:relative;cursor:zoom-in}.bm-media img{transition:transform .5s cubic-bezier(.25,.8,.3,1);cursor:zoom-in;background:var(--sky,#eaeefc)}.bm-media img:hover{transform:scale(1.03)}` +
-  `.bm-media .bm-zoomtag{position:absolute;right:10px;bottom:10px;z-index:2;font-size:11.5px;font-weight:700;color:var(--acc,#4f57c4);background:rgba(255,255,255,.92);border:1px solid var(--line,rgba(79,87,196,.16));padding:5px 10px;border-radius:99px;opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s;pointer-events:none}.bm-media .bm-stage:hover .bm-zoomtag{opacity:1;transform:translateY(0)}` +
+  `.bm-media .bm-stage{position:relative;cursor:zoom-in}.bm-media img{transition:filter .3s cubic-bezier(.25,.8,.3,1);cursor:zoom-in;background:var(--sky,#eaeefc)}.bm-media img:hover{filter:brightness(1.06)}` +
+  `.bm-media .bm-zoomtag{position:absolute;right:10px;bottom:10px;z-index:5;font-size:11.5px;font-weight:700;color:var(--acc,#4f57c4);background:rgba(255,255,255,.92);border:1px solid var(--line,rgba(79,87,196,.16));padding:5px 10px;border-radius:99px;opacity:1;pointer-events:none}` +
   `.bm-lightbox{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:26px;background:rgba(24,26,48,.82)}.bm-lightbox.is-open{display:flex}.bm-lightbox img{max-width:min(92vw,900px);max-height:88vh;border-radius:12px}` +
-  `.bm-lightbox .bm-close{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}` +
+  `.bm-lightbox .bm-close{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(20,26,48,.5);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 4px 16px rgba(0,0,0,.35);transition:background .3s,transform .3s,box-shadow .3s}.bm-lightbox .bm-close:hover{background:rgba(20,26,48,.75);transform:rotate(90deg) scale(1.08);box-shadow:0 6px 20px rgba(0,0,0,.45)}` +
   `.bm-faq{margin-top:6px;border:1px solid var(--line,rgba(79,87,196,.16));border-radius:12px;overflow:hidden}.bm-faq-item{border-bottom:1px solid var(--line,rgba(79,87,196,.16))}.bm-faq-item:last-child{border-bottom:0}` +
   `.bm-faq-q{list-style:none;cursor:pointer;width:100%;display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff;border:0;text-align:left;font-size:13.4px;font-weight:700;color:var(--acc,#4f57c4)}.bm-faq-q::-webkit-details-marker{display:none}.bm-faq-q::marker{content:""}` +
   `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative;transition:transform .3s}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:opacity .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item[open] .bm-plus,.bm-faq-item.is-open .bm-plus{transform:rotate(90deg)}.bm-faq-item[open] .bm-plus::after,.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
@@ -707,6 +707,20 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //     real hover affordance even when the model's own CSS forgot one.
   `.bm-trust span{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s cubic-bezier(.4,0,.2,1)!important}` +
   `.bm-trust span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,63,140,217),.28)!important;background:#fff!important}` +
+  // 4i) product photos must never zoom/scale on hover (that reads as a jarring
+  //     "magnify" effect) — only a subtle brightness lift; and the "Tap to
+  //     zoom" hint must always be visible, never hover-only, since touch
+  //     devices have no real :hover state and the tag would otherwise never
+  //     appear at all (observed complaint: "the tap-to-zoom area stays behind
+  //     the image" on mobile — it wasn't behind it, it was just permanently
+  //     opacity:0 because :hover never fires on a tap).
+  `.bm-media img{transform:none!important}` +
+  `.bm-media img:hover{transform:none!important;filter:brightness(1.06)!important}` +
+  `.bm-media .bm-zoomtag{opacity:1!important;transform:none!important;z-index:5!important}` +
+  // 4j) the root card is capped for a narrow desktop theme column — widen it
+  //     on devices that actually have the room (desktop/tablet) regardless of
+  //     what the model's own `.bm{}` max-width says.
+  `.bm{max-width:1400px!important}` +
   // 4h) the "🔍 Tap to zoom" tag inherits font-size:0 from `.bm-media` (that
   //     0 is intentional there — it's the classic trick to remove whitespace
   //     gaps between stacked inline-block images). The reference example

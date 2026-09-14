@@ -15,6 +15,7 @@ import {
   renderBlogHtml,
 } from "@shared/blogPresets.ts";
 import type { BlogConfig, BlogRecord, JobView } from "@shared/types.ts";
+import { CLAUDE_MODELS } from "@shared/models.ts";
 
 const LANGS = ["English", "Türkçe", "Deutsch", "Français", "Español", "Italiano", "Nederlands", "日本語"];
 
@@ -325,7 +326,7 @@ export default function BlogStudio({
             <label className="field" style={{ width: 200 }}>
               {t("blog.model")}
               <select value={model} onChange={(e) => setModel(e.target.value)}>
-                {[defaultModel, "claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"]
+                {[defaultModel, ...CLAUDE_MODELS.map((m) => m.id)]
                   .filter((v, i, a) => a.indexOf(v) === i)
                   .map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
