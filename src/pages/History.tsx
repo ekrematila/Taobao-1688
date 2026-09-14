@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
@@ -13,6 +13,23 @@ export default function History() {
   const drafts = useQuery({ queryKey: ["drafts"], queryFn: api.drafts });
   const [confirm, setConfirm] = useState<DraftSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // 1s-delayed "what was done / which AI" preview, shown on row hover
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current != null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+  const onRowEnter = (id: string) => {
+    clearHoverTimer();
+    hoverTimer.current = window.setTimeout(() => setHoverId(id), 1000);
+  };
+  const onRowLeave = () => {
+    clearHoverTimer();
+    setHoverId(null);
+  };
 
   async function doDelete() {
     if (!confirm) return;
@@ -54,8 +71,27 @@ export default function History() {
                 </thead>
                 <tbody>
                   {drafts.data.map((d) => (
-                    <tr key={d.id}>
-                      <td>{d.title || "—"}</td>
+                    <tr key={d.id} onMouseEnter={() => onRowEnter(d.id)} onMouseLeave={onRowLeave}>
+                      <td style={{ position: "relative" }}>
+                        {d.title || "—"}
+                        {hoverId === d.id && (
+                          <div className="draft-hover-pop" role="tooltip">
+                            <div className="tiny">
+                              <b>{t("history.hoverModel")}</b>: {d.lastModel || t("history.hoverNone")}
+                            </div>
+                            {d.descChars != null && (
+                              <div className="tiny">
+                                {t("history.hoverDesc")}: {d.descChars.toLocaleString()} {t("history.hoverChars")}
+                              </div>
+                            )}
+                            {d.tagCount != null && (
+                              <div className="tiny">
+                                {t("history.hoverTags")}: {d.tagCount}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="mono">
                         {d.platform} · {d.numIid}
                       </td>

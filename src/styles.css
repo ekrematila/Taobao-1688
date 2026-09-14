@@ -453,6 +453,16 @@ pre.json {
   pointer-events: none;
 }
 .hinttip:hover .hinttip-pop, .hinttip:focus-within .hinttip-pop { opacity: 1; visibility: visible; transform: none; }
+.draft-hover-wrap { position: relative; display: block; }
+.draft-hover-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  width: min(280px, 82vw); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px;
+  box-shadow: var(--shadow-lg); color: var(--ink-soft);
+  animation: draftHoverIn .15s ease;
+  pointer-events: none;
+}
+@keyframes draftHoverIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .note {
   border: 1px solid var(--line); border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3); background: var(--panel-2); color: var(--ink);

@@ -9,6 +9,7 @@ import ApiExplorer from "../components/ApiExplorer";
 import AdvicePanel from "../components/AdvicePanel";
 import VisualWorkspace from "../components/VisualWorkspace";
 import DeliveryStudio from "../components/DeliveryStudio";
+import DraftHoverPreview from "../components/DraftHoverPreview";
 import type { DraftSummary } from "@shared/types.ts";
 
 const UNDO_CAP = 40;
@@ -224,28 +225,30 @@ export default function Studio() {
           <div className="rail-h">{t("studio.railTitle")}</div>
           {(draftsQ.data ?? []).length === 0 && <div className="tiny muted" style={{ padding: 8 }}>{t("studio.railEmpty")}</div>}
           {(draftsQ.data ?? []).map((d) => (
-            <div key={d.id} className={"rail-item" + (d.id === draft?.id ? " on" : "")}>
-              <button
-                className="rail-open"
-                onClick={() => {
-                  nav(`/studio/${d.id}`);
-                  setStep(Math.max(2, Math.min(d.step, 4)));
-                }}
-                title={d.title || d.numIid}
-              >
-                <span className="rail-name">{d.title || d.numIid}</span>
-                <span className="tiny muted">
-                  {d.platform} · {d.numIid} · {t("studio.railStep", { n: String(d.step) })}
-                </span>
-              </button>
-              <button
-                className="rail-del"
-                title={t("history.delete")}
-                onClick={() => setConfirmDel(d)}
-              >
-                ×
-              </button>
-            </div>
+            <DraftHoverPreview key={d.id} draft={d}>
+              <div className={"rail-item" + (d.id === draft?.id ? " on" : "")}>
+                <button
+                  className="rail-open"
+                  onClick={() => {
+                    nav(`/studio/${d.id}`);
+                    setStep(Math.max(2, Math.min(d.step, 4)));
+                  }}
+                  title={d.title || d.numIid}
+                >
+                  <span className="rail-name">{d.title || d.numIid}</span>
+                  <span className="tiny muted">
+                    {d.platform} · {d.numIid} · {t("studio.railStep", { n: String(d.step) })}
+                  </span>
+                </button>
+                <button
+                  className="rail-del"
+                  title={t("history.delete")}
+                  onClick={() => setConfirmDel(d)}
+                >
+                  ×
+                </button>
+              </div>
+            </DraftHoverPreview>
           ))}
           <button
             className="btn ghost sm"

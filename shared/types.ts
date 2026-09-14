@@ -270,6 +270,12 @@ export interface DraftSummary {
   step: number;
   updatedAt: string;
   revisionCount: number;
+  /** Model that produced the last full listing generation, if any (hover preview). */
+  lastModel?: string;
+  /** Rendered description length (characters) from the last generation, if any. */
+  descChars?: number;
+  /** Tag count from the last generation, if any. */
+  tagCount?: number;
 }
 
 export interface DraftRevision {

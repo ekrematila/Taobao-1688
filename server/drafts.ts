@@ -233,14 +233,37 @@ export function deleteDraft(id: string): void {
 
 export function listDrafts(): DraftSummary[] {
   const rows = db.prepare("SELECT * FROM drafts ORDER BY updated_at DESC").all() as unknown as DraftRow[];
-  return rows.map((r) => ({
-    id: r.id,
-    numIid: r.num_iid,
-    platform: r.platform as any,
-    title: r.title,
-    channel: r.channel as any,
-    step: r.step,
-    updatedAt: r.updated_at,
-    revisionCount: (db.prepare("SELECT COUNT(*) c FROM revisions WHERE draft_id = ?").get(r.id) as any).c,
-  }));
+  return rows.map((r) => {
+    // `listing` is already fetched as part of the row above (SELECT *) — this
+    // is a cheap in-memory JSON.parse of text we already have, not an extra
+    // query, so it's fine to do for every row in what's otherwise a plain list.
+    let lastModel: string | undefined;
+    let descChars: number | undefined;
+    let tagCount: number | undefined;
+    if (r.listing) {
+      try {
+        const listing = JSON.parse(r.listing) as GeneratedListing;
+        lastModel = listing.model;
+        const desc = listing.fields?.find((f) => f.key === "description")?.value;
+        if (desc) descChars = desc.length;
+        const tags = listing.fields?.find((f) => f.key === "tags")?.value;
+        if (tags) tagCount = tags.split(",").map((s) => s.trim()).filter(Boolean).length;
+      } catch {
+        /* corrupt/legacy listing blob — summary just omits it */
+      }
+    }
+    return {
+      id: r.id,
+      numIid: r.num_iid,
+      platform: r.platform as any,
+      title: r.title,
+      channel: r.channel as any,
+      step: r.step,
+      updatedAt: r.updated_at,
+      revisionCount: (db.prepare("SELECT COUNT(*) c FROM revisions WHERE draft_id = ?").get(r.id) as any).c,
+      lastModel,
+      descChars,
+      tagCount,
+    };
+  });
 }
