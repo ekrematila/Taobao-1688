@@ -5,9 +5,9 @@
 /* ------------------------------- Etsy ------------------------------- */
 
 export const ETSY_TITLE_EXAMPLES = [
-  "Cute White Crystal Jelly Cat Keycap Set for Mechanical Keyboard | Kawaii Artisan Keycaps, MAO Profile Design – KeyArtisan®",
+  "Cute White Crystal Jelly Cat Keycap Set | Kawaii Artisan Keycaps, MAO Profile Design – KeyArtisan®",
   "One Piece Theme Anime Artisan Keycap Set | Pirate Adventure Keycaps, MOA & Cherry Profile, PBT Dye-Sub – KeyArtisan®",
-  "Cozy Cafe Theme Coffee Latte Keycap Set for Mechanical Keyboard | Mocha & Plaid Design Keycaps – KeyArtisan®",
+  "Cozy Cafe Theme Coffee Latte Keycap Set | Mocha & Plaid Design Keycaps – KeyArtisan®",
   "Cute Ita Bag Kawaii School Backpack with Clear Window | Anime Pin Plush Display Bag – CutieGiftsUS®",
 ].join("\n");
 
@@ -85,11 +85,11 @@ ita bag for girls, ita handbag
 /* ------------------------------ Shopify ----------------------------- */
 
 export const SHOPIFY_TITLE_EXAMPLES = [
-  "PIIFOX Eva Unit-01 Metallic Style Keycap Set",
+  "PIIFOX Eva Unit Metallic Style Keycap Set",
   "Ancient Chinese Theme Artisan Keycap Set",
-  "MU02 Mountain Seclusion Mechanical Keyboard",
-  "Super Mario Bros. Layered Resin Artisan Keycap",
-  "Harry Potter Themed Artisan Keycap Set & Keyboard",
+  "MU Mountain Seclusion Mechanical Keyboard",
+  "Super Mario Bros Layered Resin Artisan Keycap",
+  "Harry Potter Themed Artisan Keycap Set",
 ].join("\n");
 
 /** A slice of the operator's large Shopify tag list — the search vocabulary. */

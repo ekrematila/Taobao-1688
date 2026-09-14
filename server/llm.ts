@@ -765,8 +765,10 @@ export async function generateListing(
         "- `title` KESİNLİKLE 35–50 karakter olacak. Title Case, TAMAMI BÜYÜK HARF değil. Ana ürün adını mutlaka içersin.",
         "- `title` aynen URL handle ve SEO başlığı olarak da kullanılacak; bu yüzden temiz, anahtar-kelime odaklı ve tekrarsız olsun.",
         "- `title` içinde \"gift\" / \"gifts\" kelimesi GEÇMESİN.",
+        "- `title` İÇİNDE HİÇBİR RAKAM/SAYI OLMAYACAK (0-9 karakteri YASAK — model numarası, ölçü, adet, tarih vb. dahil). \"for\" kelimesi de başlıkta KESİNLİKLE KULLANILMAYACAK.",
+        "- Başlıklar aşağıdaki ÖRNEKLERE (biçim, uzunluk, üslup olarak) YAKIN olsun; onlardan çok sapma.",
         kb.isKeycapSet
-          ? "- KEYCAP SET İSE: `title` içine ASLA keycap profili / tuş yüksekliği YAZMA (Cherry, Cherry Profile, OEM, OEM height, SA, XDA, DSA, MOA, MAO, FOA, SOA, MDA, KAT, ASA, original height, 原厂高度 vb.). Onun yerine ürünün TEMASINI öne çıkar. Profil ve malzeme bilgisi AÇIKLAMA ve ETİKETLERDE kalır, sadece başlıkta OLMAZ."
+          ? "- KEYCAP SET İSE: `title` içine ASLA keycap profili / tuş yüksekliği YAZMA (Cherry, Cherry Profile, OEM, OEM height, SA, XDA, DSA, MOA, MAO, FOA, SOA, MDA, KAT, ASA, original height, 原厂高度 vb.). Onun yerine ürünün TEMASINI öne çıkar. Profil ve malzeme bilgisi AÇIKLAMA ve ETİKETLERDE kalır, sadece başlıkta OLMAZ. `title` içinde \"keyboard\" veya \"key set\" kelimesi ASLA GEÇMESİN — sadece \"keycap set\" / \"keycaps\" kullan."
           : "",
         kb.isKeycapSet && profs.length
           ? `- PROFİL: Bu ürünün profili ${sv.noteMode ? "(operatör detaylarında yazan) " : ""}"${profStr}". AÇIKLAMADA ve ETİKETLERDE bunu AYNEN kullan (ör. FOA yazıyorsa çıktıda da FOA). ${sv.noteMode || sv.singleConfig ? "TEK profil — 'şu/şu profil seçenekleri var' DEME." : 'Birden fazlaysa "Cherry & MOA Profile" biçiminde belirt.'} Uydurma profil ekleme.`
@@ -798,6 +800,11 @@ export async function generateListing(
         "  5) EN SONDA marka (aşağıdaki MARKA satırına göre).",
         "  KELİME TEKRARI YASAK: aynı kelime (büyük/küçük harf farkı dahil) başlıkta İKİ KEZ geçemez.",
         "  \"gift\" / \"gifts\" kelimesi başlıkta GEÇMESİN.",
+        "  `title` VE `title_alt` İÇİNDE HİÇBİR RAKAM/SAYI OLMAYACAK (0-9 karakteri YASAK — model numarası, ölçü, adet, tarih vb. dahil). \"for\" kelimesi de başlıkta KESİNLİKLE KULLANILMAYACAK.",
+        "  Başlıklar aşağıdaki ÖRNEĞE (biçim, uzunluk, üslup olarak) YAKIN olsun; ondan çok sapma.",
+        kb.isKeycapSet
+          ? "  KEYCAP SET İSE: `title` ve `title_alt` içinde \"keyboard\" veya \"key set\" kelimesi ASLA GEÇMESİN — sadece \"keycap set\" / \"keycaps\" kullan."
+          : "",
         "  ÖRNEK: One Piece Theme Anime Artisan Keycap Set | Pirate Adventure Keycaps, MOA & Cherry Profile, PBT Dye-Sub – KeyArtisan®",
         kb.isKeycapSet && profs.length > 1
           ? `  PROFİL: Bu üründe BİRDEN FAZLA profil var (${profStr}). Başlıkta ve açıklamada TAM olarak "${profStr}" biçiminde belirt (ör. "Cherry & MOA Profile"). Profiller üründen ürüne değişir — SADECE ürün verisinde/görsellerinde geçenleri yaz.`
@@ -1181,10 +1188,23 @@ export async function generateListing(
     }
   }
 
+  // No digits anywhere in a title, no "for", and (keycap set only) no
+  // "keyboard" / "key set" — applied BEFORE any brand suffix so a trusted,
+  // fixed brand string is never touched. A deterministic backstop, not just
+  // prompt wording: the operator wants this with zero exceptions.
+  const sanitizeTitleWords = (s: string): string => {
+    let t = s.replace(/\d+/g, "").replace(/\bfor\b/gi, "");
+    if (kb.isKeycapSet) t = t.replace(/\bkey\s*sets?\b/gi, "keycap set").replace(/\bkeyboards?\b/gi, "");
+    return t
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s*,\s*,+/g, ", ") // a removed word can leave a doubled comma
+      .trim();
+  };
+
   if (isShopify) {
     const titleField = getF("title");
     if (titleField) {
-      let tv = clampTitle(titleField.value).replace(/\bgifts?\b/gi, "").replace(/\s{2,}/g, " ").trim();
+      let tv = clampTitle(sanitizeTitleWords(titleField.value.replace(/\bgifts?\b/gi, ""))).replace(/\s{2,}/g, " ").trim();
       // keycap set → no profile/height word in the Shopify title (theme carries it)
       if (kb.isKeycapSet) tv = clampTitle(stripKeycapProfileFromTitle(tv));
       titleField.value = tv;
@@ -1209,7 +1229,7 @@ export async function generateListing(
     // ---- Etsy title: no "gift", brand suffix, ≤120 on a phrase boundary ----
     const tf = getF("title");
     if (tf) {
-      let v = tf.value.replace(/\s+/g, " ").trim().replace(/\bgifts?\b/gi, "");
+      let v = sanitizeTitleWords(tf.value.replace(/\s+/g, " ").trim().replace(/\bgifts?\b/gi, ""));
       v = ensureBrandSuffix(v, input.brand);
       v = clampEtsyTitle(v, input.brand);
       // hard guarantee: pre-"|" segment ≤ 40 chars (space before "|" not counted)
@@ -1222,7 +1242,7 @@ export async function generateListing(
     {
       const rawAlt = getF("title_alt")?.value?.trim();
       let alt = rawAlt
-        ? rawAlt.replace(/\s+/g, " ").replace(/\bgifts?\b/gi, "").replace(/\s+([,|])/g, "$1").trim()
+        ? sanitizeTitleWords(rawAlt.replace(/\s+/g, " ").replace(/\bgifts?\b/gi, "").replace(/\s+([,|])/g, "$1").trim())
         : finalTitle;
       alt = ensureBrandSuffix(alt, input.brand);
       alt = etsyAltTitle(alt, input.brand, 14);
