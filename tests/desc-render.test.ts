@@ -55,48 +55,60 @@ test("the bare-text fallback card's mobile 'Product Details' panel is never perm
   assert.ok(out.includes("Specifications"), "real content is present in the output");
 });
 
-test("the main .bm example's mobile 'Product Details' panel is a real, working native <details> toggle", () => {
+test("the main .bm example splits mobile into independent 'Description'/'Images' tabs, hero always visible", () => {
   // The BIGGER version of the earlier bug: the golden reference example
   // itself (what the model is told to copy near-verbatim into every real
   // generation, not just the rare bare-text fallback) used to ship a
   // checkbox + grid-template-rows:0fr->1fr mobile collapse trick, gating the
-  // ENTIRE info panel (hero, highlights, specs, FAQ, CTA) behind it. That
-  // trick could silently fail to reach 1fr on a real mobile browser, leaving
-  // the panel permanently collapsed and empty with no way to open it —
-  // exactly what a user screenshot showed. It's now a native
-  // <details class="bm-acc" open>/<summary class="bm-bar"> disclosure, which
-  // needs no CSS to show/hide correctly — the browser handles that itself.
-  // The one remaining gap: the summary bar is hidden on desktop (mobile-only
-  // affordance), so if the model ever wrote the <details> WITHOUT `open`, a
-  // desktop shopper would have no bar to click and see nothing. Guarantee
-  // desktop always shows the panel regardless of the [open] attribute.
+  // ENTIRE info panel (hero, highlights, specs, FAQ, CTA) behind ONE toggle.
+  // That trick could silently fail to reach 1fr on a real mobile browser,
+  // leaving the panel permanently collapsed and empty — exactly what a user
+  // screenshot showed. Per a later request the single toggle was ALSO split
+  // into two independent native <details> tabs — "Description" (the .bm-c2
+  // column, on the right on desktop) and "Images" (.bm-media, on the left on
+  // desktop) — each opens/closes on its own without affecting the other, and
+  // the hero (.bm-c1: title/badges) is never gated behind any accordion at
+  // all so it's always visible immediately.
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
-  assert.ok(/<details class="bm-acc" open>/.test(out), "info panel is wrapped in a native, open-by-default <details>");
-  assert.ok(/<summary class="bm-bar">/.test(out), "the tap target is a real <summary>, not a checkbox+label");
+  assert.ok(/<details class="bm-acc bm-acc-desc" open>/.test(out), "Description tab is a native, open-by-default <details>");
+  assert.ok(/<details class="bm-acc bm-acc-media" open>/.test(out), "Images tab is a native, open-by-default <details>");
   assert.ok(!/class="bm-toggle"/.test(out), "no more checkbox-driven toggle");
+  // the hero lives OUTSIDE any <details> — never gated behind a tap
+  const bodyStart = out.indexOf("</style>");
+  const c1Idx = out.indexOf('class="bm-c1"', bodyStart);
+  const firstDetailsIdx = out.indexOf("<details class=", bodyStart);
+  assert.ok(c1Idx > 0 && c1Idx < firstDetailsIdx, "hero (.bm-c1) sits before either tab and isn't wrapped in one");
   const flat = out.replace(/\s+/g, "");
-  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>summary\{display:none!important\}/.test(flat), "desktop hides the mobile-only bar");
-  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>\.bm-c1\{display:block!important\}/.test(flat), "desktop force-shows the info panel regardless of [open]");
-  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>\.bm-grid\{display:grid!important\}/.test(flat), "desktop force-shows the grid regardless of [open]");
-  assert.ok(out.includes("querySelectorAll('.bm .bm-acc')") && out.includes("setAttribute('open',''"), "script defensively re-adds open if the model forgot it");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-acc>summary\{display:none!important\}/.test(flat), "desktop hides the mobile-only bars");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-grid>\.bm-acc>\.bm-media\{display:block!important\}/.test(flat), "desktop force-shows Images regardless of [open]");
+  assert.ok(/min-width:900px\)\{[\s\S]*?\.bm\.bm-grid>\.bm-acc>\.bm-c2\{display:block!important\}/.test(flat), "desktop force-shows Description regardless of [open]");
+  assert.ok(out.includes("querySelectorAll('.bm .bm-acc')") && out.includes("setAttribute('open',''"), "script defensively re-adds open on any .bm-acc if the model forgot it");
+  // the two tabs must be independently toggleable, not a single-open group
+  // (unlike the FAQ, opening one must never auto-close the other)
+  assert.ok(out.includes("function openAcc") && out.includes("function closeAcc"), "dedicated smooth open/close helpers exist for the tabs");
+  assert.ok(!/openAcc[\s\S]{0,200}querySelectorAll\('\.bm-acc\[open\]'\)/.test(out), "opening one tab doesn't hunt down and close sibling tabs");
 });
 
-test("a model that ignores the <details> instruction and writes the old checkbox toggle is rewritten anyway", () => {
+test("a model that ignores the tab instructions and writes the old single-toggle checkbox pattern is rewritten anyway", () => {
   // Reproduces a REAL failure, found by testing a live regeneration on the
   // actual product store: even right after the reference example and prompt
-  // were updated to the native <details>/<summary> form, Claude's own output
+  // were updated to a native <details>/<summary> form, Claude's own output
   // still wrote the legacy `<input class="bm-toggle">…<label class="bm-bar">`
-  // markup — the same "prompt wording isn't enough for a structural change"
-  // lesson as forceCtaOnclick. This must be corrected in code regardless of
-  // what the model wrote, the same way forceCtaOnclick corrects the onclick.
-  const legacyToggle = STACKED_DESC_EXAMPLE.replace(
-    /<details class="bm-acc" open>\s*<summary class="bm-bar">([\s\S]*?)<\/summary>/,
-    '<input class="bm-toggle" type="checkbox" id="bmDetails"> <label class="bm-bar" for="bmDetails">$1</label>',
-  ).replace(/<\/details>\n<script>/, "\n<script>");
-  // sanity: the input fixture actually reproduces the legacy pattern, not a no-op
-  assert.ok(legacyToggle.includes('<input class="bm-toggle"'), "fixture setup: legacy checkbox present");
-  assert.ok(!legacyToggle.includes('<details class="bm-acc"'), "fixture setup: no <details> element left to trivially pass");
-
+  // markup wrapping the WHOLE panel — the same "prompt wording isn't enough
+  // for a structural change" lesson as forceCtaOnclick. forceBmAccDisclosure
+  // must correct this regardless of what the model wrote, converting it into
+  // a single working <details> (the two-tab split only applies when the
+  // model actually followed the new structure — this is the safety net for
+  // when it reverts all the way to the oldest known pattern).
+  const legacyToggle =
+    "<style>.bm{color:#111}</style>" +
+    '<div class="bm">' +
+    '<input class="bm-toggle" type="checkbox" id="bmDetails"> <label class="bm-bar" for="bmDetails">🐰 Product Details</label>' +
+    '<div class="bm-c1"><div class="bm-inner"><div class="bm-hero bm-reveal"><h2>Test</h2></div></div></div>' +
+    '<div class="bm-grid"><div class="bm-c2"><div class="bm-inner"><div class="bm-info bm-reveal">' +
+    '<h3>Specifications</h3><div class="bm-spec"><div class="bm-r"><span class="bm-k">Material</span><span class="bm-v">PBT</span></div></div>' +
+    '</div></div></div><div class="bm-media"></div></div>' +
+    "</div>";
   const out = renderDescriptionHtml("stacked-plain", legacyToggle, imgs);
   assert.ok(/<details class="bm-acc" open><summary class="bm-bar">/.test(out), "rewritten into a native, open-by-default <details>/<summary>");
   assert.ok(!out.includes('class="bm-toggle"'), "legacy checkbox is gone");

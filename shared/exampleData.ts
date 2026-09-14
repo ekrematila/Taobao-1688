@@ -234,8 +234,8 @@ export const STACKED_DESC_EXAMPLE = `<style>
 @keyframes bmPop{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
 /* ---- DESKTOP LAYOUT (kesin kural): images ALWAYS left, text/info ALWAYS right ---- */
 .bm-grid{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:18px; align-items:start; transition:gap .45s cubic-bezier(.25,.8,.3,1)}
-.bm-media{grid-column:1; grid-row:1}
-.bm-c2{grid-column:2; grid-row:1; position:-webkit-sticky; position:sticky; top:var(--top); align-self:start}
+.bm-acc-media{grid-column:1; grid-row:1}
+.bm-acc-desc{grid-column:2; grid-row:1; position:-webkit-sticky; position:sticky; top:var(--top); align-self:start}
 .bm-media{font-size:0; line-height:0; border-radius:var(--r); overflow:hidden; border:1px solid var(--line); background:var(--milk)}
 .bm-media .bm-stage{position:relative; cursor:zoom-in}
 .bm-media img{
@@ -435,10 +435,11 @@ export const STACKED_DESC_EXAMPLE = `<style>
   .bm-acc:not([open]) > .bm-bar i{transform:rotate(45deg)}
   .bm-bar:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
   .bm-c1 .bm-hero{margin:12px 0 0}
-  .bm-grid{grid-template-columns:1fr; gap:12px; margin-top:12px}
-  /* single column — order is IMAGES FIRST, then the text/info block */
-  .bm-media{grid-column:1; grid-row:1; position:static}
-  .bm-c2{grid-column:1; grid-row:2; position:static; top:auto}
+  .bm-grid{grid-template-columns:1fr; gap:10px; margin-top:12px}
+  /* single column, each half its own tap-to-open/close tab — order is
+     DESCRIPTION first, then IMAGES (per the operator's requested order). */
+  .bm-acc-desc{grid-column:1; grid-row:1; position:static; top:auto}
+  .bm-acc-media{grid-column:1; grid-row:2}
   .bm-info{padding:18px 16px}
   .bm-hero{padding:22px 15px 18px}
   /* the floating decorative emoji is sized for a wide desktop hero card — at
@@ -467,8 +468,6 @@ export const STACKED_DESC_EXAMPLE = `<style>
 </style>
 <noscript><style>.bm-reveal{opacity:1 !important; transform:none !important}</style></noscript>
 <div class="bm">
-<details class="bm-acc" open>
-<summary class="bm-bar">🐰 Product Details — full specs, compatibility &amp; FAQ inside<i></i></summary>
 <div class="bm-c1"><div class="bm-inner">
 <div class="bm-hero bm-reveal">
 <span class="bm-eyebrow">Chiikawa Usagi Collection</span>
@@ -480,6 +479,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 </div>
 </div></div>
 <div class="bm-grid">
+<details class="bm-acc bm-acc-media" open>
+<summary class="bm-bar">🖼️ Images<i></i></summary>
+<div class="bm-media"></div>
+</details>
+<details class="bm-acc bm-acc-desc" open>
+<summary class="bm-bar">📝 Description — full specs, compatibility &amp; FAQ inside<i></i></summary>
 <div class="bm-c2"><div class="bm-inner">
 <div class="bm-info bm-reveal">
 
@@ -570,10 +575,9 @@ export const STACKED_DESC_EXAMPLE = `<style>
 
 </div>
 </div></div>
-<div class="bm-media"></div>
+</details>
 <div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button><img src="" alt="Zoomed product image" data-bm-lightbox-img></div>
 </div>
-</details>
 <script>
 /* Progressive enhancement only. The description works with NO JavaScript:
    reveals are visible by default, the FAQ is a native <details>, and the CTA

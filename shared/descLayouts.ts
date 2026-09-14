@@ -445,8 +445,51 @@ ${FIND_ATC_FN}
     b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
     setTimeout(finish, 450);
   }
+  /* The mobile "Description"/"Images" tabs: same reliable height-animation
+     pattern as the FAQ above (native <details> open/close is instant with no
+     transition at all -- this progressively enhances it to a smooth slide
+     when JS is present, per "geçişler garip olmasın ama bir anda da
+     açılmasın"). Only the two NEW per-section accordions get this treatment
+     (they are direct children of .bm-grid); a legacy single "Product Details"
+     wrapper rewritten by forceBmAccDisclosure() is left on plain native
+     open/close, which still works fine, just without the slide. Unlike the
+     FAQ these are independent, not single-open -- opening one never closes
+     the other. */
+  function accContent(acc){
+    var kids = acc.children;
+    for(var i = 0; i < kids.length; i++){ if(kids[i].tagName !== 'SUMMARY') return kids[i]; }
+    return null;
+  }
+  function closeAcc(acc){
+    var b = accContent(acc);
+    if(!b){ acc.removeAttribute('open'); return; }
+    var done = false;
+    function finish(){ if(done) return; done = true; acc.removeAttribute('open'); b.style.height = ''; b.style.overflow = ''; }
+    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .4s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 500);
+  }
+  function openAcc(acc){
+    acc.setAttribute('open', '');
+    var b = accContent(acc);
+    if(!b) return;
+    var done = false;
+    function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; }
+    b.style.transition = 'height .4s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
+    b.style.height = b.scrollHeight + 'px';
+    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
+    setTimeout(finish, 500);
+  }
   document.addEventListener('click', function(e){
     var t = e.target;
+    var accBar = t.closest && t.closest('.bm-grid > .bm-acc > summary.bm-bar');
+    if(accBar){
+      var acc = accBar.parentElement;
+      e.preventDefault();
+      if(acc.hasAttribute('open')) closeAcc(acc); else openAcc(acc);
+      return;
+    }
     var q = t.closest && t.closest('.bm .bm-faq-q');
     if(q){
       var item = q.closest('.bm-faq-item'); if(!item) return;
@@ -737,10 +780,19 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
   `.bm .bm-c2{grid-column:2!important;grid-row:1!important}` +
+  // Mobile "Description"/"Images" tabs: .bm-media/.bm-c2 are now nested one
+  // level deeper, inside their own <details class="bm-acc-media|bm-acc-desc">
+  // — grid-column/row on the raw div above no longer positions anything (a
+  // grid item's placement props only apply to actual grid children), so the
+  // wrapping <details> needs its own placement instead.
+  `.bm .bm-acc-media{grid-column:1!important;grid-row:1!important}` +
+  `.bm .bm-acc-desc{grid-column:2!important;grid-row:1!important}` +
   `@media (max-width:899px){` +
   `.bm .bm-grid{grid-template-columns:1fr!important}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +   // images first on mobile
   `.bm .bm-c2{grid-column:1!important;grid-row:2!important}` +
+  `.bm .bm-acc-desc{grid-column:1!important;grid-row:1!important}` +   // Description tab first
+  `.bm .bm-acc-media{grid-column:1!important;grid-row:2!important}` +
   // 4d) badge text must always be fully readable on mobile — the model's own
   //     nowrap+scroll badge row (correct on desktop) reads as truncated/cut
   //     text ("140 Key", "PBT Dye-S…") on a narrow screen with no obvious way
@@ -791,6 +843,12 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-acc>summary{display:none!important}` +
   `.bm .bm-acc>.bm-c1{display:block!important}` +
   `.bm .bm-acc>.bm-grid{display:grid!important}` +
+  // Same guarantee for the NEW per-section "Description"/"Images" tabs
+  // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
+  // a missing `open` there would otherwise hide half the description
+  // permanently on desktop, where there is no visible bar to click at all.
+  `.bm .bm-grid>.bm-acc>.bm-media{display:block!important}` +
+  `.bm .bm-grid>.bm-acc>.bm-c2{display:block!important}` +
   `}` +
   `</style>`,
 );
