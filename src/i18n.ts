@@ -51,6 +51,7 @@ const tr = {
   "common.copy": "Kopyala",
   "common.copied": "Kopyalandı.",
   "common.open": "Aç",
+  "common.showOptions": "Seçenekleri göster",
 
   "blog.productBlogs": "Ürün blogları",
   "blog.categoryBlogs": "Kategori blogları",
@@ -452,6 +453,9 @@ const tr = {
   "ws.altLocalDone": "{n} alt metin yazıldı (yerel)",
   "ws.altTextsLocalHint":
     "Yapay zekasız (yerel): görselin piksellerini inceler — baskın renkler, ışık, yön, kadraj, yazı var mı — ve ürün başlığı + özellikleriyle birleştirip erişilebilir bir alt metin cümlesi kurar. Ücretsiz ve anında. Manus: görseli gerçekten görerek çok daha ayrıntılı yazar (AI, kredi harcar).",
+  "ws.altDefaultCmd": "Varsayılan alt metin komutu",
+  "ws.altDefaultCmdPh": "her seferinde uygulanacak sabit yönerge (ör. 'malzeme ve rengi vurgula')",
+  "ws.altDefaultCmdHint": "Burada yazdığın yönerge, her 'Manus ile yaz' çalıştırmasında otomatik uygulanır — taslak bazında değil, tarayıcında kalıcıdır.",
   "ws.trTitle": "Görsel düzeltme (Manus)",
   "ws.trTip":
     "Bu araç görseli satışa hazır hale getirir:\n• Ürün ve niş tanınır; görsel üzerindeki eklenmiş Çince pazarlama/açıklama yazıları doğru terminolojiyle hedef dile çevrilir, yazı boyutu / satır bölme / boşluklar yeniden düzgün ayarlanır.\n• Satıcının mağaza adı ve logosu, her türlü filigran (tek ya da tüm görsele döşeli, seyrek/sık farketmez) ve ürünle alakasız yazılar silinir; altları arka plan/üründen temizce doldurulur (iz, leke, bulanık yama bırakmadan).\n• Ürünün kendi tasarımı ve gerçek yazıları (tuş harfleri vb.), arka plan, ışık ve kompozisyon aynen korunur.\n• Düzeltilecek bir şey yoksa (çevrilecek yazı da filigran/marka da yok) yeni görsel üretilmez.",
@@ -1159,6 +1163,7 @@ const en: Record<keyof typeof tr, string> = {
   "common.copy": "Copy",
   "common.copied": "Copied.",
   "common.open": "Open",
+  "common.showOptions": "Show options",
 
   "blog.productBlogs": "Product blogs",
   "blog.categoryBlogs": "Category blogs",
@@ -1560,6 +1565,9 @@ const en: Record<keyof typeof tr, string> = {
   "ws.altLocalDone": "{n} alt texts written (local)",
   "ws.altTextsLocalHint":
     "No-AI (local): inspects the actual pixels — dominant colours, lighting, orientation, framing, whether there's overlay text — and combines that with the product title + properties into one accessible alt-text sentence. Free and instant. Manus: actually sees the image and writes far more detail (AI, spends credits).",
+  "ws.altDefaultCmd": "Default alt-text command",
+  "ws.altDefaultCmdPh": "a standing instruction applied every time (e.g. 'emphasize the material and colour')",
+  "ws.altDefaultCmdHint": "Whatever you write here is automatically applied on every 'Write with Manus' run — saved in your browser, not per draft.",
   "ws.trTitle": "Image cleanup (Manus)",
   "ws.trTip":
     "This tool makes the image sale-ready:\n• Identifies the product and niche; translates the Chinese marketing/caption text overlaid on the image into the target language with correct terminology, and re-fits font size / line-wrapping / spacing.\n• Removes the seller's shop name and logo, any watermark (a single mark or one tiled across the whole image, sparse or dense), and text unrelated to the product; rebuilds what was behind them from the background/product (no ghosting, smear or blur patch).\n• Keeps the product's own design and real text (keycap legends etc.), the background, lighting and composition exactly as-is.\n• If there is nothing to fix (no text to translate and no watermark/brand to remove) no new image is produced.",

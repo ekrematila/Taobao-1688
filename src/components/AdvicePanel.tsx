@@ -4,6 +4,7 @@ import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { JobCancelled, type RunningJob } from "../lib/jobs";
 import JobProgress from "./JobProgress";
+import Collapsible from "./Collapsible";
 import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL } from "@shared/models.ts";
 import type { ChannelId, JobView } from "@shared/types.ts";
 
@@ -90,7 +91,9 @@ export default function AdvicePanel({
         <h3>{t("advice.title")}</h3>
         <span className="sub">{t("advice.sub")}</span>
       </div>
-      <div className="card-b col" style={{ gap: 12 }}>
+      <div className="card-b col" style={{ gap: 0, padding: 0 }}>
+      <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="advice-panel">
+      <div className="col" style={{ gap: 12 }}>
         <div className="row">
           <button className={"chip" + (channel === "shopify" ? " active" : "")} onClick={() => setChannel("shopify")}>
             Shopify
@@ -176,6 +179,8 @@ export default function AdvicePanel({
             </span>
           </label>
         )}
+      </div>
+      </Collapsible>
       </div>
 
       {confirm !== null && (

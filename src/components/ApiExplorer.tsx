@@ -33,7 +33,7 @@ export default function ApiExplorer({
   const [endpoint, setEndpoint] = useState("item_get_pro");
   const [query, setQuery] = useState(defaultQuery);
   const [noCache, setNoCache] = useState(false);
-  const [lang, setLang] = useState("cn");
+  const lang = "cn";
   const [filter, setFilter] = useState("");
   const [result, setResult] = useState<ApiCallResult | null>(
     initialJson != null ? { requestUrl: "", status: 200, ms: 0, json: initialJson } : null,
@@ -126,14 +126,7 @@ export default function ApiExplorer({
             </div>
           )}
           <div className="row">
-            <label className="field" style={{ flex: 1 }}>
-              {t("explorer.lang")}
-              <select value={lang} onChange={(e) => setLang(e.target.value)}>
-                <option value="cn">{t("explorer.langZh")}</option>
-                <option value="en">en</option>
-              </select>
-            </label>
-            <label className="row" style={{ gap: 6, marginTop: 18 }}>
+            <label className="row" style={{ gap: 6 }}>
               <input type="checkbox" style={{ width: 16 }} checked={noCache} onChange={(e) => setNoCache(e.target.checked)} />
               <span className="tiny">{t("explorer.noCache")}</span>
             </label>

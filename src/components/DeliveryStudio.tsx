@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { JobCancelled, type RunningJob } from "../lib/jobs";
 import JobProgress from "./JobProgress";
+import Collapsible from "./Collapsible";
 import ListingPreview from "./ListingPreview";
 import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
@@ -640,12 +641,14 @@ export default function DeliveryStudio({
             </div>
           </label>
 
-          {/* Step-2 advice gate (mirrors the AdvicePanel checkbox) */}
+          {/* Step-2 advice gate (mirrors the AdvicePanel checkbox) — collapsed by default */}
           <div className="card" style={{ boxShadow: "none" }}>
             <div className="card-h">
               <h3 style={{ fontSize: 12 }}>{t("advice.title")}</h3>
             </div>
-            <div className="card-b col">
+            <div className="card-b col" style={{ padding: 0 }}>
+            <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="delivery-advice">
+            <div className="col">
               {adviceText ? (
                 <>
                   <details>
@@ -670,9 +673,11 @@ export default function DeliveryStudio({
                 <p className="tiny muted" style={{ margin: 0 }}>{t("delivery.adviceNone")}</p>
               )}
             </div>
+            </Collapsible>
+            </div>
           </div>
 
-          {/* Category research */}
+          {/* Category research — collapsed by default */}
           <div className="card" style={{ boxShadow: "none" }}>
             <div className="card-h" style={{ gap: 6, flexWrap: "wrap" }}>
               <h3 style={{ fontSize: 12 }}>{t("delivery.research")}</h3>
@@ -693,7 +698,9 @@ export default function DeliveryStudio({
                 </>
               )}
             </div>
-            <div className="card-b col">
+            <div className="card-b col" style={{ padding: 0 }}>
+            <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="delivery-research">
+            <div className="col">
               <div className="row">
                 <label className="field" style={{ flex: 1 }}>
                   {t("delivery.researchClaudeModel")}
@@ -734,6 +741,8 @@ export default function DeliveryStudio({
               ) : (
                 <p className="tiny muted" style={{ margin: 0 }}>{t("delivery.researchHint")}</p>
               )}
+            </div>
+            </Collapsible>
             </div>
           </div>
 

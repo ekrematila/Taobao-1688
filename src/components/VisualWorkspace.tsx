@@ -239,6 +239,25 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     }
   }, [showNoAi]);
 
+  // A persisted "default command" the operator sets once and reuses on every
+  // "AI ile yaz" alt-text run — the underlying altTextManus() already accepts
+  // a free-form `instruction`, this just gives it a saved default instead of
+  // requiring it to be retyped per draft.
+  const [altDefaultCmd, setAltDefaultCmd] = useState<string>(() => {
+    try {
+      return localStorage.getItem("tps:ws:altDefaultCmd") || "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("tps:ws:altDefaultCmd", altDefaultCmd);
+    } catch {
+      /* private mode / disabled storage */
+    }
+  }, [altDefaultCmd]);
+
   // right-click shortcut menu over a workspace thumbnail
   const [imgMenu, setImgMenu] = useState<{ x: number; y: number; url: string } | null>(null);
   const [imgMenuPrompt, setImgMenuPrompt] = useState("");
@@ -510,7 +529,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     const urls = sel.size ? [...sel] : undefined; // undefined = all images
     const r = trackJob<unknown>((onProgress) =>
       source === "manus"
-        ? altTextsManusJob({ draftId: draft.id, imageUrls: urls, targetLanguage: tLang }, onProgress)
+        ? altTextsManusJob({ draftId: draft.id, imageUrls: urls, targetLanguage: tLang, instruction: altDefaultCmd.trim() || undefined }, onProgress)
         : altTextsJob(draft.id, tLang, settings.data?.llmModel, onProgress),
     );
     try {
@@ -1290,6 +1309,15 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
             </button>
           </div>
           {showNoAi && <p className="tiny muted">{t("ws.altTextsLocalHint")}</p>}
+          <Collapsible title={t("ws.altDefaultCmd")} defaultOpen={false} storageKey="ws-alt-default-cmd">
+            <input
+              type="text"
+              value={altDefaultCmd}
+              onChange={(e) => setAltDefaultCmd(e.target.value)}
+              placeholder={t("ws.altDefaultCmdPh")}
+            />
+            <p className="tiny muted" style={{ margin: 0 }}>{t("ws.altDefaultCmdHint")}</p>
+          </Collapsible>
 
           {/* 3) free-form AI image command (not translation) */}
           <div className="card" style={{ boxShadow: "none" }}>
@@ -1297,7 +1325,9 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               <h3 style={{ fontSize: 13 }}>{t("ws.aiCmdTitle")}</h3>
               {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
             </div>
-            <div className="card-b col">
+            <div className="card-b col" style={{ padding: 0 }}>
+            <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="ws-ai-cmd">
+            <div className="col">
               <input
                 type="text"
                 value={aiCmd}
@@ -1315,6 +1345,8 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               </div>
               <p className="tiny muted">{t("ws.aiCmdHint")}</p>
             </div>
+            </Collapsible>
+            </div>
           </div>
 
           {/* 3b) AI image / ad studio — detailed, research-backed prompts per type */}
@@ -1323,7 +1355,9 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               <h3 style={{ fontSize: 13 }}>🎨 {t("ws.studioTitle")}</h3>
               {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
             </div>
-            <div className="card-b col" style={{ gap: 8 }}>
+            <div className="card-b col" style={{ padding: 0 }}>
+            <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="ws-ai-studio">
+            <div className="col" style={{ gap: 8 }}>
               <p className="tiny muted" style={{ margin: 0 }}>{t("ws.studioIntro")}</p>
               <div className="chips">
                 {BRIEF_META.map((m) => (
@@ -1369,6 +1403,8 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 />
               </details>
               <p className="tiny muted" style={{ margin: 0 }}>{t("ws.studioHint")}</p>
+            </div>
+            </Collapsible>
             </div>
           </div>
 
@@ -1447,7 +1483,9 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           <h3>{t("ws.quickCrop")}</h3>
           <span className="sub">{previewUrls.length > 1 ? t("ws.previewN", { n: previewUrls.length }) : ""}</span>
         </div>
-        <div className="card-b col">
+        <div className="card-b col" style={{ padding: 0 }}>
+        <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="ws-quick-crop">
+        <div className="col">
           <label className="field">
             {t("ws.watermark")}
             <input
@@ -1648,6 +1686,8 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               </div>
             </div>
           )}
+        </div>
+        </Collapsible>
         </div>
       </div>
       <VideoStudio
