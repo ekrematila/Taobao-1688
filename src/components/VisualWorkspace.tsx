@@ -6,8 +6,10 @@ import {
   altTextsJob,
   altTextsManusJob,
   api,
+  classifyImagesJob,
   editImagesJob,
   editVideoJob,
+  generateListingJob,
   proxied,
   translateImagesJob,
   videoAltJob,
@@ -57,6 +59,9 @@ import {
   type VideoMeta,
 } from "../lib/videoBake";
 import { BRIEF_META, IMAGE_LENGTH_BANDS, buildStudioPrompt, wordCount } from "@shared/imageBriefs.ts";
+import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
+import { isSelfContainedLayout } from "@shared/descLayouts.ts";
+import type { ChannelId, GeneratedField } from "@shared/types.ts";
 
 /** A logo added in the VIDEO studio starts a bit larger and higher so it clears
  *  the player's control bar; the operator can drag it anywhere afterwards. */
@@ -257,6 +262,17 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
       /* private mode / disabled storage */
     }
   }, [altDefaultCmd]);
+
+  // one-click "check product → drop junk slides → translate/clean up" flow,
+  // ending in two follow-up asks (generate content? add logo?) using settings
+  // already configured elsewhere (Delivery step / the logo panel below).
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [autoContentAsk, setAutoContentAsk] = useState(false);
+  const [autoContentFields, setAutoContentFields] = useState<Set<"title" | "description" | "tags">>(
+    new Set(["title", "description", "tags"]),
+  );
+  const [autoContentBusy, setAutoContentBusy] = useState(false);
+  const [autoLogoAsk, setAutoLogoAsk] = useState(false);
 
   // right-click shortcut menu over a workspace thumbnail
   const [imgMenu, setImgMenu] = useState<{ x: number; y: number; url: string } | null>(null);
@@ -641,6 +657,119 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     onSaved();
   }
 
+  /** One-click: check the product, drop meaningless/blank slides (AI vision),
+   *  then translate/clean up (Chinese text + seller logo/watermark) every
+   *  remaining image — the two operations offered separately above, fanned out
+   *  over ALL images regardless of the current selection. Finishes by asking
+   *  whether to also (re)generate content and add a logo. */
+  async function runAutoPrepare() {
+    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    const urls = images.map((i) => i.url);
+    if (!urls.length) return toast(t("ws.selectFirst"), "err");
+    setAutoBusy(true);
+    toast(t("ws.autoChecking"));
+    try {
+      const cls = trackJob(
+        (op) => classifyImagesJob({ draftId: draft.id, imageUrls: urls }, op),
+        t("ws.autoClassifyLabel"),
+      );
+      const clsRes = await cls.promise;
+      const drop = clsRes.results.filter((r) => r.meaningless).map((r) => r.url);
+      if (drop.length) {
+        removeImages(drop);
+        toast(t("ws.autoDropped", { n: drop.length }));
+      }
+      const remaining = urls.filter((u) => !drop.includes(u));
+      if (remaining.length) reportTranslateSettled(await translateFanout(remaining));
+      onSaved();
+      toast(t("ws.autoDone"), "ok");
+    } catch (e) {
+      if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
+    } finally {
+      setAutoBusy(false);
+      setAutoContentAsk(true);
+    }
+  }
+
+  /** Regenerate the picked listing fields using the settings already saved from
+   *  the Delivery step (language, layout, model, effort…) — a convenience
+   *  shortcut, not a replacement for that step's own full controls. */
+  async function runAutoContentGenerate() {
+    const channel = draft.channel;
+    if (!channel) return toast(t("ws.autoContentNeedChannel"), "err");
+    const dc = ((draft.imageState as any)?.delivery ?? {}) as Record<string, any>;
+    const targetLang: string = dc.targetLang || "en";
+    const layout = dc.layout || "stacked-plain";
+    const productType: string = dc.productType || "";
+    const model: string = settings.data?.llmModel || "claude-sonnet-5";
+    const fieldCfg = (dc.fieldCfg ?? {}) as Record<string, { examples?: string; rules?: string }>;
+    const defaultExample = (k: string): string => {
+      if (k === "description" && channel === "shopify") {
+        return isSelfContainedLayout(layout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE;
+      }
+      return (DEFAULT_FIELD_EXAMPLES as any)[channel]?.[k] ?? "";
+    };
+    const keys: GeneratedField["key"][] = [];
+    if (autoContentFields.has("title")) {
+      keys.push("title");
+      if (channel === "etsy") keys.push("title_alt");
+    }
+    if (autoContentFields.has("description")) keys.push("description");
+    if (autoContentFields.has("tags")) {
+      keys.push("tags");
+      if (channel === "etsy") keys.push("tags_pool");
+    }
+    if (!keys.length) return toast(t("ws.selectFirst"), "err");
+    setAutoContentBusy(true);
+    try {
+      const r = trackJob(
+        (op) =>
+          generateListingJob(
+            {
+              draftId: draft.id,
+              channel,
+              productType,
+              targetLanguage: targetLang,
+              descriptionLayout: layout,
+              globalRules: dc.globalRules,
+              model,
+              effort: dc.genEffort || undefined,
+              thinking: dc.genThinking || undefined,
+              brand: channel === "etsy" ? dc.brand : undefined,
+              htmlBudget: channel === "shopify" ? dc.htmlBudget : undefined,
+              htmlLengthBand: channel === "shopify" ? dc.htmlBand : undefined,
+              htmlLengthUnit: channel === "shopify" ? dc.htmlUnit : undefined,
+              descStyle: dc.descStyle,
+              fields: keys.map((k) => ({
+                key: k,
+                examples: (fieldCfg[k]?.examples ?? defaultExample(k)) || undefined,
+                rules: fieldCfg[k]?.rules,
+              })),
+            },
+            op,
+          ),
+        t("ws.autoContentTitle"),
+      );
+      await r.promise;
+      onSaved();
+      toast(t("ws.autoContentDone"), "ok");
+      setAutoContentAsk(false);
+    } catch (e) {
+      if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
+    } finally {
+      setAutoContentBusy(false);
+      setAutoLogoAsk(true);
+    }
+  }
+
+  function toggleAutoField(k: "title" | "description" | "tags") {
+    setAutoContentFields((s) => {
+      const n = new Set(s);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
+  }
+
   /** One edit job PER image (same reasoning as translateFanout). */
   function editFanout(urls: string[], instruction: string) {
     return fanOutPerImage(urls, t("ws.jobImage"), (url, op) =>
@@ -775,10 +904,11 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     }
   }
 
-  /** Bake the current logo into the selected images (or all) and persist in place. */
-  async function applyLogo() {
+  /** Bake the current logo into the selected images (or all) and persist in place.
+   *  `targets` defaults to the bulk-target selection; pass an explicit list (e.g.
+   *  every image) to apply regardless of what's currently selected. */
+  async function applyLogo(targets: string[] = bulkTargets) {
     if (!logo || !logoImg) return toast(t("editor.logoNotReady"), "err");
-    const targets = bulkTargets;
     if (!targets.length) return toast(t("ws.selectFirst"), "err");
     setBusy("logo");
     try {
@@ -1058,6 +1188,69 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
         </div>
       )}
 
+      {autoContentAsk && (
+        <div className="modal-scrim" onClick={() => !autoContentBusy && setAutoContentAsk(false)}>
+          <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("ws.autoContentTitle")}</h3>
+            <p className="sub">{t("ws.autoContentHint")}</p>
+            <div className="col" style={{ gap: 6, margin: "10px 0" }}>
+              <label className="row" style={{ gap: 6 }}>
+                <input type="checkbox" checked={autoContentFields.has("title")} onChange={() => toggleAutoField("title")} />
+                {t("ws.autoContentTitleField")}
+              </label>
+              <label className="row" style={{ gap: 6 }}>
+                <input type="checkbox" checked={autoContentFields.has("description")} onChange={() => toggleAutoField("description")} />
+                {t("ws.autoContentDescField")}
+              </label>
+              <label className="row" style={{ gap: 6 }}>
+                <input type="checkbox" checked={autoContentFields.has("tags")} onChange={() => toggleAutoField("tags")} />
+                {t("ws.autoContentTagsField")}
+              </label>
+              <button
+                type="button"
+                className="btn ghost sm"
+                style={{ alignSelf: "flex-start" }}
+                onClick={() => setAutoContentFields(new Set(["title", "description", "tags"]))}
+              >
+                {t("ws.autoContentAll")}
+              </button>
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button className="btn" disabled={autoContentBusy} onClick={() => { setAutoContentAsk(false); setAutoLogoAsk(true); }}>
+                {t("ws.autoContentSkip")}
+              </button>
+              <button className="btn primary" disabled={autoContentBusy || !autoContentFields.size} onClick={runAutoContentGenerate}>
+                {autoContentBusy ? <span className="spin" /> : t("ws.autoContentRun")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {autoLogoAsk && (
+        <div className="modal-scrim" onClick={() => busy !== "logo" && setAutoLogoAsk(false)}>
+          <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("ws.autoLogoTitle")}</h3>
+            <p className="sub">{logo && logoImg ? t("ws.autoLogoHint") : t("ws.autoLogoNeedUpload")}</p>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button className="btn" disabled={busy === "logo"} onClick={() => setAutoLogoAsk(false)}>
+                {t("ws.autoLogoSkip")}
+              </button>
+              <button
+                className="btn primary"
+                disabled={busy === "logo" || !logo || !logoImg}
+                onClick={async () => {
+                  await applyLogo(images.map((i) => i.url));
+                  setAutoLogoAsk(false);
+                }}
+              >
+                {busy === "logo" ? <span className="spin" /> : t("ws.autoLogoRun")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-h">
           <h3>{t("ws.title")}</h3>
@@ -1224,6 +1417,28 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
             <button className="btn sm" onClick={() => setStudioSeed(sel.size >= 1 ? [...sel] : "open")}>
               {sel.size >= 1 ? `${t("ws.studioCombine")} (${sel.size})` : `🎨 ${t("ws.studio")}`}
             </button>
+          </div>
+
+          {/* 0) one-click: check product → drop junk slides → translate/clean up → ask content/logo */}
+          <div className="card" style={{ boxShadow: "none" }}>
+            <div className="card-h">
+              <span className="hinttip">
+                <h3 style={{ fontSize: 13 }}>{t("ws.autoTitle")}</h3>
+                <span className="hinttip-badge" tabIndex={0} aria-label={t("ws.autoHint")}>?</span>
+                <span className="hinttip-pop" role="tooltip">{t("ws.autoHint")}</span>
+              </span>
+              {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
+            </div>
+            <div className="card-b col">
+              <button
+                className="btn primary"
+                onClick={runAutoPrepare}
+                disabled={autoBusy || running || !settings.data?.hasManusKey || !images.length}
+              >
+                {autoBusy ? <span className="spin" /> : t("ws.autoRun")}
+              </button>
+              <p className="tiny muted" style={{ margin: 0 }}>{t("ws.autoHint")}</p>
+            </div>
           </div>
 
           {/* 1) image cleanup (translate + strip watermark/logo/off-topic text + re-fit type) */}
@@ -1559,7 +1774,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 <div className="row" style={{ gap: 6 }}>
                   <button
                     className="btn primary sm"
-                    onClick={applyLogo}
+                    onClick={() => applyLogo()}
                     disabled={!!busy || !logoImg || !bulkTargets.length}
                   >
                     {busy === "logo" ? <span className="spin" /> : t("editor.logoApply", { n: bulkTargets.length })}

@@ -752,6 +752,9 @@ export async function generateListing(
       ? Math.round(Math.max(16000, Math.min(64000, targetChars / 2.6 + 8000)))
       : Math.round(Math.max(12000, Math.min(64000, targetChars / 3.1 + 6000)));
   }
+  // a partial request that doesn't include the HTML description (e.g. "just
+  // regenerate tags") needs none of the above budget — keep it fast/cheap.
+  if (!input.fields.some((f) => f.key === "description")) descMaxTokens = 4000;
   const brandLine = input.brand?.trim()
     ? `MARKA: "${input.brand.trim()}" — Etsy başlığının EN SONUNA " – ${input.brand.trim()}®" ekle (bir kez).`
     : 'MARKA: verilmedi — başlıkta marka kullanma (uydurma).';
@@ -839,6 +842,20 @@ export async function generateListing(
         .filter(Boolean)
         .join("\n");
 
+  // Schema keys the model must return — normally the whole channel's field set
+  // (what every existing caller sends), but a caller MAY ask for a genuine
+  // subset (e.g. "just regenerate tags"); the schema line must match exactly,
+  // otherwise the model follows the rigid JSON-shape instruction and returns
+  // every field regardless of what was actually asked for.
+  const requestedKeys = new Set(input.fields.map((f) => f.key));
+  const schemaKeys = (isShopify
+    ? (["title", "description", "tags"] as const)
+    : (["title", "title_alt", "description", "tags", "tags_pool"] as const)
+  ).filter((k) => requestedKeys.has(k));
+  const schemaFields = (schemaKeys.length ? schemaKeys : isShopify ? ["title", "description", "tags"] : ["title", "title_alt", "description", "tags", "tags_pool"])
+    .map((k) => `{ "key": "${k}", "value": "..." }`)
+    .join(", ");
+
   const system = [
     "Sen bir e-ticaret listeleme uzmanısın. Taobao/1688 ürün verisinden",
     `${isShopify ? "Shopify" : "Etsy"} için satışa hazır, özgün ve doğru listeleme içeriği üretiyorsun.`,
@@ -849,9 +866,7 @@ export async function generateListing(
     "ALAKA — KESİN, İSTİSNASIZ KURAL: `title`, `title_alt`, `tags` ve `tags_pool` içindeki HER TEK kelime/öbek gerçek bir alıcının TAM OLARAK BU ürünü ararken kullanacağı, ürünü DOĞRU tanımlayan bir ifade olmalı. SADECE çeşitlilik/SEO doldurma amacıyla yakın ama YANLIŞ veya aşırı-genel bir eş anlamlı KELİME UYDURMA — ör. şeffaf pencereli bir 'ita bag'/çanta için alakasız 'rucksack' (sırt/dağcı çantası) YAZMA; ürün bir 'case' ise 'backpack' türetme, ürün gerçekten öyle DEĞİLSE o kelimeyi kullanma. Bir kelimeyi SADECE başka bir kelimeye benziyor/eş anlamlı göründüğü için ekleme — önce kendine 'bu ürün gerçekten bu kelimeyle mi aranır/tarif edilir?' diye sor, hayırsa ATLA. Emin değilsen daha GENEL ama DOĞRU bir terim kullan, uydurma spesifik terim değil.",
     "KEYCAP SET İSE: L şeklinde büyük Enter tuşu = ISO düzen; düz Enter = ANSI. Bazı ilanlar ikisini de sunar — o zaman varyanta göre değişir, başlık/etiket/açıklamada doğru belirt.",
     channelRules,
-    isShopify
-      ? 'Yanıtı SADECE şu şemada geçerli JSON ver: { "fields": [ { "key": "title", "value": "..." }, { "key": "description", "value": "..." }, { "key": "tags", "value": "..." } ] }'
-      : 'Yanıtı SADECE şu şemada geçerli JSON ver: { "fields": [ { "key": "title", "value": "..." }, { "key": "title_alt", "value": "..." }, { "key": "description", "value": "..." }, { "key": "tags", "value": "..." }, { "key": "tags_pool", "value": "..." } ] }',
+    `Yanıtı SADECE şu şemada geçerli JSON ver: { "fields": [ ${schemaFields} ] }`,
     "Markdown, kod bloğu veya açıklama ekleme.",
   ].join("\n");
 
@@ -975,7 +990,10 @@ export async function generateListing(
     try {
       const p = extractJson(text);
       const fs = (p.fields || []) as { key: string; value: unknown }[];
-      const descOk = !isShopify || (fs.find((f) => f.key === "description")?.value || "").toString().trim();
+      // only require a non-empty `description` when it was actually asked for —
+      // a partial request (e.g. "just regenerate tags") never includes it.
+      const descOk =
+        !isShopify || !requestedKeys.has("description") || (fs.find((f) => f.key === "description")?.value || "").toString().trim();
       if (fs.length && descOk) {
         parsed = p;
         break;
@@ -1285,6 +1303,65 @@ export async function generateAltTexts(
     url: im.url,
     alt: stripCJK(String(rows.find((r) => Number(r.i) === i)?.alt || "")),
   }));
+  return { results, usage };
+}
+
+export interface ImageClassification {
+  url: string;
+  /** true = a text/graphic marketing slide with no real photographed product
+   *  (certificate, packaging-design card, purchase-notice banner, factory/brand
+   *  intro slide, compatibility diagram, plain text-on-white slide, CTA
+   *  graphic) — a candidate for automatic removal. */
+  meaningless: boolean;
+  reason?: string;
+}
+
+/**
+ * Vision-classify each image as a real photographed product/scene (kept) vs. a
+ * "meaningless" marketing/text graphic (candidate for deletion) — used by the
+ * Visual Studio's one-click auto-prepare button to drop 1688/Taobao detail-page
+ * filler slides (purchase notices, factory intros, packaging mockups, etc.)
+ * before translation/description generation runs.
+ */
+export async function classifyProductImages(
+  urls: string[],
+  opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
+): Promise<{ results: ImageClassification[]; usage: LlmUsage }> {
+  if (urls.length === 0) return { results: [], usage: zeroUsage() };
+  const capped = urls.slice(0, 40);
+  const fetched = await Promise.all(
+    capped.map(async (url) => {
+      try {
+        return { url, ...(await imageToBase64(url)) };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const valid = fetched.filter((f): f is { url: string; data: string; mime: string } => !!f);
+  if (valid.length === 0) return { results: [], usage: zeroUsage() };
+
+  const system = [
+    "Bir e-ticaret görsel küratörüsün. Sana SIRAYLA, 0'dan başlayarak indekslenmiş birden fazla görsel gösteriliyor.",
+    "Her görsel için, o görselin GERÇEK FOTOĞRAFLANMIŞ bir ürün/sahne mi (\"photo\"), yoksa esas olarak metin/grafik ağırlıklı bir PAZARLAMA SLAYTI mı (\"banner\") olduğuna karar ver.",
+    "\"banner\" örnekleri: sertifika/telif hakkı kartı, paketleme/kutu tanıtım grafiği, 'satın alma bilgilendirme' metin afişi, marka/fabrika tanıtım slaydı, uyumluluk/ölçü diyagramı, düz renkli zemin üzerine sadece başlık yazısı, garanti/iade rozet grid'i, mağaza QR kod/topluluk reklamı, jenerik 'sepete ekle/şimdi satın al' CTA grafiği.",
+    "\"photo\": gerçek ürün gerçek bir sahne/arka planda fotoğraflanmış, gerçek doku/ışık/gölge/derinlik görünüyor — üzerinde biraz metin/rozet/logo olsa bile ASIL GÖRSEL İÇERİK gerçek bir fotoğrafsa yine \"photo\" say.",
+    "EMİN DEĞİLSEN \"photo\" DE — yanlışlıkla gerçek bir ürün fotoğrafını silmektense pazarlama slaydını tutmak daha güvenli.",
+    'SADECE geçerli JSON dizi döndür: [{ "i": 0, "class": "photo" | "banner", "reason": "kısa neden (Türkçe)" }, ...] — gösterilen HER görsel için bir satır, aynı sırayla.',
+  ].join("\n");
+  const user = `${valid.length} görsel gösteriliyor, sırasıyla 0'dan ${valid.length - 1}'e kadar indekslenmiş. Her biri için "photo" mu "banner" mı karar ver.`;
+  const { text, usage } = await ask(system, user, "classifyProductImages", {
+    maxTokens: 2500,
+    effort: "low",
+    thinking: "off",
+    ...opts,
+    images: valid.map((im) => ({ data: im.data, mime: im.mime })),
+  });
+  const rows = extractJson(text) as { i: number; class: string; reason?: string }[];
+  const results: ImageClassification[] = valid.map((im, i) => {
+    const hit = rows.find((r) => Number(r.i) === i);
+    return { url: im.url, meaningless: hit?.class === "banner", reason: hit?.reason };
+  });
   return { results, usage };
 }
 

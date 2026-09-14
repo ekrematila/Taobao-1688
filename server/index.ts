@@ -16,6 +16,7 @@ import {
   nameVariantsForChannel,
   translateVariants,
   generateAltTexts,
+  classifyProductImages,
   logManusUsage,
   manusUsdPerCredit,
   activeModel,
@@ -107,7 +108,7 @@ import {
   restoreRevision,
   withDraftLock,
 } from "./drafts.ts";
-import { ONEBOUND_ENDPOINTS, type ApiCallInput, type ProductImage, type Settings } from "@shared/types.ts";
+import { ONEBOUND_ENDPOINTS, type ApiCallInput, type GeneratedField, type ProductImage, type Settings } from "@shared/types.ts";
 import { claudePricing, DEFAULT_PRODUCT_TYPES } from "@shared/models.ts";
 
 const app = express();
@@ -527,6 +528,20 @@ app.post(
 
 /* ---------------------------------- ai --------------------------------- */
 
+// The channel's full field set — used only to tell a genuine partial request
+// ("just regenerate tags") apart from the normal full-listing generation every
+// existing caller sends, so a partial request MERGES into the existing
+// listing instead of silently wiping the fields it didn't ask for.
+const FULL_LISTING_FIELDS: Record<string, GeneratedField["key"][]> = {
+  shopify: ["title", "description", "tags"],
+  etsy: ["title", "title_alt", "description", "tags", "tags_pool"],
+};
+function mergeListingFields(oldFields: GeneratedField[] = [], newFields: GeneratedField[]): GeneratedField[] {
+  const byKey = new Map(oldFields.map((f) => [f.key, f] as const));
+  for (const f of newFields) byKey.set(f.key, f);
+  return [...byKey.values()];
+}
+
 app.post(
   "/api/ai/generate-listing",
   wrap(async (req, res) => {
@@ -539,8 +554,15 @@ app.post(
       ctx.step(local ? "Şablonla içerik kuruluyor" : "Kod / içerik yazılıyor");
       const listing = local ? localListing(draft.product!, input) : await generateListing(draft.product!, input, ctx.signal);
       ctx.step("Kanal kurallarına göre biçimleniyor");
-      patchDraft(draft.id, { listing, channel: input.channel, step: Math.max(draft.step, 4) }, local ? "Listeleme üretildi (şablon)" : "Listeleme üretildi");
-      return listing;
+      const requested = new Set<string>((input.fields || []).map((f: any) => f.key));
+      const fullSet = FULL_LISTING_FIELDS[input.channel] || [];
+      const isPartial = fullSet.length > 0 && fullSet.some((k) => !requested.has(k));
+      const finalListing =
+        isPartial && draft.listing && draft.listing.channel === input.channel
+          ? { ...listing, fields: mergeListingFields(draft.listing.fields, listing.fields) }
+          : listing;
+      patchDraft(draft.id, { listing: finalListing, channel: input.channel, step: Math.max(draft.step, 4) }, local ? "Listeleme üretildi (şablon)" : "Listeleme üretildi");
+      return finalListing;
     });
     res.json({ jobId });
   }),
@@ -962,6 +984,27 @@ app.post(
       return { items: results, totalCredits, replaced, errors: errs };
     });
 
+    res.json({ jobId });
+  }),
+);
+
+/** Vision-classify each image as a real photo vs. a meaningless marketing/text
+ *  slide, for the Visual Studio's one-click auto-prepare button. */
+app.post(
+  "/api/ai/classify-images",
+  wrap(async (req, res) => {
+    const { draftId, imageUrls } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
+    const urls: string[] = Array.isArray(imageUrls) && imageUrls.length
+      ? imageUrls
+      : [...new Set(draft.product.images.map((im) => im.url))];
+    const jobId = startJob("classify-images", async (ctx) => {
+      ctx.plan(["Görseller inceleniyor"]);
+      ctx.step("Görseller inceleniyor");
+      const { results } = await classifyProductImages(urls, { draftId: draft.id, signal: ctx.signal });
+      return { results };
+    });
     res.json({ jobId });
   }),
 );

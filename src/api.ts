@@ -215,6 +215,12 @@ export function translateImagesJob(
 ): RunningJob<ImageTranslateJobResult> {
   return runJob(() => post("/ai/translate-images", body), onProgress);
 }
+export function classifyImagesJob(
+  body: { draftId: string; imageUrls?: string[] },
+  onProgress: Progress,
+): RunningJob<{ results: { url: string; meaningless: boolean; reason?: string }[] }> {
+  return runJob(() => post("/ai/classify-images", body), onProgress);
+}
 export function editImagesJob(
   body: {
     draftId: string;
