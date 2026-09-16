@@ -3,11 +3,11 @@ import { mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { ROOT } from "./env.ts";
+import { DATA_DIR } from "./env.ts";
 
 const pExecFile = promisify(execFile);
 
-const DIR = join(ROOT, "data", "media");
+const DIR = join(DATA_DIR, "media");
 mkdirSync(DIR, { recursive: true });
 
 const EXT: Record<string, string> = {

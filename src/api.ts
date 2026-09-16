@@ -32,8 +32,10 @@ export interface Draft {
   updatedAt: string;
 }
 
+export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}${path}`;
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...init });
+  const res = await fetch(withBase(`/api${path}`), { headers: { "Content-Type": "application/json" }, ...init });
   const text = await res.text();
   const json = text ? JSON.parse(text) : {};
   if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -88,6 +90,12 @@ export const api = {
   draft: (id: string) => req<Draft>(`/drafts/${id}`),
   researchHsCode: (draftId: string, productType: string, model?: string) =>
     post<{ code: string; heading: string; rationale: string }>("/ai/hs-code", { draftId, productType, model }),
+  suggestProductType: (draftId: string, model?: string) =>
+    post<{ productType: string; isNew: boolean; rationale: string }>("/ai/suggest-product-type", { draftId, model }),
+  resolveTaxonomy: (draftId: string, productType: string) =>
+    req<{ path: string; gid: string }>(
+      "/taxonomy/resolve?" + new URLSearchParams({ draftId, productType }).toString(),
+    ),
   patchDraft: (id: string, patch: Record<string, unknown>) => post<Draft>(`/drafts/${id}`, patch),
   deleteDraft: (id: string) => req<{ ok: true }>(`/drafts/${id}`, { method: "DELETE" }),
   setDraftVideo: (id: string, body: { dataUrl?: string; url?: string }) => post<Draft>(`/drafts/${id}/video`, body),
@@ -293,8 +301,9 @@ export function blogGenJob(
 /** Route a remote product image through our proxy so canvas pixels stay readable. */
 export function proxied(url: string): string {
   if (!url) return url;
-  if (url.startsWith("/api/") || url.startsWith("data:") || url.startsWith("blob:")) return url;
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (url.startsWith("/api/")) return withBase(url);
+  return withBase(`/api/image-proxy?url=${encodeURIComponent(url)}`);
 }
 
 const CN_CDN = /(^|\.)(alicdn|taobao|tmall|1688|aliyuncs)\.com$/i;
@@ -313,7 +322,7 @@ export function absoluteUrl(url: string): string {
   if (s.startsWith("//")) return "https:" + s;
   if (s.startsWith("/")) {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return origin + s;
+    return origin + withBase(s);
   }
   try {
     const u = new URL(s);

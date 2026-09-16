@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { downloadBlob } from "../lib/image";
 
@@ -8,7 +8,7 @@ export default function Archive() {
   const a = useQuery({ queryKey: ["archive"], queryFn: api.archive });
 
   async function redownload(id: string) {
-    const res = await fetch(`/api/archive/${id}`);
+    const res = await fetch(withBase(`/api/archive/${id}`));
     const row = await res.json();
     const p = row.payload;
     if (p?.csv) {

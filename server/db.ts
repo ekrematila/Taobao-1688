@@ -1,10 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT } from "./env.ts";
+import { DATA_DIR } from "./env.ts";
 
-mkdirSync(join(ROOT, "data"), { recursive: true });
-export const db = new DatabaseSync(join(ROOT, "data", "app.sqlite"));
+mkdirSync(DATA_DIR, { recursive: true });
+export const db = new DatabaseSync(join(DATA_DIR, "app.sqlite"));
 
 db.exec(`
   PRAGMA journal_mode = WAL;

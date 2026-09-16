@@ -1594,6 +1594,82 @@ export async function researchHsCode(
   };
 }
 
+export interface ProductTypeSuggestion {
+  productType: string;
+  isNew: boolean;
+  rationale: string;
+  model: string;
+  usage: LlmUsage;
+}
+
+/**
+ * AI-suggested short product-type label from the product's REAL photos (vision)
+ * plus its title/specs — the store's own type presets are shown as a menu the
+ * model should prefer; only when nothing fits does it propose a new short label
+ * in the same terse, lowercase style (e.g. "keycap set", "wrist rest").
+ */
+export async function suggestProductType(
+  product: NormalisedProduct,
+  knownTypes: string[],
+  opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
+): Promise<ProductTypeSuggestion> {
+  const galleryImages = product.images.filter((im) => im.role === "gallery").slice(0, 3);
+  const images: { data: string; mime: string }[] = [];
+  for (const im of galleryImages) {
+    const src = im.url || im.srcUrl;
+    if (!src) continue;
+    try {
+      images.push(await imageToBase64(src));
+    } catch (e) {
+      console.error("[suggestProductType] could not download a product photo, skipping:", e);
+    }
+  }
+
+  const system = [
+    "You classify an e-commerce product into a short, lowercase product-type label used internally by the store to pick a Shopify category, HS code and shipping-weight default.",
+    "Look at the product photos AND the title/specs TOGETHER — the photos are the ground truth for what the item physically is; the title text can be misleading (bundled/kitted listings, translated puns, etc.).",
+    knownTypes.length
+      ? `Prefer an EXISTING label from this list when it genuinely fits the product: ${knownTypes.join(", ")}.`
+      : "",
+    'If none of those fit, propose a NEW short label: 2-4 words, lowercase, no punctuation, same terse style as the examples above (e.g. "keycap set", "deskmat", "wrist rest", "phone case").',
+    'Reply as strict JSON only: {"productType":"...","isNew":true|false,"rationale":"one short sentence citing what you actually saw"}',
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const user = [
+    `Product title (zh): ${product.title}`,
+    product.titleTranslated ? `Product title (translated): ${product.titleTranslated}` : "",
+    `Key specs: ${cleanSpecs(product.props, 12).map((s) => `${s.label}: ${s.value}`).join("; ")}`,
+    images.length ? `${images.length} product photo(s) attached above.` : "(no product photos available — text only)",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { text, usage, model } = await ask(system, user, "suggestProductType", {
+    model: opts.model,
+    maxTokens: 300,
+    signal: opts.signal,
+    draftId: opts.draftId,
+    images,
+  });
+
+  let parsed: any = {};
+  try {
+    parsed = JSON.parse((text.match(/\{[\s\S]*\}/) || ["{}"])[0]);
+  } catch {
+    /* fall through */
+  }
+  const productType = String(parsed.productType || "").toLowerCase().trim().slice(0, 40);
+  return {
+    productType,
+    isNew: !!parsed.isNew && !knownTypes.includes(productType),
+    rationale: String(parsed.rationale || "").slice(0, 200),
+    model,
+    usage,
+  };
+}
+
 /* -------------------- Shopify taxonomy attribute picks -------------------- */
 
 export interface AttrForAI {

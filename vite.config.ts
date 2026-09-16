@@ -3,8 +3,10 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 
 const API_PORT = process.env.PORT || "8787";
+const basePath = (process.env.BASE_PATH || "").replace(/\/+$/, "");
 
 export default defineConfig({
+  base: `${basePath}/`,
   plugins: [react()],
   resolve: {
     alias: {
@@ -31,7 +33,7 @@ export default defineConfig({
       ".ngrok-free.dev", ".ngrok-free.app", ".ngrok.app", ".ngrok.io",
     ],
     proxy: {
-      "/api": {
+      [`${basePath}/api`]: {
         target: `http://localhost:${API_PORT}`,
         changeOrigin: true,
       },

@@ -60,8 +60,13 @@ export function resolveCategory(
   const typed = findTaxonomy(productType || "");
   if (typed) return typed;
 
-  const hay = `${productType || ""} ${product?.titleTranslated || ""} ${product?.title || ""} ${Object.keys(product?.props || {}).join(" ")}`
-    .toLowerCase();
+  // Prop VALUES matter as much as their (often Chinese/numeric) keys — OneBound
+  // frequently ships a ready-made English value like "Tactical Roll Up Padded
+  // Shooting Mat" under an opaque key ("3", "型号号"…) that keys-only used to miss.
+  const propText = Object.entries(product?.props || {})
+    .map(([k, v]) => `${k} ${v}`)
+    .join(" ");
+  const hay = `${productType || ""} ${product?.titleTranslated || ""} ${product?.title || ""} ${propText}`.toLowerCase();
 
   // curated domain classifier — trust it ONLY when the product itself is a
   // keyboard-hobby item (not just because the classifier's default is keycaps).

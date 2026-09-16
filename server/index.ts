@@ -13,6 +13,7 @@ import {
   generateAdvice,
   researchCategory,
   researchHsCode,
+  suggestProductType,
   nameVariantsForChannel,
   translateVariants,
   generateAltTexts,
@@ -113,6 +114,7 @@ import { claudePricing, DEFAULT_PRODUCT_TYPES } from "@shared/models.ts";
 
 const app = express();
 app.use(express.json({ limit: "64mb" }));
+const router = express.Router();
 
 /* ----------------------------- auth (optional) ---------------------------- */
 
@@ -140,7 +142,7 @@ function authed(req: express.Request): boolean {
   }
 }
 
-app.post("/api/login", (req, res) => {
+router.post("/api/login", (req, res) => {
   if (!env.appPassword) return res.json({ authed: true });
   if (String(req.body?.password || "") === env.appPassword) {
     issue(res);
@@ -148,11 +150,11 @@ app.post("/api/login", (req, res) => {
   }
   res.status(401).json({ error: "Parola hatalı." });
 });
-app.post("/api/logout", (_req, res) => {
+router.post("/api/logout", (_req, res) => {
   res.setHeader("Set-Cookie", `${COOKIE}=; HttpOnly; Path=/; Max-Age=0`);
   res.json({ ok: true });
 });
-app.get("/api/me", (req, res) => {
+router.get("/api/me", (req, res) => {
   res.json({ needsAuth: Boolean(env.appPassword), authed: authed(req) });
 });
 
@@ -161,7 +163,7 @@ app.get("/api/me", (req, res) => {
 // it (re)starts. The UI polls this so the address shown in-app always matches
 // reality, including after a restart hands out a brand new *.trycloudflare.com
 // address (those are never stable across runs).
-app.get("/api/tunnel-url", (_req, res) => {
+router.get("/api/tunnel-url", (_req, res) => {
   try {
     const p = join(ROOT, "tools", "tunnel-url.txt");
     const url = existsSync(p) ? readFileSync(p, "utf8").trim() : "";
@@ -172,7 +174,7 @@ app.get("/api/tunnel-url", (_req, res) => {
 });
 
 // Gate everything else under /api.
-app.use("/api", (req, res, next) => {
+router.use("/api", (req, res, next) => {
   if (
     req.path === "/login" ||
     req.path === "/logout" ||
@@ -262,12 +264,12 @@ function readProductTypes(): string[] {
   return [...DEFAULT_PRODUCT_TYPES, ...saved].filter((x) => x && !seen.has(x) && (seen.add(x), true));
 }
 
-app.get(
+router.get(
   "/api/settings",
   wrap(async (_req, res) => res.json(await currentSettings())),
 );
 
-app.post(
+router.post(
   "/api/settings",
   wrap(async (req, res) => {
     const p = req.body ?? {};
@@ -334,15 +336,15 @@ app.post(
 );
 
 // POST so the UI can test a key that was typed but not saved yet.
-app.post(
+router.post(
   "/api/verify/claude",
   wrap(async (req, res) => res.json(await verifyClaude(String(req.body?.key || "") || undefined))),
 );
-app.post(
+router.post(
   "/api/verify/manus",
   wrap(async (req, res) => res.json(await verifyManus(String(req.body?.key || "") || undefined))),
 );
-app.post(
+router.post(
   "/api/verify/shopify",
   wrap(async (req, res) =>
     res.json(await verifyShopify(String(req.body?.domain || "") || undefined, String(req.body?.token || "") || undefined)),
@@ -354,7 +356,7 @@ app.post(
 const SHOPIFY_REDIRECT_URI = `${env.appPublicUrl}/api/shopify/oauth/callback`;
 
 /** Kick off OAuth: browser → Shopify authorize screen. */
-app.get(
+router.get(
   "/api/shopify/oauth/start",
   wrap(async (req, res) => {
     const url = shopifyOAuthStart(String(req.query.shop || ""), SHOPIFY_REDIRECT_URI);
@@ -363,7 +365,7 @@ app.get(
 );
 
 /** Shopify redirects the browser back here with ?code&hmac&shop&state. */
-app.get(
+router.get(
   "/api/shopify/oauth/callback",
   wrap(async (req, res) => {
     try {
@@ -378,10 +380,10 @@ app.get(
 
 /* ------------------------------- onebound -------------------------------- */
 
-app.get("/api/onebound/endpoints", (_req, res) => res.json(ONEBOUND_ENDPOINTS));
+router.get("/api/onebound/endpoints", (_req, res) => res.json(ONEBOUND_ENDPOINTS));
 
 /** The COMPLETE Shopify product taxonomy (bundled) — for the Category picker. */
-app.get("/api/taxonomy", (_req, res) => {
+router.get("/api/taxonomy", (_req, res) => {
   res.set("Cache-Control", "public, max-age=86400");
   res.json({ count: TAXONOMY.length, paths: TAXONOMY_PATHS, attrCount: TAXONOMY_ATTR_COUNT });
 });
@@ -398,7 +400,7 @@ function resolveCategoryNode(catQuery: string, draftId: string) {
   return { node, draft, product };
 }
 
-app.get(
+router.get(
   "/api/taxonomy/attributes",
   wrap(async (req, res) => {
     const { node, product } = resolveCategoryNode(String(req.query.category || ""), String(req.query.draftId || ""));
@@ -413,7 +415,7 @@ app.get(
 );
 
 /** AI pick of taxonomy attribute values for a draft's product. */
-app.post(
+router.post(
   "/api/taxonomy/attributes/suggest",
   wrap(async (req, res) => {
     const { node, draft, product } = resolveCategoryNode(String(req.body?.category || ""), String(req.body?.draftId || ""));
@@ -446,7 +448,7 @@ app.post(
   }),
 );
 
-app.post(
+router.post(
   "/api/onebound/call",
   wrap(async (req, res) => {
     const input = req.body as ApiCallInput;
@@ -474,8 +476,8 @@ app.post(
 
 /* -------------------------------- drafts -------------------------------- */
 
-app.get("/api/drafts", (_req, res) => res.json(listDrafts()));
-app.get(
+router.get("/api/drafts", (_req, res) => res.json(listDrafts()));
+router.get(
   "/api/drafts/:id",
   wrap(async (req, res) => {
     const d = getDraft(req.params.id);
@@ -483,7 +485,7 @@ app.get(
     res.json(d);
   }),
 );
-app.post(
+router.post(
   "/api/drafts/:id",
   wrap(async (req, res) => {
     const { channel, step, imageState, product, listing, title, label } = req.body ?? {};
@@ -491,7 +493,7 @@ app.post(
     res.json(d);
   }),
 );
-app.delete(
+router.delete(
   "/api/drafts/:id",
   wrap(async (req, res) => {
     if (!getDraft(req.params.id)) return res.status(404).json({ error: "Taslak bulunamadı" });
@@ -499,21 +501,21 @@ app.delete(
     res.json({ ok: true });
   }),
 );
-app.get("/api/examples", (_req, res) => res.json(allExamples()));
+router.get("/api/examples", (_req, res) => res.json(allExamples()));
 
-app.get(
+router.get(
   "/api/drafts/:id/revisions",
   wrap(async (req, res) => res.json(listRevisions(req.params.id))),
 );
-app.post(
+router.post(
   "/api/revisions/:id/restore",
   wrap(async (req, res) => res.json(restoreRevision(Number(req.params.id)))),
 );
 
 /* ---------------------------------- jobs ------------------------------- */
 
-app.get("/api/jobs", (_req, res) => res.json(listJobs()));
-app.get(
+router.get("/api/jobs", (_req, res) => res.json(listJobs()));
+router.get(
   "/api/jobs/:id",
   wrap(async (req, res) => {
     const j = getJob(req.params.id);
@@ -521,7 +523,7 @@ app.get(
     res.json(j);
   }),
 );
-app.post(
+router.post(
   "/api/jobs/:id/cancel",
   wrap(async (req, res) => res.json({ cancelled: cancelJob(req.params.id) })),
 );
@@ -542,7 +544,7 @@ function mergeListingFields(oldFields: GeneratedField[] = [], newFields: Generat
   return [...byKey.values()];
 }
 
-app.post(
+router.post(
   "/api/ai/generate-listing",
   wrap(async (req, res) => {
     const input = req.body;
@@ -569,7 +571,7 @@ app.post(
 );
 
 /** Step 2 — quick AI review of the product, GUIDANCE ONLY. */
-app.post(
+router.post(
   "/api/ai/advice",
   wrap(async (req, res) => {
     const { draftId, channel, model, effort, thinking, targetLanguage, mode } = req.body ?? {};
@@ -605,7 +607,7 @@ app.post(
 );
 
 /** On-demand deep research of the product's CATEGORY (step 4 helper). */
-app.post(
+router.post(
   "/api/ai/category-research",
   wrap(async (req, res) => {
     const { draftId, question, model, effort, thinking, targetLanguage, mode = "manus", agentProfile } = req.body ?? {};
@@ -658,7 +660,7 @@ app.post(
 );
 
 /** Best-guess HS (Harmonized System) code for Shopify customs — Claude. */
-app.post(
+router.post(
   "/api/ai/hs-code",
   wrap(async (req, res) => {
     const { draftId, productType, model } = req.body ?? {};
@@ -669,9 +671,37 @@ app.post(
   }),
 );
 
+/** AI-suggested product type from the product's real photos (vision) + specs —
+ *  prefers one of the store's saved type presets, else proposes a short new one. */
+router.post(
+  "/api/ai/suggest-product-type",
+  wrap(async (req, res) => {
+    const { draftId, model } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
+    const r = await suggestProductType(draft.product, readProductTypes(), { model, draftId: draft.id });
+    res.json(r);
+  }),
+);
+
+/** Resolve the Shopify taxonomy category for an (unsaved) product type against
+ *  the FULL bundled taxonomy (~14.6k paths) — same resolver used for attributes,
+ *  exposed standalone so the shipping "fill" button gets the real match instead
+ *  of the client's small curated list. */
+router.get(
+  "/api/taxonomy/resolve",
+  wrap(async (req, res) => {
+    const draftId = String(req.query.draftId || "");
+    const productType = String(req.query.productType || "");
+    const draft = draftId ? getDraft(draftId) : null;
+    const node = resolveCategory(productType, draft?.product ?? undefined);
+    res.json({ path: node.path, gid: node.gid });
+  }),
+);
+
 /** Concise channel-ready variant names (Etsy ≤20 / Shopify ≤40 chars). `mode`
  *  "ai" = Claude · "free" = glossary + free MT (no paid AI). */
-app.post(
+router.post(
   "/api/ai/name-variants",
   wrap(async (req, res) => {
     const { draftId, channel, targetLanguage, model, mode } = req.body ?? {};
@@ -709,7 +739,7 @@ app.post(
 );
 
 /** Free machine translation (no paid AI). `{ texts: string[], to?, from? }`. */
-app.post(
+router.post(
   "/api/translate/free",
   wrap(async (req, res) => {
     const texts: string[] = Array.isArray(req.body?.texts) ? req.body.texts.map(String).slice(0, 60) : [];
@@ -718,7 +748,7 @@ app.post(
   }),
 );
 
-app.post(
+router.post(
   "/api/ai/translate-variants",
   wrap(async (req, res) => {
     const { draftId, targetLanguage, model } = req.body;
@@ -742,7 +772,7 @@ app.post(
   }),
 );
 
-app.post(
+router.post(
   "/api/ai/alt-texts",
   wrap(async (req, res) => {
     const { draftId, targetLanguage, model } = req.body;
@@ -771,7 +801,7 @@ app.post(
 );
 
 /** Manus vision-based DETAILED batch alt texts (angle, framing, background, …). */
-app.post(
+router.post(
   "/api/ai/alt-texts-manus",
   wrap(async (req, res) => {
     const { draftId, imageUrls, targetLanguage, instruction } = req.body ?? {};
@@ -837,7 +867,7 @@ app.post(
  * Manus image translation — selectable (imageUrls[]) or bulk. Default zh -> target.
  * Only translates Chinese OVERLAY text; product + background untouched.
  */
-app.post(
+router.post(
   "/api/ai/translate-images",
   wrap(async (req, res) => {
     const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile } = req.body ?? {};
@@ -990,7 +1020,7 @@ app.post(
 
 /** Vision-classify each image as a real photo vs. a meaningless marketing/text
  *  slide, for the Visual Studio's one-click auto-prepare button. */
-app.post(
+router.post(
   "/api/ai/classify-images",
   wrap(async (req, res) => {
     const { draftId, imageUrls } = req.body ?? {};
@@ -1010,7 +1040,7 @@ app.post(
 );
 
 /** Free-form (non-translate) AI image edit on the selected images via Manus. */
-app.post(
+router.post(
   "/api/ai/edit-images",
   wrap(async (req, res) => {
     const { draftId, imageUrls, instruction, imageSpec, speed, agentProfile } = req.body ?? {};
@@ -1083,7 +1113,7 @@ app.post(
  * collage, studio shot, background swap) from up to 20 source images. The result
  * is persisted and returned; the client appends it to the gallery.
  */
-app.post(
+router.post(
   "/api/ai/research-brand",
   wrap(async (req, res) => {
     const { draftId, brandUrl } = req.body ?? {};
@@ -1111,7 +1141,7 @@ app.post(
   }),
 );
 
-app.post(
+router.post(
   "/api/ai/compose-image",
   wrap(async (req, res) => {
     const { draftId, imageUrls, instruction, brandBrief, imageSpec, speed, agentProfile } = req.body ?? {};
@@ -1157,7 +1187,7 @@ app.post(
 
 /* --------------------------------- video ------------------------------- */
 
-app.post(
+router.post(
   "/api/ai/edit-video",
   wrap(async (req, res) => {
     const { draftId, instruction, agentProfile, logoDataUrl } = req.body ?? {};
@@ -1212,7 +1242,7 @@ app.post(
   }),
 );
 
-app.post(
+router.post(
   "/api/ai/video-alt",
   wrap(async (req, res) => {
     const { draftId, targetLanguage, agentProfile, model, mode = "manus" } = req.body ?? {};
@@ -1348,7 +1378,7 @@ function sanitiseVideoPlan(j: any): { plan: Record<string, unknown>; summary: st
   return { plan: p, summary };
 }
 
-app.post(
+router.post(
   "/api/ai/video-plan",
   wrap(async (req, res) => {
     const { draftId, request: reqText, meta, model } = req.body ?? {};
@@ -1425,7 +1455,7 @@ function renderAndStore(rec: BlogRecord): BlogRecord {
   return patchBlog(rec.id, { html: full });
 }
 
-app.get(
+router.get(
   "/api/blogs",
   wrap(async (req, res) => {
     const kind = req.query.kind === "product" || req.query.kind === "category" ? req.query.kind : undefined;
@@ -1433,7 +1463,7 @@ app.get(
   }),
 );
 
-app.get(
+router.get(
   "/api/blogs/:id",
   wrap(async (req, res) => {
     const b = getBlog(req.params.id);
@@ -1443,7 +1473,7 @@ app.get(
 );
 
 /** Create (or reuse) the product blog for a finished draft. */
-app.post(
+router.post(
   "/api/blogs/product",
   wrap(async (req, res) => {
     const draft = getDraft(String(req.body?.draftId || ""));
@@ -1454,7 +1484,7 @@ app.post(
 );
 
 /** Create a category blog — needs a category name and our site link. */
-app.post(
+router.post(
   "/api/blogs/category",
   wrap(async (req, res) => {
     const category = String(req.body?.category || "").trim();
@@ -1466,7 +1496,7 @@ app.post(
 );
 
 /** Patch title / config; re-renders HTML if a doc already exists. */
-app.post(
+router.post(
   "/api/blogs/:id",
   wrap(async (req, res) => {
     const cur = getBlog(req.params.id);
@@ -1480,7 +1510,7 @@ app.post(
   }),
 );
 
-app.delete(
+router.delete(
   "/api/blogs/:id",
   wrap(async (req, res) => {
     deleteBlog(req.params.id);
@@ -1489,7 +1519,7 @@ app.delete(
 );
 
 /** SEO research for a blog (Claude). */
-app.post(
+router.post(
   "/api/ai/blog-seo",
   wrap(async (req, res) => {
     const rec = getBlog(String(req.body?.blogId || ""));
@@ -1516,7 +1546,7 @@ app.post(
 );
 
 /** Generate (or regenerate) the blog article. */
-app.post(
+router.post(
   "/api/ai/blog",
   wrap(async (req, res) => {
     const rec = getBlog(String(req.body?.blogId || ""));
@@ -1553,7 +1583,7 @@ app.post(
 
 /* -------------------------------- shopify ------------------------------ */
 
-app.post(
+router.post(
   "/api/shopify/push",
   wrap(async (req, res) => {
     const draft = getDraft(req.body?.draftId);
@@ -1565,12 +1595,12 @@ app.post(
 
 /* ------------------------------ Etsy app ----------------------------- */
 
-app.get("/api/etsy-app/status", wrap(async (_req, res) => res.json(await etsyAppStatus())));
+router.get("/api/etsy-app/status", wrap(async (_req, res) => res.json(await etsyAppStatus())));
 
-app.post("/api/etsy-app/pair", wrap(async (req, res) => res.json(await pairEtsyApp(req.body?.url))));
+router.post("/api/etsy-app/pair", wrap(async (req, res) => res.json(await pairEtsyApp(req.body?.url))));
 
 /** Send this Etsy draft to the Etsy Command Center as a local draft. */
-app.post(
+router.post(
   "/api/etsy-app/push",
   wrap(async (req, res) => {
     const draft = getDraft(req.body?.draftId);
@@ -1614,7 +1644,7 @@ function parseResult(raw: unknown): unknown {
   return raw;
 }
 
-app.get("/api/usage", (req, res) => {
+router.get("/api/usage", (req, res) => {
   const { from, to, where, args } = usageRange(req);
   const calls = db
     .prepare(
@@ -1709,7 +1739,7 @@ app.get("/api/usage", (req, res) => {
  * each task shows the real billed credits. Manual tasks the user ran on manus.im
  * are NOT included. `?from=&to=` filters by the app's log timestamp.
  */
-app.get(
+router.get(
   "/api/manus/usage",
   wrap(async (req, res) => {
     const { from, to, where, args } = usageRange(req);
@@ -1826,7 +1856,7 @@ app.get(
 
 /* ------------------------------- archive ----------------------------- */
 
-app.get("/api/archive", (_req, res) => {
+router.get("/api/archive", (_req, res) => {
   const rows = db.prepare("SELECT id, draft_id, channel, title, format, created_at FROM archive ORDER BY created_at DESC").all() as any[];
   res.json(
     rows.map((r) => ({
@@ -1839,7 +1869,7 @@ app.get("/api/archive", (_req, res) => {
     })),
   );
 });
-app.post(
+router.post(
   "/api/archive",
   wrap(async (req, res) => {
     const { id, draftId, channel, title, format, payload } = req.body ?? {};
@@ -1855,7 +1885,7 @@ app.post(
     res.json({ ok: true });
   }),
 );
-app.get(
+router.get(
   "/api/archive/:id",
   wrap(async (req, res) => {
     const row = db.prepare("SELECT * FROM archive WHERE id = ?").get(req.params.id) as any;
@@ -1867,13 +1897,13 @@ app.get(
 /* ------------------------------ media store ------------------------ */
 // Persisted images: Manus translations (their URLs expire in 48h) and
 // browser-edited images. Stored under data/media, served from our origin.
-app.get("/api/media/:file", (req, res) => {
+router.get("/api/media/:file", (req, res) => {
   const p = mediaPath(req.params.file);
   if (!fsExists(p)) return res.status(404).json({ error: "Bulunamadı" });
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.sendFile(p);
 });
-app.post(
+router.post(
   "/api/media",
   wrap(async (req, res) => {
     const dataUrl = String(req.body?.dataUrl || "");
@@ -1883,7 +1913,7 @@ app.post(
 );
 
 /** Attach a product video by file (data:video/... URL) or by remote link. */
-app.post(
+router.post(
   "/api/drafts/:id/video",
   wrap(async (req, res) => {
     const draft = getDraft(req.params.id);
@@ -1917,7 +1947,7 @@ app.post(
     res.json(getDraft(draft.id));
   }),
 );
-app.delete(
+router.delete(
   "/api/drafts/:id/video",
   wrap(async (req, res) => {
     const draft = getDraft(req.params.id);
@@ -1931,7 +1961,7 @@ app.delete(
 /* ---------------------------- image proxy --------------------------- */
 // Streams remote product images from our own origin so the browser canvas
 // can read their pixels (crop / watermark / PNG export) without tainting.
-app.get(
+router.get(
   "/api/image-proxy",
   wrap(async (req, res) => {
     const url = String(req.query.url || "");
@@ -1959,9 +1989,11 @@ app.get(
 
 const dist = join(ROOT, "dist");
 if (env.isProd && existsSync(dist)) {
-  app.use(express.static(dist));
-  app.get("*", (_req, res) => res.sendFile(join(dist, "index.html")));
+  router.use(express.static(dist));
+  router.get("*", (_req, res) => res.sendFile(join(dist, "index.html")));
 }
+
+app.use(process.env.BASE_PATH || "/", router);
 
 app.listen(env.port, () => {
   console.log(`  Taobao Product Studio API  ->  http://localhost:${env.port}`);

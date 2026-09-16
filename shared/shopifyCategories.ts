@@ -123,7 +123,11 @@ function hay(p?: Pick<NormalisedProduct, "title" | "titleTranslated" | "props" |
   return [
     p.title || "",
     p.titleTranslated || "",
-    Object.keys(p.props || {}).join(" "),
+    // values matter as much as keys — OneBound often ships a ready-made English
+    // value ("Tactical Roll Up Padded Shooting Mat") under an opaque/Chinese key
+    Object.entries(p.props || {})
+      .map(([k, v]) => `${k} ${v}`)
+      .join(" "),
     (p.descHtml || "").replace(/<[^>]+>/g, " ").slice(0, 600),
   ]
     .join(" ")

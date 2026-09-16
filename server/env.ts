@@ -24,6 +24,7 @@ function loadDotEnv() {
 loadDotEnv();
 
 export const ROOT = root;
+export const DATA_DIR = (process.env.DATA_DIR || join(root, "data")).replace(/\/+$/, "");
 
 export const env = {
   port: Number(process.env.PORT || 8787),

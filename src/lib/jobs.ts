@@ -1,4 +1,5 @@
 import type { JobView } from "@shared/types.ts";
+import { withBase } from "../api";
 
 export interface RunningJob<T> {
   promise: Promise<T>;
@@ -22,7 +23,7 @@ export function runJob<T>(
     jobId = id;
     while (!stopped) {
       await new Promise((r) => setTimeout(r, pollMs));
-      const res = await fetch(`/api/jobs/${id}`);
+      const res = await fetch(withBase(`/api/jobs/${id}`));
       if (res.status === 404) throw new Error("İş kaydı düştü.");
       const j = (await res.json()) as JobView;
       onProgress(j);
@@ -37,7 +38,7 @@ export function runJob<T>(
     promise,
     cancel: () => {
       stopped = true;
-      if (jobId) fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" }).catch(() => {});
+      if (jobId) fetch(withBase(`/api/jobs/${jobId}/cancel`), { method: "POST" }).catch(() => {});
     },
   };
 }

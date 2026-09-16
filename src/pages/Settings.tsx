@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, type Effort } from "@shared/models.ts";
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                 {t("settings.shopifyOauthHint")}
                 <br />
                 <span className="mono" style={{ userSelect: "all" }}>
-                  {s.data?.shopifyRedirectUri || `${window.location.origin}/api/shopify/oauth/callback`}
+                  {s.data?.shopifyRedirectUri || `${window.location.origin}${withBase("/api/shopify/oauth/callback")}`}
                 </span>
               </p>
               <button
@@ -497,7 +497,7 @@ export default function SettingsPage() {
                   await save(); // persist domain + client id/secret first
                   const dom = (shopDomain.trim() || s.data?.shopifyDomain || "").trim();
                   if (!dom) return toast(t("settings.shopifyDomain"), "err");
-                  window.location.href = `/api/shopify/oauth/start?shop=${encodeURIComponent(dom)}`;
+                  window.location.href = withBase(`/api/shopify/oauth/start?shop=${encodeURIComponent(dom)}`);
                 }}
                 disabled={busy}
               >

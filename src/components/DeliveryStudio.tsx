@@ -116,10 +116,23 @@ export default function DeliveryStudio({
   const [weightNote, setWeightNote] = useState("");
   const [hsNote, setHsNote] = useState("");
   const [hsBusy, setHsBusy] = useState(false);
+  const [shipBusy, setShipBusy] = useState(false);
+  const [ptAiBusy, setPtAiBusy] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
+  const catBoxRef = useRef<HTMLLabelElement | null>(null);
   // Shopify taxonomy attributes chosen for this product (keyed by attribute handle)
   const [attrPicks, setAttrPicks] = useState<Record<string, ProductAttrPick>>({});
   const [attrOpen, setAttrOpen] = useState(false);
   const shipHydrated = useRef(false);
+  // close the category picker panel on outside click
+  useEffect(() => {
+    if (!catOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (catBoxRef.current && !catBoxRef.current.contains(e.target as Node)) setCatOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [catOpen]);
   const shopType = productType.trim().replace(/\b\w/g, (c) => c.toUpperCase());
   const [applyAdvice, setApplyAdvice] = useState(false);
   const [applyResearch, setApplyResearch] = useState(false);
@@ -391,20 +404,68 @@ export default function DeliveryStudio({
     await api.patchDraft(draft.id, { product: { ...draft.product, variants }, label: t("delivery.variantsLabel") });
     onSaved();
   }
-  /** Fill Category (bundled Shopify taxonomy) + Origin (CN) + HS code (keycap/keyboard
-   *  defaults) + Weight (declared or type estimate) from the product. */
-  function fillShipping() {
-    if (!draft.product) return;
-    setCategory(categoryFor(productType, draft.product));
-    setOriginCountry("CN");
-    const hs = defaultHsCode(productType, draft.product);
-    if (hs) {
-      setHsCode(hs);
-      setHsNote(lang === "tr" ? `varsayılan (${/keycap|键帽/i.test(productType || draft.product.title) ? "keycap set" : "klavye"})` : "default");
+  /** Fill Category + Origin (CN) + HS code + Weight from the ACTUAL product —
+   *  never a constant. Category resolves against the full bundled Shopify
+   *  taxonomy (server-side, ~14.6k paths) instead of the small local list; HS
+   *  code uses the fast known-type default when there is one, otherwise it asks
+   *  Claude to research the real 6-digit code instead of leaving the field blank. */
+  async function fillShipping() {
+    const product = draft.product;
+    if (!product) return;
+    setShipBusy(true);
+    try {
+      try {
+        const r = await api.resolveTaxonomy(draft.id, productType);
+        setCategory(r.path || categoryFor(productType, product));
+      } catch {
+        setCategory(categoryFor(productType, product)); // offline / API-down fallback
+      }
+      setOriginCountry("CN");
+
+      const hs = defaultHsCode(productType, product);
+      if (hs) {
+        setHsCode(hs);
+        setHsNote(lang === "tr" ? `varsayılan (${/keycap|键帽/i.test(productType || product.title) ? "keycap set" : "klavye"})` : "default");
+      } else {
+        setHsBusy(true);
+        try {
+          const r = await api.researchHsCode(draft.id, productType, model);
+          if (r.code) {
+            setHsCode(r.code);
+            setHsNote(`${r.heading}${r.rationale ? " — " + r.rationale : ""}`.slice(0, 200));
+          }
+        } catch {
+          /* leave HS blank — the manual "AI ile araştır" button still works */
+        } finally {
+          setHsBusy(false);
+        }
+      }
+
+      const g = estimateWeightKg(product, productType);
+      setWeightNote(lang === "tr" ? g.tr : g.en);
+      if (g.kg != null) setWeightKg(String(g.kg));
+    } finally {
+      setShipBusy(false);
     }
-    const g = estimateWeightKg(draft.product, productType);
-    setWeightNote(lang === "tr" ? g.tr : g.en);
-    if (g.kg != null) setWeightKg(String(g.kg));
+  }
+
+  /** AI-suggested product type from the product's real photos + specs. */
+  async function suggestPt() {
+    if (!draft.product) return;
+    setPtAiBusy(true);
+    try {
+      const r = await api.suggestProductType(draft.id, model);
+      if (r.productType) {
+        setProductType(r.productType);
+        toast(r.rationale || "✓", "ok");
+      } else {
+        toast(t("delivery.productTypeAiFail"), "err");
+      }
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setPtAiBusy(false);
+    }
   }
   async function researchHs() {
     if (!draft.product) return;
@@ -558,6 +619,15 @@ export default function DeliveryStudio({
                     <option key={pt} value={pt} />
                   ))}
                 </datalist>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={suggestPt}
+                  disabled={!draft.product || ptAiBusy}
+                  title={t("delivery.productTypeAiHint")}
+                >
+                  {ptAiBusy ? <span className="spin" /> : `✨ ${t("delivery.productTypeAi")}`}
+                </button>
                 <button
                   type="button"
                   className="btn ghost sm"
@@ -771,8 +841,8 @@ export default function DeliveryStudio({
               <h3 style={{ fontSize: 12 }}>{t("delivery.ship")}</h3>
               <span className="sub">{t("delivery.shipSub")}</span>
               <div className="grow" style={{ flex: 1 }} />
-              <button className="btn sm" onClick={fillShipping} disabled={!draft.product}>
-                {t("delivery.shipFill")}
+              <button className="btn sm" onClick={fillShipping} disabled={!draft.product || shipBusy}>
+                {shipBusy ? <span className="spin" /> : t("delivery.shipFill")}
               </button>
             </div>
             <div className="card-b col" style={{ gap: 10 }}>
@@ -781,28 +851,48 @@ export default function DeliveryStudio({
                   {t("delivery.shipType")}
                   <input value={shopType} readOnly disabled placeholder={t("delivery.shipTypePh")} />
                 </label>
-                <label className="field" style={{ flex: "1 1 260px" }}>
+                <label className="field catpick" style={{ flex: "1 1 260px" }} ref={catBoxRef}>
                   {t("delivery.shipCategory")}
                   <input
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setCatOpen(true);
+                    }}
+                    onFocus={() => setCatOpen(true)}
                     placeholder={t("delivery.shipCategoryPh")}
-                    list="dl-shopcat"
+                    autoComplete="off"
                   />
-                  <datalist id="dl-shopcat">
-                    {(() => {
+                  {catOpen &&
+                    (() => {
                       const all = taxonomyQ.data?.paths ?? SHOPIFY_CATEGORY_PATHS;
                       const q = category.trim().toLowerCase();
                       const words = q.split(/\s+/).filter(Boolean);
-                      const list = q
-                        ? all.filter((p) => words.every((w) => p.toLowerCase().includes(w))).slice(0, 200)
-                        : (taxonomyQ.data?.paths
-                            ? SHOPIFY_CATEGORY_PATHS // sensible starter set until they type
-                            : all
-                          ).slice(0, 200);
-                      return list.map((p) => <option key={p} value={p} />);
+                      const list = (
+                        q ? all.filter((p) => words.every((w) => p.toLowerCase().includes(w))) : SHOPIFY_CATEGORY_PATHS
+                      ).slice(0, 80);
+                      return (
+                        <div className="catpick-panel">
+                          {list.length ? (
+                            list.map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                className={"catpick-item" + (p === category ? " active" : "")}
+                                onClick={() => {
+                                  setCategory(p);
+                                  setCatOpen(false);
+                                }}
+                              >
+                                {p}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="catpick-empty">{t("explorer.noMatch")}</div>
+                          )}
+                        </div>
+                      );
                     })()}
-                  </datalist>
                   {taxonomyQ.data && (
                     <span className="tiny muted">{t("delivery.taxonomyCount", { n: taxonomyQ.data.count.toLocaleString() })}</span>
                   )}

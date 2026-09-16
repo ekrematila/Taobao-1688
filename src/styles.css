@@ -453,6 +453,24 @@ pre.json {
   pointer-events: none;
 }
 .hinttip:hover .hinttip-pop, .hinttip:focus-within .hinttip-pop { opacity: 1; visibility: visible; transform: none; }
+/* Custom category combobox — native <datalist> popups clip/truncate long
+   Shopify-taxonomy paths to the input's width, so this renders its own panel
+   that wraps the full breadcrumb instead. */
+.catpick { position: relative; }
+.catpick-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 70;
+  width: max(100%, min(460px, 90vw)); max-height: 320px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px;
+  box-shadow: var(--shadow-lg); padding: 4px;
+}
+.catpick-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 7px 9px; border-radius: 7px; cursor: pointer;
+  font: 400 12px/1.4 var(--sans); color: var(--ink); white-space: normal; word-break: break-word;
+}
+.catpick-item:hover, .catpick-item.active { background: var(--accent-soft); }
+.catpick-empty { padding: 10px; font-size: 12px; color: var(--ink-faint); }
+
 .draft-hover-wrap { position: relative; display: block; }
 .draft-hover-pop {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
