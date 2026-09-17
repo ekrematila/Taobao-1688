@@ -46,8 +46,9 @@ export interface JobCtx {
   step(label: string): void;
   /** mark a planned step skipped ("çeviriye gerek yok") */
   skip(label: string): void;
-  /** stash a Manus task id so cancel() can also stop it remotely */
-  bindManusTask(taskId: string): void;
+  /** stash a Manus task id (+ which account created it) so cancel() can also
+   *  stop it remotely, correctly, from a later request with no account bound */
+  bindManusTask(taskId: string, manusKey?: string): void;
   throwIfCancelled(): void;
 }
 
@@ -154,9 +155,9 @@ async function execJob(j: JobInternal) {
       if (s) s.state = "skipped";
       touch();
     },
-    bindManusTask(taskId) {
+    bindManusTask(taskId, manusKey) {
       j.manusTaskId = taskId;
-      j.onCancel.push(() => stopManusTask(taskId).catch(() => {}));
+      j.onCancel.push(() => stopManusTask(taskId, manusKey).catch(() => {}));
     },
     throwIfCancelled() {
       if (j.ac.signal.aborted) throw new Cancelled();

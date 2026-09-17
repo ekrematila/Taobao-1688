@@ -42,6 +42,11 @@ export default function SettingsPage() {
 
   const [vClaude, setVClaude] = useState<VerifyClaudeResult | "loading" | null>(null);
   const [vManus, setVManus] = useState<VerifyManusResult | "loading" | null>(null);
+  const [newAcctLabel, setNewAcctLabel] = useState("");
+  const [newAcctKey, setNewAcctKey] = useState("");
+  const [addingAcct, setAddingAcct] = useState(false);
+  const [removingAcct, setRemovingAcct] = useState<number | null>(null);
+  const [acctVerify, setAcctVerify] = useState<Record<number, VerifyManusResult | "loading">>({});
   const [vShop, setVShop] = useState<VerifyShopifyResult | "loading" | null>(null);
 
   // guards the initial s.data -> state sync so it doesn't trigger an auto-save
@@ -179,6 +184,44 @@ export default function SettingsPage() {
       }
     } catch (e) {
       setVManus({ ok: false, credits: null, base: "", authMode: null, agentProfiles: [], note: "", error: (e as Error).message });
+    }
+  }
+  async function addManusAccount() {
+    if (!newAcctKey.trim()) return;
+    setAddingAcct(true);
+    try {
+      await api.addManusAccount(newAcctLabel.trim(), newAcctKey.trim());
+      setNewAcctLabel("");
+      setNewAcctKey("");
+      toast(t("settings.manusAcctAdded"), "ok");
+      s.refetch();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setAddingAcct(false);
+    }
+  }
+  async function removeManusAccount(index: number) {
+    setRemovingAcct(index);
+    try {
+      await api.removeManusAccount(index);
+      s.refetch();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setRemovingAcct(null);
+    }
+  }
+  async function verifyManusAccount(index: number) {
+    setAcctVerify((m) => ({ ...m, [index]: "loading" }));
+    try {
+      const r = await api.verifyManusAccount(index);
+      setAcctVerify((m) => ({ ...m, [index]: r }));
+    } catch (e) {
+      setAcctVerify((m) => ({
+        ...m,
+        [index]: { ok: false, credits: null, base: "", authMode: null, agentProfiles: [], note: "", error: (e as Error).message },
+      }));
     }
   }
   async function runVerifyShopify() {
@@ -446,6 +489,66 @@ export default function SettingsPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Additional Manus accounts — round-robin for real extra throughput */}
+        <div className="card">
+          <div className="card-h">
+            <h3>🖼➕ {t("settings.secManusAccounts")}</h3>
+            <span className="badge">{(s.data?.manusAccounts?.length ?? 0) + 1}</span>
+          </div>
+          <div className="card-b col" style={{ gap: 12 }}>
+            <p className="tiny muted">{t("settings.manusAccountsHint")}</p>
+            {s.data?.manusAccounts?.map((a, i) => (
+              <div key={i} className="col" style={{ gap: 6, padding: 8, border: "1px solid var(--line)", borderRadius: 8 }}>
+                <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <div className="row" style={{ gap: 8 }}>
+                    <b>{a.label}</b>
+                    <span className="badge mono">{a.keyHint}</span>
+                  </div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <button className="btn sm" onClick={() => verifyManusAccount(i)} disabled={acctVerify[i] === "loading"}>
+                      {acctVerify[i] === "loading" ? t("settings.verifying") : t("settings.verify")}
+                    </button>
+                    <button className="btn ghost sm" onClick={() => removeManusAccount(i)} disabled={removingAcct === i}>
+                      {removingAcct === i ? <span className="spin" /> : t("settings.clear")}
+                    </button>
+                  </div>
+                </div>
+                {acctVerify[i] && acctVerify[i] !== "loading" && (
+                  <div className="tiny">
+                    {(acctVerify[i] as VerifyManusResult).ok ? (
+                      <span className="ok-t">
+                        ✓ {t("settings.verifyOk")}
+                        {(acctVerify[i] as VerifyManusResult).credits != null &&
+                          ` · ${t("settings.manusBalanceLabel")}: ${(acctVerify[i] as VerifyManusResult).credits}`}
+                      </span>
+                    ) : (
+                      <span className="err-t">✗ {(acctVerify[i] as VerifyManusResult).error || t("settings.verifyFail")}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <input
+                value={newAcctLabel}
+                onChange={(e) => setNewAcctLabel(e.target.value)}
+                placeholder={t("settings.manusAcctLabelPlaceholder")}
+                style={{ maxWidth: 180 }}
+              />
+              <input
+                type="password"
+                value={newAcctKey}
+                onChange={(e) => setNewAcctKey(e.target.value)}
+                placeholder="mns-…"
+                style={{ maxWidth: 220 }}
+              />
+              <button className="btn sm primary" onClick={addManusAccount} disabled={addingAcct || !newAcctKey.trim()}>
+                {addingAcct ? <span className="spin" /> : t("settings.manusAcctAdd")}
+              </button>
+            </div>
           </div>
         </div>
 

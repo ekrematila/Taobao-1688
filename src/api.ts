@@ -67,6 +67,10 @@ export const api = {
   saveSettings: (patch: SettingsPatch) => post<Settings>("/settings", patch),
   verifyClaude: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/claude", { key }),
   verifyManus: (key?: string) => post<import("@shared/types.ts").VerifyManusResult>("/verify/manus", { key }),
+  addManusAccount: (label: string, key: string) => post<Settings>("/settings/manus-accounts", { label, key }),
+  removeManusAccount: (index: number) => req<Settings>(`/settings/manus-accounts/${index}`, { method: "DELETE" }),
+  verifyManusAccount: (index: number) =>
+    post<import("@shared/types.ts").VerifyManusResult>(`/settings/manus-accounts/${index}/verify`),
   verifyShopify: (domain?: string, token?: string) =>
     post<import("@shared/types.ts").VerifyShopifyResult>("/verify/shopify", { domain, token }),
 

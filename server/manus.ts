@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { env } from "./env.ts";
 import { getSetting } from "./db.ts";
 import { mediaPath } from "./imagestore.ts";
@@ -20,13 +21,97 @@ export class ManusError extends Error {
   }
 }
 
-/** Settings-page value wins over .env. */
-export function activeManusKey(): string {
+export interface ManusAccount {
+  label: string;
+  key: string;
+}
+
+const LEGACY_LABEL = "Varsayılan";
+
+function legacyManusKeyRaw(): string {
   return getSetting("manus_key") || env.manusKey;
+}
+
+/** Every configured Manus account — the legacy single key (Settings' main
+ *  Manus card) as account #1 if set, plus whatever additional accounts were
+ *  added below it. Multiple accounts each get their OWN 10/min task.create
+ *  allowance (Manus's limit is pooled per account, not raised by plan tier
+ *  or by more keys on the SAME account — see open.manus.ai/docs/v2/rate-limits),
+ *  so round-robining across real separate accounts genuinely multiplies
+ *  batch-translation throughput. */
+export function manusAccountPool(): ManusAccount[] {
+  const pool: ManusAccount[] = [];
+  const legacy = legacyManusKeyRaw();
+  if (legacy) pool.push({ label: LEGACY_LABEL, key: legacy });
+  const raw = getSetting("manus_accounts");
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const a of parsed) {
+          const key = String((a as any)?.key || "").trim();
+          if (key) pool.push({ label: String((a as any)?.label || "").trim() || `Hesap ${pool.length + 1}`, key });
+        }
+      }
+    } catch {
+      /* corrupt JSON — ignore, legacy key (if any) still works */
+    }
+  }
+  return pool;
+}
+
+/** Settings-page value wins over .env; falls back to the first configured
+ *  additional account if the legacy single-key field is empty. For anywhere
+ *  that isn't multi-account-aware (a bare "is Manus configured at all?"
+ *  check, or a call made outside any `withManusAccount` binding). */
+export function activeManusKey(): string {
+  return legacyManusKeyRaw() || manusAccountPool()[0]?.key || "";
 }
 
 export function manusConfigured(): boolean {
   return Boolean(activeManusKey());
+}
+
+let rrCursor = 0;
+/** Round-robins across configured accounts — each independent Manus
+ *  operation (each image in a translate batch, each single edit/compose
+ *  call) gets the next account in rotation, spreading task.create calls
+ *  across every account's own rate-limit allowance instead of queuing
+ *  behind just one. */
+function pickManusAccount(): ManusAccount | null {
+  const pool = manusAccountPool();
+  if (!pool.length) return null;
+  const acct = pool[rrCursor % pool.length];
+  rrCursor = (rrCursor + 1) % pool.length;
+  return acct;
+}
+
+const manusAccountContext = new AsyncLocalStorage<ManusAccount>();
+
+/** Bind ONE Manus account for the entire lifetime of `fn` — task.create,
+ *  every task.listMessages poll, task.stop, and the result-file download
+ *  all have to use the SAME account, since a task created under one
+ *  account can't be read back with another's key. Call this once around
+ *  each independent Manus operation (see call sites in index.ts); nested
+ *  calls (e.g. runManusTask() called from inside an already-wrapped
+ *  translateImage()) just reuse whatever account is already bound. */
+export function withManusAccount<T>(fn: () => Promise<T>): Promise<T> {
+  const existing = manusAccountContext.getStore();
+  if (existing) return fn();
+  const acct = pickManusAccount();
+  if (!acct) return fn(); // nothing configured — let the usual "not configured" errors fire naturally
+  return manusAccountContext.run(acct, fn);
+}
+
+/** The account bound by the nearest enclosing `withManusAccount`, for
+ *  anything (job cancellation) that needs to remember it past the original
+ *  call's own lifetime — see bindManusTask/stopManusTask. */
+export function boundManusAccount(): ManusAccount | null {
+  return manusAccountContext.getStore() ?? null;
+}
+
+function currentManusKey(): string {
+  return manusAccountContext.getStore()?.key || activeManusKey();
 }
 
 /** Manus v2 accepts an API key (`x-manus-api-key`) OR an OAuth token (`Authorization: Bearer`). */
@@ -62,19 +147,27 @@ const RATE_LIMIT_BACKOFF_MS = [5000, 15000, 40000];
  * (5s/15s/40s) — the real source of the "one at a time" feeling. 6500ms
  * keeps us under 10/min with margin; CONCURRENCY still lets multiple tasks
  * run/poll at once once they're created, this only paces the creates. 0 disables.
+ *
+ * Paced PER ACCOUNT (keyed by which key is bound via withManusAccount) —
+ * the 10/min cap is per Manus account, so N accounts genuinely get N times
+ * the creation throughput; a single shared gate would defeat the whole
+ * point of configuring more than one account.
  */
 const TASK_SPAWN_GAP_MS = Math.max(0, Number(process.env.MANUS_TASK_SPAWN_GAP_MS) || 6500);
-let spawnChain: Promise<void> = Promise.resolve();
-let lastSpawnAt = 0;
-/** Serialise + space out task.create calls across all concurrent jobs. */
+const spawnChains = new Map<string, Promise<void>>();
+const lastSpawnAt = new Map<string, number>();
+/** Serialise + space out task.create calls, per account, across all concurrent jobs. */
 function throttleTaskSpawn(): Promise<void> {
   if (!TASK_SPAWN_GAP_MS) return Promise.resolve();
-  spawnChain = spawnChain.then(async () => {
-    const wait = lastSpawnAt + TASK_SPAWN_GAP_MS - Date.now();
+  const acctKey = currentManusKey() || "";
+  const chain = spawnChains.get(acctKey) ?? Promise.resolve();
+  const next = chain.then(async () => {
+    const wait = (lastSpawnAt.get(acctKey) ?? 0) + TASK_SPAWN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastSpawnAt = Date.now();
+    lastSpawnAt.set(acctKey, Date.now());
   });
-  return spawnChain;
+  spawnChains.set(acctKey, next);
+  return next;
 }
 
 async function callManus(path: string, init: RequestInit, key: string, mode: ManusAuthMode) {
@@ -93,7 +186,7 @@ async function callManus(path: string, init: RequestInit, key: string, mode: Man
 }
 
 async function mfetch(path: string, init: RequestInit = {}): Promise<any> {
-  const key = activeManusKey();
+  const key = currentManusKey();
   if (!key) throw new ManusError("MANUS_API_KEY ayarlı değil.", 400);
 
   let last: { res: Response; json: any } | null = null;
@@ -420,15 +513,29 @@ export async function manusUsageList(maxPages = 6): Promise<{ rows: ManusUsageRo
   return { rows, truncated: true };
 }
 
-/** Public balance lookup for the settings/usage screens. */
-export function manusCredits(): Promise<number | null> {
-  if (!activeManusKey()) return Promise.resolve(null);
-  return availableCredits();
+/** Public balance lookup for the settings/usage screens — summed across every
+ *  configured account, since with more than one that's the real total the
+ *  operator has to spend. */
+export async function manusCredits(): Promise<number | null> {
+  const pool = manusAccountPool();
+  if (!pool.length) return null;
+  let sum = 0;
+  let any = false;
+  for (const acct of pool) {
+    const v = await manusAccountContext.run(acct, () => availableCredits());
+    if (typeof v === "number") {
+      sum += v;
+      any = true;
+    }
+  }
+  return any ? sum : null;
 }
 
-/** Auth headers for fetching Manus-hosted result files (uses the mode that worked). */
+/** Auth headers for fetching Manus-hosted result files (uses the mode that worked).
+ *  Reads whichever account is currently bound via withManusAccount — call
+ *  this from within the same operation that created the task/result. */
 export function manusFileAuthHeaders(): Record<string, string> {
-  const key = activeManusKey();
+  const key = currentManusKey();
   return key ? manusAuthHeaders(key, cachedAuthMode ?? "apikey") : {};
 }
 
@@ -534,7 +641,7 @@ export async function runManusTask(
   });
   const taskId: string = created.task_id;
   const taskUrl: string = created.task_url || "";
-  ctx?.bindManusTask(taskId);
+  ctx?.bindManusTask(taskId, currentManusKey());
 
   const started = Date.now();
   let cursor: string | undefined;
@@ -616,8 +723,13 @@ export async function runManusTask(
   return { taskId, taskUrl, text, attachments, structured, creditsUsed, creditsEstimated };
 }
 
-export async function stopManusTask(taskId: string): Promise<void> {
-  await mfetch("/v2/task.stop", { method: "POST", body: JSON.stringify({ task_id: taskId }) });
+/** `key` is required when calling from OUTSIDE the original task's own
+ *  withManusAccount scope (e.g. a later job-cancellation request) — the task
+ *  can only be stopped with the same account's key that created it. */
+export async function stopManusTask(taskId: string, key?: string): Promise<void> {
+  const call = () => mfetch("/v2/task.stop", { method: "POST", body: JSON.stringify({ task_id: taskId }) });
+  if (key && !manusAccountContext.getStore()) return manusAccountContext.run({ label: "", key }, call);
+  await call();
 }
 
 export type ManusSpeed = "fast" | "medium" | "slow";
@@ -696,6 +808,8 @@ export async function translateImage(opts: {
   const prompt = [
     `Look at this product photo. Find any Chinese text that was ADDED ON TOP of the photo (headlines, captions, labels, banner text, badges) and translate it into ${targetLanguage}, in the EXACT SAME visual style it already has — same font weight/look, same colour or gradient, same outline/shadow/glow, same size, same position. Fully erase the original glyphs first (no ghosting) before placing the ${targetLanguage} text.`,
     `REMOVE (do not translate) shop/seller names, watermarks, and off-topic marketplace text (Taobao/Tmall/1688/Pinduoduo, WeChat/QQ/phone numbers, QR codes, "scan to buy") — cleanly reconstruct whatever was behind them.`,
+    `REMOVE any watermark overlaid on the photo (a semi-transparent repeating mark, a corner/center stamp, a photographer or studio credit) — cleanly reconstruct whatever was behind it.`,
+    `REMOVE any logo overlaid on the photo as a graphic badge/sticker (a shop's or brand's logo stamped on top of the image) — cleanly reconstruct whatever was behind it. A logo that is part of the PRODUCT ITSELF (printed/molded/embroidered onto the product) is not overlay — leave that alone, per the rule below.`,
     `If what looks like Chinese is actually part of the product's OWN physical design (printed or molded onto the product itself, not text overlaid on the photo — e.g. a keycap's own legend), leave the product exactly as it is. Do not translate or touch it.`,
     `Everything that is not overlay text — the product, the background, every other pixel — must come back visually identical.`,
     productContext ? `Product context (for correct terminology): ${productContext.slice(0, 400)}` : "",

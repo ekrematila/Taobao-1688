@@ -84,6 +84,8 @@ import {
   manusUsageList,
   activeManusKey,
   manusFileAuthHeaders,
+  manusAccountPool,
+  withManusAccount,
   translateImage,
   editImageManus,
   editVideoManus,
@@ -247,6 +249,7 @@ async function currentSettings(): Promise<Settings> {
     manusBase: env.manusBase,
     manusUsdPerCredit: manusUsdPerCredit(),
     manusCredits: await manusCredits(),
+    manusAccounts: readManusAccounts().map((a) => ({ label: a.label, keyHint: mask(a.key) })),
     anthropicBalanceUsd: Number(getSetting("anthropic_balance_usd")) || 0,
     hasShopify: shopifyConfigured(),
     shopifyDomain: activeShopifyDomain(),
@@ -280,6 +283,19 @@ function readProductTypes(): string[] {
   }
   const seen = new Set<string>();
   return [...DEFAULT_PRODUCT_TYPES, ...saved].filter((x) => x && !seen.has(x) && (seen.add(x), true));
+}
+
+/** Additional Manus accounts (beyond the main key) — raw, server-side only. */
+function readManusAccounts(): { label: string; key: string }[] {
+  try {
+    const raw = JSON.parse(getSetting("manus_accounts") ?? "[]");
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((a: any) => ({ label: String(a?.label || "").trim(), key: String(a?.key || "").trim() }))
+      .filter((a) => a.key);
+  } catch {
+    return [];
+  }
 }
 
 router.get(
@@ -402,6 +418,51 @@ router.post(
   "/api/verify/manus",
   wrap(async (req, res) => res.json(await verifyManus(String(req.body?.key || "") || undefined))),
 );
+
+/** Add one more Manus account beyond the main key — round-robins into batch
+ *  translations for real extra throughput (each account has its own 10/min
+ *  task.create allowance). Append-only by design: never touches existing
+ *  accounts, so a save here can't accidentally wipe one the client can't see
+ *  (only a masked hint is ever sent back). */
+router.post(
+  "/api/settings/manus-accounts",
+  wrap(async (req, res) => {
+    const key = String(req.body?.key || "").trim();
+    if (!key) return res.status(400).json({ error: "API key gerekli." });
+    const list = readManusAccounts();
+    const label = String(req.body?.label || "").trim().slice(0, 60) || `Hesap ${list.length + 1}`;
+    list.push({ label, key });
+    setSetting("manus_accounts", JSON.stringify(list.slice(0, 20)));
+    res.json(await currentSettings());
+  }),
+);
+
+/** Remove one additional Manus account by its position in the list (the
+ *  main key above isn't part of this list and can't be removed here). */
+router.delete(
+  "/api/settings/manus-accounts/:index",
+  wrap(async (req, res) => {
+    const idx = Number(req.params.index);
+    const list = readManusAccounts();
+    if (!Number.isInteger(idx) || idx < 0 || idx >= list.length) return res.status(400).json({ error: "Geçersiz hesap." });
+    list.splice(idx, 1);
+    setSetting("manus_accounts", JSON.stringify(list));
+    res.json(await currentSettings());
+  }),
+);
+
+/** Verify an already-saved additional account by position — reads its key
+ *  server-side so the raw value never has to round-trip to the client. */
+router.post(
+  "/api/settings/manus-accounts/:index/verify",
+  wrap(async (req, res) => {
+    const idx = Number(req.params.index);
+    const list = readManusAccounts();
+    if (!Number.isInteger(idx) || idx < 0 || idx >= list.length) return res.status(400).json({ error: "Geçersiz hesap." });
+    res.json(await verifyManus(list[idx].key));
+  }),
+);
+
 router.post(
   "/api/verify/shopify",
   wrap(async (req, res) =>
@@ -689,14 +750,16 @@ router.post(
           targetLanguage,
         });
       } else {
-        const mr = await researchCategoryManus({
-          productTitle: draft.product!.titleTranslated || draft.product!.title,
-          props: draft.product!.props,
-          question: String(question || ""),
-          targetLanguage: targetLanguage || "English",
-          agentProfile: typeof agentProfile === "string" ? agentProfile : undefined,
-          ctx,
-        });
+        const mr = await withManusAccount(() =>
+          researchCategoryManus({
+            productTitle: draft.product!.titleTranslated || draft.product!.title,
+            props: draft.product!.props,
+            question: String(question || ""),
+            targetLanguage: targetLanguage || "English",
+            agentProfile: typeof agentProfile === "string" ? agentProfile : undefined,
+            ctx,
+          }),
+        );
         if (mr.taskId)
           logManusUsage("category-research", mr.creditsUsed, mr.creditsEstimated, draft.id, mr.taskId, {
             text: mr.research,
@@ -886,13 +949,15 @@ router.post(
         ctx.throwIfCancelled();
         ctx.step(`Görsel ${i + 1}/${urls.length} — alt metin`);
         try {
-          const r = await altTextManus({
-            imageUrl: urls[i],
-            productContext: context,
-            targetLanguage: target,
-            instruction: instruction ? String(instruction) : undefined,
-            ctx,
-          });
+          const r = await withManusAccount(() =>
+            altTextManus({
+              imageUrl: urls[i],
+              productContext: context,
+              targetLanguage: target,
+              instruction: instruction ? String(instruction) : undefined,
+              ctx,
+            }),
+          );
           results.push({ url: r.sourceUrl, alt: r.alt });
           totalCredits += r.creditsUsed;
           // always log so the task_id is recorded — the dashboard reconciles the
@@ -1016,34 +1081,39 @@ router.post(
           if (i >= urls.length) return;
           ctx.throwIfCancelled();
           try {
-            const r = await translateImage({
-              imageUrl: urls[i],
-              targetLanguage: target,
-              productContext: context,
-              instruction,
-              speed,
-              agentProfile,
-              ctx,
-            });
-            if (r.taskId)
-              logManusUsage("translate-image", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, {
-                from: urls[i],
-                to: r.resultUrl,
-                changed: r.changed,
-                model: r.model,
-                taskUrl: r.taskUrl,
+            // one account bound for this image's whole lifecycle — create,
+            // poll, AND the result-file download in applyOne() below, which
+            // all have to agree on the same Manus account.
+            await withManusAccount(async () => {
+              const r = await translateImage({
+                imageUrl: urls[i],
+                targetLanguage: target,
+                productContext: context,
+                instruction,
+                speed,
+                agentProfile,
+                ctx,
               });
-            items[i] = r;
-            if (r.changed) {
-              await applyOne(r); // reflect this image in the app right now
-              done++;
-              console.log(`[translate-images] #${i + 1}/${urls.length} OK model=${r.model} task=${r.taskUrl || r.taskId}`);
-              ctx.step(labels[done - 1]);
-            } else {
-              done++;
-              console.warn(`[translate-images] #${i + 1}/${urls.length} NO IMAGE (no change) task=${r.taskUrl || r.taskId}`);
-              ctx.skip(labels[done - 1]);
-            }
+              if (r.taskId)
+                logManusUsage("translate-image", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, {
+                  from: urls[i],
+                  to: r.resultUrl,
+                  changed: r.changed,
+                  model: r.model,
+                  taskUrl: r.taskUrl,
+                });
+              items[i] = r;
+              if (r.changed) {
+                await applyOne(r); // reflect this image in the app right now
+                done++;
+                console.log(`[translate-images] #${i + 1}/${urls.length} OK model=${r.model} task=${r.taskUrl || r.taskId}`);
+                ctx.step(labels[done - 1]);
+              } else {
+                done++;
+                console.warn(`[translate-images] #${i + 1}/${urls.length} NO IMAGE (no change) task=${r.taskUrl || r.taskId}`);
+                ctx.skip(labels[done - 1]);
+              }
+            });
           } catch (e) {
             if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
             console.error(`[translate-images] #${i + 1}/${urls.length} FAILED:`, (e as Error).message);
@@ -1120,31 +1190,33 @@ router.post(
         ctx.throwIfCancelled();
         ctx.step(`Görsel ${i + 1}/${urls.length} düzenleniyor`);
         try {
-          const r = await editImageManus({
-            imageUrl: urls[i],
-            instruction: String(instruction),
-            productContext: context,
-            imageSpec,
-            speed,
-            agentProfile,
-            ctx,
-          });
-          totalCredits += r.creditsUsed;
-          if (r.taskId)
-            logManusUsage("edit-image", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, {
-              from: urls[i],
-              to: r.resultUrl,
-              taskUrl: r.taskUrl,
+          await withManusAccount(async () => {
+            const r = await editImageManus({
+              imageUrl: urls[i],
+              instruction: String(instruction),
+              productContext: context,
+              imageSpec,
+              speed,
+              agentProfile,
+              ctx,
             });
-          if (r.resultUrl) {
-            let persisted = r.resultUrl;
-            try {
-              persisted = await persistFromUrl(r.resultUrl, manusFileAuthHeaders());
-            } catch {
-              /* keep ephemeral */
+            totalCredits += r.creditsUsed;
+            if (r.taskId)
+              logManusUsage("edit-image", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, {
+                from: urls[i],
+                to: r.resultUrl,
+                taskUrl: r.taskUrl,
+              });
+            if (r.resultUrl) {
+              let persisted = r.resultUrl;
+              try {
+                persisted = await persistFromUrl(r.resultUrl, manusFileAuthHeaders());
+              } catch {
+                /* keep ephemeral */
+              }
+              map.push({ from: urls[i], to: persisted, remote: r.resultUrl || undefined });
             }
-            map.push({ from: urls[i], to: persisted, remote: r.resultUrl || undefined });
-          }
+          });
         } catch (e) {
           if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
           /* skip one */
@@ -1182,7 +1254,7 @@ router.post(
     if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
     const url = String(brandUrl || "").trim();
     if (!/^https?:\/\/.+\..+/.test(url)) return res.status(400).json({ error: "Geçerli bir marka web sitesi adresi girin." });
-    const jobId = startJob("research-brand", async (ctx) => {
+    const jobId = startJob("research-brand", (ctx) => withManusAccount(async () => {
       ctx.plan(["Marka sitesi araştırılıyor", "Yaratıcı brief yazılıyor"]);
       ctx.step("Marka sitesi araştırılıyor");
       const r = await researchBrandManus({
@@ -1196,7 +1268,7 @@ router.post(
       setSetting("brand_url", url);
       setSetting("brand_brief", r.brief);
       return { brief: r.brief, taskUrl: r.taskUrl, credits: r.creditsUsed };
-    });
+    }));
     res.json({ jobId });
   }),
 );
@@ -1213,7 +1285,7 @@ router.post(
     if (!urls.length) return res.status(400).json({ error: "En az bir kaynak görsel seçin." });
     const context = `${draft.product.titleTranslated || draft.product.title}. ${layoutNote(detectKeyboardLayout(draft.product), "en")}`;
 
-    const jobId = startJob("compose-image", async (ctx) => {
+    const jobId = startJob("compose-image", (ctx) => withManusAccount(async () => {
       ctx.plan(["Kaynak görseller hazırlanıyor", "Yeni görsel oluşturuluyor", "Kaydediliyor"]);
       ctx.step("Yeni görsel oluşturuluyor");
       const r = await composeImagesManus({
@@ -1240,7 +1312,7 @@ router.post(
         /* keep ephemeral url */
       }
       return { url, remoteUrl: r.resultUrl, taskUrl: r.taskUrl, credits: r.creditsUsed };
-    });
+    }));
     res.json({ jobId });
   }),
 );
@@ -1256,7 +1328,7 @@ router.post(
     if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
     if (!String(instruction || "").trim()) return res.status(400).json({ error: "Komut boş." });
     const context = `${draft.product.titleTranslated || draft.product.title}. ${layoutNote(detectKeyboardLayout(draft.product), "en")}`;
-    const jobId = startJob("edit-video", async (ctx) => {
+    const jobId = startJob("edit-video", (ctx) => withManusAccount(async () => {
       ctx.plan(["Video hazırlanıyor", "AI düzenliyor", "Kaydediliyor"]);
       ctx.step("AI düzenliyor");
       const r = await editVideoManus({
@@ -1297,7 +1369,7 @@ router.post(
         );
       });
       return { url, remoteUrl: r.resultUrl, taskUrl: r.taskUrl, credits: r.creditsUsed };
-    });
+    }));
     res.json({ jobId });
   }),
 );
@@ -1337,13 +1409,15 @@ router.post(
         });
         return { alt: altText, credits: 0 };
       }
-      const r = await videoAltManus({
-        videoUrl: p.videoUrl!,
-        productContext: context,
-        targetLanguage: lang,
-        agentProfile: typeof agentProfile === "string" ? agentProfile : undefined,
-        ctx,
-      });
+      const r = await withManusAccount(() =>
+        videoAltManus({
+          videoUrl: p.videoUrl!,
+          productContext: context,
+          targetLanguage: lang,
+          agentProfile: typeof agentProfile === "string" ? agentProfile : undefined,
+          ctx,
+        }),
+      );
       if (r.taskId) logManusUsage("video-alt", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, { alt: r.alt });
       await withDraftLock(draft.id, async () => {
         const fresh = getDraft(draft.id)!;

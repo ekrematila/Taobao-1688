@@ -308,6 +308,10 @@ export interface Settings {
   manusBase: string;
   manusUsdPerCredit: number;
   manusCredits: number | null;
+  /** additional Manus accounts beyond the main key above — each gets its own
+   *  10/min task.create allowance, so batch translations round-robin across
+   *  all of them (main key + these) for real extra throughput */
+  manusAccounts: { label: string; keyHint: string }[];
   /** manually entered Anthropic prepaid balance in USD (no API for it); 0 = unset */
   anthropicBalanceUsd: number;
   hasShopify: boolean;
