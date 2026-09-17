@@ -53,7 +53,7 @@ async function getJson(url: string, ms = 5000): Promise<{ ok: boolean; status: n
  */
 export async function pairEtsyApp(rawUrl?: string): Promise<{ url: string; connected: boolean }> {
   const base = (rawUrl || etsyAppBaseUrl()).replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(base)) throw new EtsyAppError("Geçerli bir adres gir (ör. http://localhost:4317).", 400);
+  if (!/^https?:\/\//i.test(base)) throw new EtsyAppError("Geçerli bir adres gir (ör. https://keyartisan.us/etsy-shopify).", 400);
   const { ok, status, json } = await getJson(`${base}${PATH}`);
   if (!ok) throw new EtsyAppError(`Etsy uygulaması ${status} döndü — adres doğru mu? (${base})`, 502);
   if (!json?.key) throw new EtsyAppError("Etsy uygulaması eşleşme anahtarı vermedi (sürümü güncel mi?).", 502);

@@ -59,8 +59,8 @@ export const env = {
   previewReferenceUrl:
     process.env.PREVIEW_REFERENCE_URL || "https://keyartisan.net/products/cool-harry-potter-theme-keycap-set",
   // where the browser reaches this app (front-end origin) — used to build the
-  // Shopify OAuth redirect_uri. Vite proxies /api → the API server.
-  appPublicUrl: (process.env.APP_PUBLIC_URL || "http://localhost:5173").replace(/\/+$/, ""),
+  // Shopify OAuth redirect_uri. In dev, Vite proxies /api → the API server.
+  appPublicUrl: (process.env.APP_PUBLIC_URL || "https://keyartisan.us/product-studio").replace(/\/+$/, ""),
 };
 
 export function mask(value: string): string {
