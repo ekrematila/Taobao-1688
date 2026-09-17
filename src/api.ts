@@ -70,6 +70,9 @@ export const api = {
   verifyShopify: (domain?: string, token?: string) =>
     post<import("@shared/types.ts").VerifyShopifyResult>("/verify/shopify", { domain, token }),
 
+  pairProduction: (url: string, password: string) => post<{ url: string }>("/settings/pair-production", { url, password }),
+  pushProduction: () => post<{ url: string; fields: number }>("/settings/push-production"),
+
   endpoints: () => req<OneboundEndpoint[]>("/onebound/endpoints"),
   taxonomy: () => req<{ count: number; paths: string[]; attrCount: number }>("/taxonomy"),
   taxonomyAttributes: (params: { draftId?: string; category?: string }) =>
@@ -107,7 +110,8 @@ export const api = {
 
   etsyAppStatus: () => req<{ configured: boolean; url: string; reachable: boolean }>("/etsy-app/status"),
   pairEtsyApp: (url?: string) => post<{ url: string; connected: boolean }>("/etsy-app/pair", { url }),
-  pushEtsyApp: (draftId: string, dryRun = false) =>
+  etsyAppShops: () => req<{ shops: { id: string; name: string }[] }>("/etsy-app/shops"),
+  pushEtsyApp: (draftId: string, shopId: string, dryRun = false) =>
     post<{
       ok?: boolean;
       dryRun?: boolean;
@@ -118,8 +122,9 @@ export const api = {
       images?: number;
       variants?: number;
       message?: string;
+      shop?: { id: string; name: string };
       wouldCreate?: { title?: string; price?: number | null; images?: number; variants?: number };
-    }>("/etsy-app/push", { draftId, dryRun }),
+    }>("/etsy-app/push", { draftId, shopId, dryRun }),
 
   usage: (range?: { from?: string; to?: string }) =>
     req<UsageDashboard>("/usage" + qs(range)),

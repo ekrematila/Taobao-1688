@@ -208,11 +208,9 @@ export function activeModel(): string {
   return getSetting("llm_model") || env.llmModel || "claude-sonnet-5";
 }
 export function activeEffort(): Effort {
-  // Default bumped from "high" to "max" — the operator asked for the AI to
-  // think harder and follow instructions completely by default, not just
-  // "balanced". Still fully overridable per-generation or in Settings.
-  const v = (getSetting("llm_effort") || process.env.LLM_EFFORT || "max") as Effort;
-  return EFFORT_LEVELS.includes(v) ? v : "max";
+  // Default is "high" — fully overridable per-generation or in Settings.
+  const v = (getSetting("llm_effort") || process.env.LLM_EFFORT || "high") as Effort;
+  return EFFORT_LEVELS.includes(v) ? v : "high";
 }
 export function activeThinking(): ThinkingMode {
   const v = getSetting("llm_thinking") || process.env.LLM_THINKING || "adaptive";

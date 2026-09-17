@@ -330,6 +330,10 @@ export interface Settings {
   brandBrief: string;
   /** saved product-type presets for the Delivery "Ürün türü" field (built-ins + operator-added) */
   productTypes: string[];
+  /** address of the paired instance this one pushes its AI/API settings to (e.g. production) */
+  productionUrl: string;
+  /** true once paired (url + exchanged sync key both known) */
+  productionConnected: boolean;
 }
 
 export interface SettingsPatch {
@@ -360,6 +364,7 @@ export interface SettingsPatch {
   brandBrief?: string;
   /** full replacement list of operator-added product-type presets */
   productTypes?: string[];
+  clearProduction?: boolean;
 }
 
 export interface VerifyClaudeResult {

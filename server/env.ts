@@ -53,7 +53,7 @@ export const env = {
   shopifyApiVersion: process.env.SHOPIFY_API_VERSION || "2025-01",
 
   // "Etsy Command Center" companion app — receives an Etsy draft on one click.
-  etsyAppUrl: (process.env.ETSY_APP_URL || "http://localhost:4317").replace(/\/+$/, ""),
+  etsyAppUrl: (process.env.ETSY_APP_URL || "https://keyartisan.us/etsy-shopify").replace(/\/+$/, ""),
   etsyAppKey: process.env.ETSY_APP_KEY || "",
 
   previewReferenceUrl:
@@ -65,6 +65,6 @@ export const env = {
 
 export function mask(value: string): string {
   if (!value) return "";
-  if (value.length <= 6) return "•".repeat(value.length);
-  return value.slice(0, 3) + "•".repeat(Math.max(3, value.length - 6)) + value.slice(-3);
+  if (value.length <= 10) return "•".repeat(value.length);
+  return value.slice(0, 5) + "•".repeat(Math.max(3, value.length - 10)) + value.slice(-5);
 }

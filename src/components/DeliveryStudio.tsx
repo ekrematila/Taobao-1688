@@ -140,6 +140,8 @@ export default function DeliveryStudio({
   const [researchQ, setResearchQ] = useState("");
   const [researchManusProfile, setResearchManusProfile] = useState<"manus-1.6-lite" | "manus-1.6" | "manus-1.6-max">("manus-1.6");
   const [confirmGate, setConfirmGate] = useState<null | boolean>(null);
+  const [etsyShopId, setEtsyShopId] = useState("");
+  const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
   const [hoverLayout, setHoverLayout] = useState<string | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState("");
@@ -153,6 +155,14 @@ export default function DeliveryStudio({
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: api.settings });
   // the COMPLETE Shopify taxonomy (bundled, ~14.6k paths) for the Category picker
   const taxonomyQ = useQuery({ queryKey: ["taxonomy"], queryFn: api.taxonomy, staleTime: 24 * 60 * 60 * 1000 });
+  // connected Etsy shops on the companion app — a push must always name one explicitly.
+  const etsyShopsQ = useQuery({
+    queryKey: ["etsyAppShops"],
+    queryFn: api.etsyAppShops,
+    enabled: channel === "etsy",
+    staleTime: 5 * 60 * 1000,
+  });
+  const etsyShops = etsyShopsQ.data?.shops ?? [];
   const productTypeOpts = settingsQ.data?.productTypes ?? DEFAULT_PRODUCT_TYPES;
   const ptNorm = productType.trim().toLowerCase();
   const canSavePt = ptNorm.length > 0 && ptNorm.length <= 40 && !productTypeOpts.includes(ptNorm);
@@ -560,7 +570,20 @@ export default function DeliveryStudio({
     }
   }
 
-  async function pushEtsy() {
+  /** Multiple Etsy shops can be paired on the companion app now — a push must
+   *  always name one explicitly, and the operator gets one last "emin misiniz?"
+   *  look at exactly which shop + category it's headed to before it fires. */
+  function pushEtsy() {
+    if (!etsyShopId) {
+      toast(t("delivery.etsyShopRequired"), "err");
+      return;
+    }
+    const shopName = etsyShops.find((s) => s.id === etsyShopId)?.name || etsyShopId;
+    setEtsyPushConfirm({ shopId: etsyShopId, shopName });
+  }
+
+  async function doPushEtsy(shopId: string) {
+    setEtsyPushConfirm(null);
     setBusy("push-etsy");
     try {
       // self-healing pairing: the pair endpoint just re-reads the companion app's
@@ -573,7 +596,7 @@ export default function DeliveryStudio({
       } catch {
         /* fall through */
       }
-      const r = await api.pushEtsyApp(draft.id);
+      const r = await api.pushEtsyApp(draft.id, shopId);
       qc.invalidateQueries({ queryKey: ["settings"] });
       toast(r.message || t("delivery.pushEtsyAppDone"), "ok");
       if (r.openUrl) window.open(r.openUrl, "_blank");
@@ -1435,9 +1458,27 @@ export default function DeliveryStudio({
                 </button>
               )}
               {channel === "etsy" && (
-                <button className="btn" onClick={pushEtsy} disabled={!!busy}>
-                  {busy === "push-etsy" ? <span className="spin" /> : t("delivery.pushEtsyApp")}
-                </button>
+                <div className="row" style={{ alignItems: "center" }}>
+                  <select
+                    className="input sm"
+                    value={etsyShopId}
+                    onChange={(e) => setEtsyShopId(e.target.value)}
+                    disabled={!!busy || etsyShopsQ.isLoading}
+                  >
+                    <option value="">{t("delivery.etsyShopPick")}</option>
+                    {etsyShops.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn" onClick={pushEtsy} disabled={!!busy}>
+                    {busy === "push-etsy" ? <span className="spin" /> : t("delivery.pushEtsyApp")}
+                  </button>
+                  {!etsyShopsQ.isLoading && etsyShops.length === 0 && (
+                    <span className="tiny muted">{t("delivery.etsyShopsEmpty")}</span>
+                  )}
+                </div>
               )}
             </>
           ) : (
@@ -1456,6 +1497,28 @@ export default function DeliveryStudio({
                 {t("common.cancel")}
               </button>
               <button className="btn primary" onClick={() => applyGateNow(confirmGate)}>
+                {t("common.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {etsyPushConfirm && (
+        <div className="modal-scrim" onClick={() => setEtsyPushConfirm(null)}>
+          <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("delivery.etsyPushConfirmTitle")}</h3>
+            <p className="sub">
+              {t("delivery.etsyPushConfirmBody", {
+                shop: etsyPushConfirm.shopName,
+                category: category || productType || "—",
+              })}
+            </p>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button className="btn" onClick={() => setEtsyPushConfirm(null)}>
+                {t("common.cancel")}
+              </button>
+              <button className="btn primary" onClick={() => doPushEtsy(etsyPushConfirm.shopId)}>
                 {t("common.confirm")}
               </button>
             </div>

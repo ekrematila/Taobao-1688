@@ -6,6 +6,9 @@ import { useToast } from "../toast";
 import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
 
+/** This operator's two Shopify stores — quick-pick instead of retyping. */
+const SHOPIFY_DOMAIN_PRESETS = ["343d10-7c.myshopify.com", "0sk8vz-7m.myshopify.com"];
+
 export default function SettingsPage() {
   const { t } = useI18n();
   const toast = useToast();
@@ -27,8 +30,12 @@ export default function SettingsPage() {
   const [shopToken, setShopToken] = useState("");
   const [shopClientId, setShopClientId] = useState("");
   const [shopClientSecret, setShopClientSecret] = useState("");
-  const [etsyUrl, setEtsyUrl] = useState("http://localhost:4317");
+  const [etsyUrl, setEtsyUrl] = useState("https://keyartisan.us/etsy-shopify");
   const [pairing, setPairing] = useState(false);
+  const [prodUrl, setProdUrl] = useState("https://keyartisan.us/product-studio");
+  const [prodPassword, setProdPassword] = useState("");
+  const [prodPairing, setProdPairing] = useState(false);
+  const [prodPushing, setProdPushing] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [vClaude, setVClaude] = useState<VerifyClaudeResult | "loading" | null>(null);
@@ -63,6 +70,7 @@ export default function SettingsPage() {
       setClaudeBalance(s.data.anthropicBalanceUsd);
       setAutoPush(s.data.autoPushShopify);
       if (s.data.etsyAppUrl) setEtsyUrl(s.data.etsyAppUrl);
+      if (s.data.productionUrl) setProdUrl(s.data.productionUrl);
       hydrated.current = true;
     }
   }, [s.data]);
@@ -463,6 +471,21 @@ export default function SettingsPage() {
                 placeholder={s.data?.shopifyDomain || "343d10-7c.myshopify.com"}
               />
             </label>
+            <div className="chips" style={{ marginTop: -4 }}>
+              {SHOPIFY_DOMAIN_PRESETS.map((d) => (
+                <span
+                  key={d}
+                  className={"chip" + (shopDomain === d ? " active" : "")}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setShopDomain(d)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShopDomain(d)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
 
             {/* A) OAuth via a Dev Dashboard app (Client ID + Secret) */}
             <div className="col" style={{ gap: 8, borderTop: "1px dashed var(--line)", paddingTop: 8 }}>
@@ -557,7 +580,7 @@ export default function SettingsPage() {
               <p className="tiny muted">{t("settings.etsyAppHint")}</p>
               <label className="field">
                 {t("settings.etsyAppUrl")}
-                <input value={etsyUrl} onChange={(e) => setEtsyUrl(e.target.value)} placeholder="http://localhost:4317" />
+                <input value={etsyUrl} onChange={(e) => setEtsyUrl(e.target.value)} placeholder="https://keyartisan.us/etsy-shopify" />
               </label>
               <div className="row" style={{ gap: 8 }}>
                 <button
@@ -583,12 +606,90 @@ export default function SettingsPage() {
                     className="btn ghost sm"
                     onClick={async () => {
                       await api.saveSettings({ clearEtsyApp: true });
-                      setEtsyUrl("http://localhost:4317");
+                      setEtsyUrl("https://keyartisan.us/etsy-shopify");
                       s.refetch();
                     }}
                   >
                     {t("settings.clear")}
                   </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Push this instance's AI/API settings to a paired instance (e.g. production) */}
+          <div className="card">
+            <h3>🔁 {t("settings.secProdSync")}</h3>
+            <span className={"badge " + (s.data?.productionConnected ? "ok" : "warn")}>
+              {s.data?.productionConnected ? t("settings.prodConnected", { url: s.data.productionUrl }) : t("settings.prodNotSet")}
+            </span>
+            <div className="col" style={{ gap: 8 }}>
+              <p className="tiny muted">{t("settings.prodSyncHint")}</p>
+              <label className="field">
+                {t("settings.prodUrl")}
+                <input value={prodUrl} onChange={(e) => setProdUrl(e.target.value)} placeholder="https://keyartisan.us/product-studio" />
+              </label>
+              {!s.data?.productionConnected && (
+                <label className="field">
+                  {t("settings.prodPassword")}
+                  <input
+                    type="password"
+                    value={prodPassword}
+                    onChange={(e) => setProdPassword(e.target.value)}
+                    placeholder={t("settings.prodPasswordHint")}
+                  />
+                </label>
+              )}
+              <div className="row" style={{ gap: 8 }}>
+                {!s.data?.productionConnected ? (
+                  <button
+                    className="btn sm"
+                    disabled={prodPairing || !prodUrl.trim()}
+                    onClick={async () => {
+                      setProdPairing(true);
+                      try {
+                        const r = await api.pairProduction(prodUrl.trim(), prodPassword);
+                        setProdPassword("");
+                        toast(t("settings.prodPaired", { url: r.url }), "ok");
+                        s.refetch();
+                      } catch (e) {
+                        toast((e as Error).message, "err");
+                      } finally {
+                        setProdPairing(false);
+                      }
+                    }}
+                  >
+                    {prodPairing ? <span className="spin" /> : t("settings.prodPair")}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="btn sm primary"
+                      disabled={prodPushing}
+                      onClick={async () => {
+                        setProdPushing(true);
+                        try {
+                          const r = await api.pushProduction();
+                          toast(t("settings.prodPushed", { n: String(r.fields) }), "ok");
+                        } catch (e) {
+                          toast((e as Error).message, "err");
+                        } finally {
+                          setProdPushing(false);
+                        }
+                      }}
+                    >
+                      {prodPushing ? <span className="spin" /> : t("settings.prodPush")}
+                    </button>
+                    <button
+                      className="btn ghost sm"
+                      onClick={async () => {
+                        await api.saveSettings({ clearProduction: true });
+                        s.refetch();
+                      }}
+                    >
+                      {t("settings.clear")}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

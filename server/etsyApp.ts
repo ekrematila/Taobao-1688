@@ -62,6 +62,33 @@ export async function pairEtsyApp(rawUrl?: string): Promise<{ url: string; conne
   return { url: base, connected: true };
 }
 
+export interface EtsyAppShop {
+  id: string;
+  name: string;
+}
+
+/** The companion app's connected Etsy shops, for the "which shop?" picker —
+ *  read off the same unguarded contract endpoint used for pairing. Multiple
+ *  shops can be paired there now, so a push MUST name one explicitly instead
+ *  of silently landing on "whichever shop happens to be active" over there. */
+export async function etsyAppShops(): Promise<EtsyAppShop[]> {
+  const base = etsyAppBaseUrl();
+  let ok = false;
+  let json: any = {};
+  try {
+    ({ ok, json } = await getJson(`${base}${PATH}`));
+  } catch {
+    return []; // companion app unreachable — an empty picker, not a crash
+  }
+  if (!ok || !Array.isArray(json?.shops)) return [];
+  return json.shops
+    .map((s: any) => ({
+      id: String(s?.id ?? s?.shopId ?? s?.shop_id ?? "").trim(),
+      name: String(s?.name ?? s?.shopName ?? s?.shop_name ?? s?.id ?? "").trim(),
+    }))
+    .filter((s: EtsyAppShop) => s.id);
+}
+
 /** Is the companion app reachable right now? */
 export async function etsyAppStatus(): Promise<{ configured: boolean; url: string; reachable: boolean }> {
   const url = etsyAppBaseUrl();
@@ -79,18 +106,20 @@ export async function etsyAppStatus(): Promise<{ configured: boolean; url: strin
 export async function pushToEtsyApp(
   product: NormalisedProduct,
   listing: GeneratedListing,
-  opts: { dryRun?: boolean } = {},
+  opts: { dryRun?: boolean; shopId?: string } = {},
 ): Promise<any> {
   const base = etsyAppBaseUrl();
   const key = etsyAppKey();
   if (!key) throw new EtsyAppError("Etsy uygulaması bağlı değil — önce Ayarlar'dan eşleştir.", 400);
+  const shopId = String(opts.shopId || "").trim();
+  if (!shopId) throw new EtsyAppError("Hangi mağazaya gönderileceği seçilmedi.", 400);
 
   let res: Response;
   try {
     res = await fetch(`${base}${PATH}/product${opts.dryRun ? "?dryRun=1" : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Product-Studio-Key": key },
-      body: JSON.stringify({ product, listing }),
+      body: JSON.stringify({ product, listing, shopId }),
       signal: AbortSignal.timeout(30000),
     });
   } catch {

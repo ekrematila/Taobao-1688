@@ -49,8 +49,20 @@ import {
   etsyAppStatus,
   etsyAppConfigured,
   etsyAppBaseUrl,
+  etsyAppShops,
   EtsyAppError,
 } from "./etsyApp.ts";
+import {
+  ensureSyncKey,
+  syncKeyMatches,
+  applySyncedSettings,
+  pairProduction,
+  pushToProduction,
+  productionUrl,
+  productionConnected,
+  clearProduction,
+  ProdSyncError,
+} from "./prodSync.ts";
 import {
   TAXONOMY,
   TAXONOMY_PATHS,
@@ -180,6 +192,7 @@ router.use("/api", (req, res, next) => {
     req.path === "/logout" ||
     req.path === "/me" ||
     req.path === "/image-proxy" ||
+    req.path === "/settings/sync" || // authenticated by its own exchanged key, not a login cookie
     req.path.startsWith("/shopify/oauth/") // OAuth callback (HMAC-verified) — must work on Shopify's redirect
   ) {
     return next();
@@ -197,7 +210,8 @@ const wrap =
         e instanceof LlmError ||
         e instanceof ShopifyError ||
         e instanceof ManusError ||
-        e instanceof EtsyAppError
+        e instanceof EtsyAppError ||
+        e instanceof ProdSyncError
           ? e.status
           : 500;
       if (status >= 500) console.error(e);
@@ -248,6 +262,8 @@ async function currentSettings(): Promise<Settings> {
     brandUrl: getSetting("brand_url") ?? "",
     brandBrief: getSetting("brand_brief") ?? "",
     productTypes: readProductTypes(),
+    productionUrl: productionUrl(),
+    productionConnected: productionConnected(),
   };
 }
 
@@ -318,6 +334,7 @@ router.post(
       setSetting("etsy_app_url", "");
       setSetting("etsy_app_key", "");
     }
+    if (p.clearProduction === true) clearProduction();
     if (p.uiLang === "tr" || p.uiLang === "en") setSetting("ui_lang", p.uiLang);
     if (typeof p.brandUrl === "string") setSetting("brand_url", p.brandUrl.trim().slice(0, 300));
     if (typeof p.brandBrief === "string") setSetting("brand_brief", p.brandBrief.slice(0, 12000));
@@ -333,6 +350,45 @@ router.post(
     }
     res.json(await currentSettings());
   }),
+);
+
+/* --------------------- production settings sync --------------------- */
+
+/** RECEIVING side: issue (or return the existing) durable sync key — called
+ *  by another instance of this app once, right after IT authenticates here
+ *  with our login password, so later pushes never need that password again.
+ *  Behind the normal login gate, like the rest of /api/settings. */
+router.post(
+  "/api/settings/sync-key",
+  wrap(async (_req, res) => res.json({ key: ensureSyncKey() })),
+);
+
+/** RECEIVING side: apply a one-click AI/API-settings push from a paired
+ *  instance. Authenticated by the exchanged key (a header), not a login
+ *  cookie — the caller is a server, not a logged-in browser, and this path
+ *  is explicitly excluded from the cookie-auth gate above. */
+router.post(
+  "/api/settings/sync",
+  wrap(async (req, res) => {
+    if (!syncKeyMatches(String(req.headers["x-settings-sync-key"] || "")))
+      return res.status(401).json({ error: "Geçersiz eşleşme anahtarı." });
+    const applied = applySyncedSettings(req.body ?? {});
+    res.json({ ok: true, applied });
+  }),
+);
+
+/** SENDING side: pair with another (e.g. production) instance — exchanges
+ *  its login password for a durable key, once. */
+router.post(
+  "/api/settings/pair-production",
+  wrap(async (req, res) => res.json(await pairProduction(String(req.body?.url || ""), String(req.body?.password || "")))),
+);
+
+/** SENDING side: push this instance's current AI/API settings to the
+ *  already-paired one. */
+router.post(
+  "/api/settings/push-production",
+  wrap(async (_req, res) => res.json(await pushToProduction())),
 );
 
 // POST so the UI can test a key that was typed but not saved yet.
@@ -1599,6 +1655,10 @@ router.get("/api/etsy-app/status", wrap(async (_req, res) => res.json(await etsy
 
 router.post("/api/etsy-app/pair", wrap(async (req, res) => res.json(await pairEtsyApp(req.body?.url))));
 
+/** The companion app's connected Etsy shops — for the "which shop?" picker
+ *  the client must show before every push (multiple shops can be paired). */
+router.get("/api/etsy-app/shops", wrap(async (_req, res) => res.json({ shops: await etsyAppShops() })));
+
 /** Send this Etsy draft to the Etsy Command Center as a local draft. */
 router.post(
   "/api/etsy-app/push",
@@ -1607,12 +1667,21 @@ router.post(
     if (!draft?.product || !draft.listing) return res.status(400).json({ error: "Ürün veya listeleme eksik." });
     if (draft.listing.channel !== "etsy")
       return res.status(400).json({ error: "Bu taslak Etsy için üretilmemiş — kanalı Etsy seçip içerik üret." });
+    const shopId = String(req.body?.shopId || "").trim();
+    if (!shopId) {
+      const shops = await etsyAppShops();
+      return res.status(400).json({
+        error:
+          "Hangi Etsy mağazasına gönderileceğini seçin" +
+          (shops.length ? ` (${shops.map((s) => s.name).join(", ")}).` : "."),
+      });
+    }
     // never carry Shopify-only material across
     const listing: typeof draft.listing = {
       ...draft.listing,
       fields: draft.listing.fields.filter((f) => f.key !== "seo_description"),
     };
-    const out = await pushToEtsyApp(draft.product, listing, { dryRun: Boolean(req.body?.dryRun) });
+    const out = await pushToEtsyApp(draft.product, listing, { dryRun: Boolean(req.body?.dryRun), shopId });
     res.json(out);
   }),
 );
