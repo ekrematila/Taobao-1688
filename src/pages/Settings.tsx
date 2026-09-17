@@ -8,6 +8,8 @@ import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyRes
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
 const SHOPIFY_DOMAIN_PRESETS = ["343d10-7c.myshopify.com", "0sk8vz-7m.myshopify.com"];
+/** The one correct Etsy Command Center address — quick-pick instead of retyping/pasting. */
+const ETSY_APP_URL_PRESETS = ["https://keyartisan.us/etsy-shopify"];
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -582,6 +584,21 @@ export default function SettingsPage() {
                 {t("settings.etsyAppUrl")}
                 <input value={etsyUrl} onChange={(e) => setEtsyUrl(e.target.value)} placeholder="https://keyartisan.us/etsy-shopify" />
               </label>
+              <div className="chips" style={{ marginTop: -4 }}>
+                {ETSY_APP_URL_PRESETS.map((d) => (
+                  <span
+                    key={d}
+                    className={"chip" + (etsyUrl === d ? " active" : "")}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setEtsyUrl(d)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setEtsyUrl(d)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
               <div className="row" style={{ gap: 8 }}>
                 <button
                   className="btn sm"
