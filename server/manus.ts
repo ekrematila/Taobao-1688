@@ -52,14 +52,18 @@ function isRateLimit(status: number, json: any): boolean {
 const RATE_LIMIT_BACKOFF_MS = [5000, 15000, 40000];
 
 /**
- * Minimum spacing between `task.create` calls. A batch of image translations can
- * ask for 10+ tasks "at once" — we still let them all run, but the actual create
- * calls are released one every `MANUS_TASK_SPAWN_GAP_MS` so Manus's per-minute
- * limit isn't tripped. Default 600ms keeps a 9-image batch starting essentially
- * together (~5s spread) on a paid plan; the 429 back-off below is the real
- * safety net. Raise it (e.g. 3500) if on the very tight free tier; 0 disables.
+ * Minimum spacing between `task.create` calls. Manus's own docs
+ * (open.manus.ai/docs/v2/rate-limits) confirm `task.create` is capped at
+ * 10 requests/min, pooled across every API key on the account (not raised
+ * by a paid plan, not raised by adding more keys — "all API keys that
+ * belong to the same user share a single counter", "no tier differentiation").
+ * 600ms (~100/min) blew straight through that after the first ~10 images,
+ * so every image after that hit a 429 and sat through the backoff below
+ * (5s/15s/40s) — the real source of the "one at a time" feeling. 6500ms
+ * keeps us under 10/min with margin; CONCURRENCY still lets multiple tasks
+ * run/poll at once once they're created, this only paces the creates. 0 disables.
  */
-const TASK_SPAWN_GAP_MS = Math.max(0, Number(process.env.MANUS_TASK_SPAWN_GAP_MS) || 600);
+const TASK_SPAWN_GAP_MS = Math.max(0, Number(process.env.MANUS_TASK_SPAWN_GAP_MS) || 6500);
 let spawnChain: Promise<void> = Promise.resolve();
 let lastSpawnAt = 0;
 /** Serialise + space out task.create calls across all concurrent jobs. */

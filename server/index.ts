@@ -943,11 +943,13 @@ router.post(
       .map(([k, v]) => `${k}: ${v}`)
       .join("; ")}. ${layoutNote(detectKeyboardLayout(draft.product), "en")}`;
 
-    // How many image-translation tasks run at once. `task.create` calls are
-    // spaced out globally by MANUS_TASK_SPAWN_GAP_MS (see manus.ts) and mfetch
-    // backs off + retries on 429, so a batch of ~10 selected images all get
-    // translated even on the free tier — just a few at a time, not a true burst.
-    // Raise MANUS_IMAGE_CONCURRENCY on a paid plan for real parallelism.
+    // How many workers pull from the queue at once. `task.create` itself is
+    // still paced to Manus's fixed 10/min account-wide cap by
+    // MANUS_TASK_SPAWN_GAP_MS regardless of this number (see manus.ts — that
+    // cap doesn't rise with plan tier or with more API keys), but once a
+    // task exists, its polling runs independently — so raising this past ~10
+    // mainly shortens the tail (more tasks waiting/polling concurrently once
+    // they're all created), not the creation rate itself.
     const CONCURRENCY = Math.max(1, Math.min(16, Number(process.env.MANUS_IMAGE_CONCURRENCY) || 6));
     const jobId = startJob("translate-images", async (ctx) => {
       const labels = urls.map((_, i) => `Görsel ${i + 1}/${urls.length} çevriliyor`);
