@@ -5,7 +5,11 @@ import { ONEBOUND_ENDPOINTS, type ApiCallInput } from "@shared/types.ts";
 export class OneboundError extends Error {
   constructor(
     message: string,
-    readonly status = 502,
+    // 409 (not 502/504/52x — Cloudflare swaps those bodies for its own HTML
+    // error page) marks "provider glitch, worth one retry" — see
+    // callOnebound() below, which keys its single retry off this exact value.
+    // Genuine bad-input errors below pass 400 explicitly and are never retried.
+    readonly status = 409,
   ) {
     super(message);
   }
@@ -128,14 +132,14 @@ async function callOnce(url: string, redacted: string): Promise<RawCall> {
         Boolean(j?.error) && !(j?.item || j?.items || j?.items_list || j?.seller_info);
   if (isError) {
     const reason = j?.reason || j?.error || `error_code ${errorCode}` || "bilinmeyen hata";
-    throw new OneboundError(`Sağlayıcı veri döndüremedi: ${reason}`, 502);
+    throw new OneboundError(`Sağlayıcı veri döndüremedi: ${reason}`, 409);
   }
 
   return { requestUrl: redacted, status: res.status, ms, json };
 }
 
 /**
- * One retry, after a short delay, ONLY for a provider-side failure (502 from
+ * One retry, after a short delay, ONLY for a provider-side failure (409 from
  * `callOnce` — bad/missing input never reaches here, `buildRequest` throws
  * those synchronously before any network call). OneBound occasionally answers
  * a perfectly valid product with a transient `error_code: "5000"` ("data
@@ -148,7 +152,7 @@ export async function callOnebound(input: ApiCallInput): Promise<RawCall> {
   try {
     return await callOnce(url, redacted);
   } catch (e) {
-    if (!(e instanceof OneboundError) || e.status !== 502) throw e;
+    if (!(e instanceof OneboundError) || e.status !== 409) throw e;
     await new Promise((r) => setTimeout(r, 900));
     return callOnce(url, redacted);
   }

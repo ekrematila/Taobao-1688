@@ -113,7 +113,7 @@ export async function pairProduction(baseUrl: string, password: string): Promise
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 502);
+    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 400);
   }
   if (!loginRes.ok) throw new ProdSyncError("Şifre yanlış ya da giriş başarısız.", 401);
   // a passwordless target answers {authed:true} with no cookie at all — its
@@ -128,10 +128,10 @@ export async function pairProduction(baseUrl: string, password: string): Promise
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 502);
+    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 400);
   }
   const json = await keyRes.json().catch(() => ({}));
-  if (!keyRes.ok || !json?.key) throw new ProdSyncError(json?.error || "Eşleşme anahtarı alınamadı.", 502);
+  if (!keyRes.ok || !json?.key) throw new ProdSyncError(json?.error || "Eşleşme anahtarı alınamadı.", 400);
 
   setSetting("production_url", base);
   setSetting("production_sync_key", String(json.key));
@@ -155,9 +155,9 @@ export async function pushToProduction(): Promise<{ url: string; fields: number 
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 502);
+    throw new ProdSyncError(`${base} adresine ulaşılamadı.`, 400);
   }
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ProdSyncError(json?.error || `Sunucu ${res.status} döndü.`, res.status >= 500 ? 502 : 400);
+  if (!res.ok) throw new ProdSyncError(json?.error || `Sunucu ${res.status} döndü.`, 400);
   return { url: base, fields: Number(json?.applied ?? Object.keys(payload).length) };
 }

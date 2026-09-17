@@ -12,7 +12,9 @@ import type { JobCtx } from "./jobs.ts";
 export class ManusError extends Error {
   constructor(
     message: string,
-    readonly status = 502,
+    // never 502/504/52x — Cloudflare swaps those response bodies for its own
+    // HTML error page, so the client's JSON.parse() never sees our message.
+    readonly status = 400,
   ) {
     super(message);
   }
@@ -129,7 +131,7 @@ async function mfetch(path: string, init: RequestInit = {}): Promise<any> {
     : isRateLimit(last!.res.status, j)
       ? " — Manus hız sınırı (ücretsiz pakette çok düşük). Daha az görseli aynı anda çevirin, birkaç dakika bekleyin veya ücretsiz OCR çevirisini kullanın."
       : "";
-  throw new ManusError(`Manus: ${msg}${hint}`, last!.res.status >= 400 && last!.res.status < 500 ? last!.res.status : 502);
+  throw new ManusError(`Manus: ${msg}${hint}`, last!.res.status >= 400 && last!.res.status < 500 ? last!.res.status : 400);
 }
 
 export interface ManusAttachment {

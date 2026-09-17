@@ -18,7 +18,10 @@ const PATH = "/api/integrations/product-studio";
 export class EtsyAppError extends Error {
   constructor(
     message: string,
-    readonly status = 502,
+    // NEVER 502/504/520-527 — Cloudflare silently replaces the response body
+    // with its own HTML error page for those, so the client's JSON.parse()
+    // blows up on "<!DOCTYPE..." instead of ever seeing our error message.
+    readonly status = 400,
   ) {
     super(message);
   }
@@ -40,7 +43,7 @@ async function getJson(url: string, ms = 5000): Promise<{ ok: boolean; status: n
   try {
     res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(ms) });
   } catch (e) {
-    throw new EtsyAppError(`Etsy uygulamasına ulaşılamadı (${url.replace(PATH + "/product", "").replace(PATH, "")}). Açık mı?`, 502);
+    throw new EtsyAppError(`Etsy uygulamasına ulaşılamadı (${url.replace(PATH + "/product", "").replace(PATH, "")}). Açık mı?`, 400);
   }
   const json = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, json };
@@ -55,8 +58,8 @@ export async function pairEtsyApp(rawUrl?: string): Promise<{ url: string; conne
   const base = (rawUrl || etsyAppBaseUrl()).replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(base)) throw new EtsyAppError("Geçerli bir adres gir (ör. https://keyartisan.us/etsy-shopify).", 400);
   const { ok, status, json } = await getJson(`${base}${PATH}`);
-  if (!ok) throw new EtsyAppError(`Etsy uygulaması ${status} döndü — adres doğru mu? (${base})`, 502);
-  if (!json?.key) throw new EtsyAppError("Etsy uygulaması eşleşme anahtarı vermedi (sürümü güncel mi?).", 502);
+  if (!ok) throw new EtsyAppError(`Etsy uygulaması ${status} döndü — adres doğru mu? (${base})`, 400);
+  if (!json?.key) throw new EtsyAppError("Etsy uygulaması eşleşme anahtarı vermedi (sürümü güncel mi?).", 400);
   setSetting("etsy_app_url", base);
   setSetting("etsy_app_key", String(json.key));
   return { url: base, connected: true };
@@ -123,14 +126,11 @@ export async function pushToEtsyApp(
       signal: AbortSignal.timeout(30000),
     });
   } catch {
-    throw new EtsyAppError(`Etsy uygulamasına ulaşılamadı (${base}). Açık mı?`, 502);
+    throw new EtsyAppError(`Etsy uygulamasına ulaşılamadı (${base}). Açık mı?`, 400);
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new EtsyAppError(
-      json?.error || `Etsy uygulaması ${res.status} döndü.`,
-      res.status >= 400 && res.status < 500 ? 400 : 502,
-    );
+    throw new EtsyAppError(json?.error || `Etsy uygulaması ${res.status} döndü.`, 400);
   }
   return json;
 }

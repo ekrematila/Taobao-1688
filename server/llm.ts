@@ -41,7 +41,9 @@ import type {
 export class LlmError extends Error {
   constructor(
     message: string,
-    readonly status = 502,
+    // never 502/504/52x — Cloudflare swaps those response bodies for its own
+    // HTML error page, so the client's JSON.parse() never sees our message.
+    readonly status = 400,
   ) {
     super(message);
   }

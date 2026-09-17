@@ -90,7 +90,7 @@ export async function shopifyOAuthCallback(rawQuery: string): Promise<{ shop: st
   });
   const j = (await res.json().catch(() => ({}))) as any;
   if (!res.ok || !j.access_token) {
-    throw new ShopifyError(`OAuth token alınamadı (${res.status}): ${JSON.stringify(j).slice(0, 200)}`, 502);
+    throw new ShopifyError(`OAuth token alınamadı (${res.status}): ${JSON.stringify(j).slice(0, 200)}`, 400);
   }
   setSetting("shopify_token", String(j.access_token));
   setSetting("shopify_domain", shop);
@@ -112,7 +112,9 @@ function localImageAttachment(u: string): { attachment: string; filename: string
 export class ShopifyError extends Error {
   constructor(
     message: string,
-    readonly status = 502,
+    // never 502/504/52x — Cloudflare swaps those response bodies for its own
+    // HTML error page, so the client's JSON.parse() never sees our message.
+    readonly status = 400,
   ) {
     super(message);
   }

@@ -205,16 +205,18 @@ const wrap =
   (fn: (req: express.Request, res: express.Response) => Promise<unknown>) =>
   (req: express.Request, res: express.Response) => {
     fn(req, res).catch((e) => {
-      const status =
+      const known =
         e instanceof OneboundError ||
         e instanceof LlmError ||
         e instanceof ShopifyError ||
         e instanceof ManusError ||
         e instanceof EtsyAppError ||
-        e instanceof ProdSyncError
-          ? e.status
-          : 500;
-      if (status >= 500) console.error(e);
+        e instanceof ProdSyncError;
+      const status = known ? e.status : 500;
+      // known upstream/business errors are worth seeing in server logs even
+      // though their HTTP status is now always < 500 (see each class's own
+      // comment: Cloudflare swaps a 502/504/52x body for its own HTML page).
+      if (!known || status >= 500) console.error(e);
       res.status(status).json({ error: e?.message || "Sunucu hatası" });
     });
   };
@@ -2045,7 +2047,7 @@ router.get(
     const upstream = await fetch(url, {
       headers: isManus ? manusFileAuthHeaders() : { Referer: "https://www.taobao.com/" },
     });
-    if (!upstream.ok || !upstream.body) return res.status(502).json({ error: `Görsel alınamadı (${upstream.status})` });
+    if (!upstream.ok || !upstream.body) return res.status(400).json({ error: `Görsel alınamadı (${upstream.status})` });
     res.setHeader("Content-Type", upstream.headers.get("content-type") || "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Access-Control-Allow-Origin", "*");
