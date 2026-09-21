@@ -620,8 +620,16 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   function reportTranslateSettled(res: PromiseSettledResult<ImageTranslateJobResult>[]) {
     const items = res.flatMap((r) => (r.status === "fulfilled" ? r.value.items : []));
     const credits = res.reduce((s, r) => s + (r.status === "fulfilled" ? r.value.totalCredits || 0 : 0), 0);
-    const failed = res.filter((r) => r.status === "rejected" && !((r as PromiseRejectedResult).reason instanceof JobCancelled));
-    reportTranslate({ items: [...items, ...failed.map(() => ({ changed: false, error: "job" }) as any)], totalCredits: credits });
+    const failed = res.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected" && !(r.reason instanceof JobCancelled),
+    );
+    reportTranslate({
+      items: [
+        ...items,
+        ...failed.map((f) => ({ changed: false, error: (f.reason as Error)?.message || String(f.reason) }) as any),
+      ],
+      totalCredits: credits,
+    });
   }
 
   /** Toast the outcome of a translate-images job — errors (rate limit etc.) win over the OK line. */
@@ -796,9 +804,14 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
 
   function reportEditSettled(res: PromiseSettledResult<{ changed: number }>[]) {
     const changed = res.reduce((s, r) => s + (r.status === "fulfilled" ? r.value.changed || 0 : 0), 0);
-    const failed = res.filter((r) => r.status === "rejected" && !((r as PromiseRejectedResult).reason instanceof JobCancelled)).length;
-    if (failed) toast(t("ws.trErrors", { n: failed, msg: "" }), "err");
-    if (changed || !failed) toast(t("ws.aiCmdDone", { n: changed }), "ok");
+    const failed = res.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected" && !(r.reason instanceof JobCancelled),
+    );
+    if (failed.length) {
+      const msg = (failed[0].reason as Error)?.message || String(failed[0].reason);
+      toast(t("ws.trErrors", { n: failed.length, msg }), "err");
+    }
+    if (changed || !failed.length) toast(t("ws.aiCmdDone", { n: changed }), "ok");
   }
 
   async function runEditUrls(urls: string[], instruction: string) {
