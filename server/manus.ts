@@ -650,6 +650,19 @@ export async function runManusTask(
   const seenText = new Set<string>();
   let text = "";
   let structured: unknown;
+  // A real run showed Manus reporting "stopped" ("Manus finished working")
+  // as a MID-TASK checkpoint, not the real end — it resumed "running" ~20s
+  // later and delivered the actual image another ~15s after that. "waiting"
+  // showed the same pattern once. Trusting either status the instant it
+  // appears cuts the task off with nothing to show for it (a fresh assistant
+  // task_id can be re-queried afterward and the work is visibly still there).
+  // So "stopped"/"waiting" only count as DONE immediately when we already
+  // have what we came for — an attachment, or an explicit "nothing to
+  // translate" token. Otherwise treat them as "maybe done" and wait out a
+  // grace window, watching for "running" to resume (which cancels it outright)
+  // or new content (attachment/text) to arrive.
+  const PENDING_STOP_GRACE_MS = 60000;
+  let pendingStopSince: number | null = null;
 
   while (true) {
     ctx?.throwIfCancelled();
@@ -674,12 +687,14 @@ export async function runManusTask(
         if (content && !seenText.has(content)) {
           seenText.add(content);
           text += (text ? "\n" : "") + content;
+          pendingStopSince = null; // new output — clearly not stuck
         }
         for (const a of am.attachments || ev.attachments || []) {
           const key = a?.url || a?.filename || JSON.stringify(a);
           if (a && !seenAtt.has(key)) {
             seenAtt.add(key);
             attachments.push(a);
+            pendingStopSince = null;
           }
         }
       } else if (ev.type === "error_message") {
@@ -690,12 +705,16 @@ export async function runManusTask(
         const st = ev.status_update?.agent_status;
         const brief = ev.status_update?.brief;
         if (brief && ctx) ctx.setStatus(brief);
-        if (st === "stopped" || st === "error") terminal = st;
-        else if (st === "waiting") {
-          // non-interactive mode: nothing to answer -> stop and use what we have
-          terminal = "stopped";
+        if (st === "error") terminal = st;
+        else if (st === "running") pendingStopSince = null; // genuinely resumed
+        else if (st === "stopped" || st === "waiting") {
+          if (attachments.length > 0 || saidNoChange(text)) terminal = "stopped"; // we already have what we came for
+          else if (pendingStopSince == null) pendingStopSince = Date.now();
         }
       }
+    }
+    if (!terminal && pendingStopSince != null && Date.now() - pendingStopSince > PENDING_STOP_GRACE_MS) {
+      terminal = "stopped"; // held "stopped"/"waiting" with zero new activity — genuinely done or stuck
     }
     // Always resume after the last message we've seen — `has_more` is only set on
     // a FULL page, so gating the cursor on it would re-read the same tail forever
