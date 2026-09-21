@@ -185,11 +185,19 @@ async function callManus(path: string, init: RequestInit, key: string, mode: Man
   return { res, json };
 }
 
+/** Short backoff for a transient NETWORK failure (fetch itself throwing —
+ *  DNS hiccup, reset connection, timeout) during a poll that can run for
+ *  minutes. Distinct from RATE_LIMIT_BACKOFF_MS: this is a real HTTP
+ *  response just failing to arrive, not Manus telling us to slow down, so a
+ *  quick retry is the right move instead of a long wait. */
+const NETWORK_RETRY_BACKOFF_MS = [1000, 3000, 6000];
+
 async function mfetch(path: string, init: RequestInit = {}): Promise<any> {
   const key = currentManusKey();
   if (!key) throw new ManusError("MANUS_API_KEY ayarlı değil.", 400);
 
   let last: { res: Response; json: any } | null = null;
+  let lastNetworkError: Error | null = null;
 
   // Retry the whole call a few times when Manus rate-limits us (429 / "rate limit
   // exceeded"). The free tier throttles hard, so a batch of image tasks would
@@ -200,8 +208,18 @@ async function mfetch(path: string, init: RequestInit = {}): Promise<any> {
       : ["apikey", "bearer"];
 
     let rateLimited = false;
+    let networkFailed = false;
     for (const mode of tryOrder) {
-      const out = await callManus(path, init, key, mode);
+      let out: { res: Response; json: any };
+      try {
+        out = await callManus(path, init, key, mode);
+      } catch (e) {
+        // a single dropped connection mid-poll used to kill the WHOLE task —
+        // the underlying Manus run kept going, we just stopped watching it.
+        lastNetworkError = e as Error;
+        networkFailed = true;
+        break;
+      }
       last = out;
       if (out.res.ok && out.json?.ok !== false) {
         cachedAuthMode = mode; // remember what worked
@@ -218,6 +236,11 @@ async function mfetch(path: string, init: RequestInit = {}): Promise<any> {
       await new Promise((r) => setTimeout(r, RATE_LIMIT_BACKOFF_MS[attempt]));
       continue;
     }
+    if (networkFailed && attempt < NETWORK_RETRY_BACKOFF_MS.length) {
+      await new Promise((r) => setTimeout(r, NETWORK_RETRY_BACKOFF_MS[attempt]));
+      continue;
+    }
+    if (networkFailed) throw new ManusError(`Manus'a ulaşılamadı: ${lastNetworkError?.message || "ağ hatası"}.`, 400);
     break;
   }
 
