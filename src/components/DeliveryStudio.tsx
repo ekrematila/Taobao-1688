@@ -599,7 +599,14 @@ export default function DeliveryStudio({
       const r = await api.pushEtsyApp(draft.id, shopId);
       qc.invalidateQueries({ queryKey: ["settings"] });
       toast(r.message || t("delivery.pushEtsyAppDone"), "ok");
-      if (r.openUrl) window.open(r.openUrl, "_blank");
+      // the companion app's own openUrl has been seen pointing at its internal
+      // localhost:10000 (unreachable from the operator's actual browser) even
+      // though the push itself succeeded — never navigate there, it can only fail.
+      if (r.openUrl && !/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/i.test(r.openUrl)) {
+        window.open(r.openUrl, "_blank");
+      } else if (r.openUrl) {
+        toast(t("delivery.etsyOpenUrlBroken"), "err");
+      }
     } catch (e) {
       toast((e as Error).message, "err");
     } finally {

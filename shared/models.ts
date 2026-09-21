@@ -143,7 +143,13 @@ export interface DescStyle {
 
 /** 20 description tones/styles. "product" = read the product and match its own character. */
 export const DESC_STYLES: DescStyle[] = [
-  { key: "product", tr: "Ürün tarzında", en: "Product-led", guide: "Read the product itself and match its own character, audience and vibe." },
+  {
+    key: "product",
+    tr: "Ürün tarzında",
+    en: "Product-led",
+    guide:
+      "Look at the PHOTOS and judge the product's actual visual aesthetic (cute/kawaii, minimalist, gaming, elegant, dark, colorful, retro, whatever it visibly is) — that aesthetic ALWAYS wins over its technical category. A keyboard/mouse/keycap/any electronic accessory that LOOKS cute, pastel, or kawaii must be written in that same warm, playful voice — do NOT default to generic 'tech'/'gadget'/'upgrade your setup' language just because the underlying object is electronic. Match the exact vibe you SEE in the photos, not the product's category.",
+  },
   { key: "simple", tr: "Basit", en: "Simple", guide: "Plain, direct, no fluff. Short sentences, everyday words." },
   { key: "cute", tr: "Sevimli", en: "Cute", guide: "Warm, sweet, playful; gentle emoji, endearing phrasing." },
   { key: "cool", tr: "Havalı", en: "Cool", guide: "Confident, effortless, trend-aware; punchy lines." },
