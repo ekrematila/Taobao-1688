@@ -41,6 +41,40 @@ test("a photo shared between the main gallery and a variant appears in both role
   assert.equal(noPicVariant!.imageUrl, undefined);
 });
 
+// Regression: OneBound keys colour swatch photos by a `properties` code in
+// `prop_imgs.prop_img` (or the alt `props_img` object shape), NOT on the sku
+// itself — most real listings carry no `sku_pic`/`pic` at all. Before this
+// fix, ProductVariant.imageUrl stayed undefined for every variant here, and
+// the client's own index-based fallback then paired each colour with an
+// unrelated photo by position instead of its real swatch.
+test("each variant gets its OWN swatch photo via prop_imgs.properties, not an unrelated one by index", () => {
+  const item = {
+    num_iid: "1",
+    title: "t",
+    pic_url: "//img.alicdn.com/g1.jpg",
+    prop_imgs: {
+      prop_img: [
+        { properties: "-1:-1", url: "//img.alicdn.com/black.jpg" },
+        { properties: "-1:-2", url: "//img.alicdn.com/blue.jpg" },
+        { properties: "-1:-3", url: "//img.alicdn.com/white.jpg" },
+      ],
+    },
+    skus: {
+      sku: [
+        { sku_id: "s1", price: 55, properties: "-1:-1", properties_name: "-1:-1:颜色:黑色" },
+        { sku_id: "s2", price: 55, properties: "-1:-2", properties_name: "-1:-2:颜色:蓝色" },
+        { sku_id: "s3", price: 55, properties: "-1:-3", properties_name: "-1:-3:颜色:白色" },
+      ],
+    },
+  };
+  const out = normaliseItem({ item }, "taobao", "1");
+  assert.ok(out);
+  const byName = Object.fromEntries(out!.variants.map((v) => [v.name, v.imageUrl]));
+  assert.equal(byName["黑色"], "https://img.alicdn.com/black.jpg");
+  assert.equal(byName["蓝色"], "https://img.alicdn.com/blue.jpg");
+  assert.equal(byName["白色"], "https://img.alicdn.com/white.jpg");
+});
+
 test("a description photo already claimed by gallery/variant doesn't get a duplicate 3rd tile", () => {
   const item = {
     num_iid: "1",

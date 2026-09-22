@@ -102,6 +102,31 @@ function collectImages(item: any): { url: string; source: ImgSource }[] {
   return out;
 }
 
+/**
+ * OneBound keys its colour/style swatch photos by a `properties` code (e.g.
+ * "-1:-6"), in `prop_imgs.prop_img` (array of {properties,url}) or, on some
+ * endpoints, `props_img` (a plain {properties: url} object) — NOT by sku_id,
+ * and each SKU in `skus.sku` carries that SAME `properties` code. This map
+ * lets collectVariants() attach the right photo to the right SKU instead of
+ * leaving every variant's imageUrl blank (the client's own index-based
+ * fallback then paired variants with unrelated photos by position).
+ */
+function propImageMap(item: any): Map<string, string> {
+  const map = new Map<string, string>();
+  const set = (properties: unknown, url: unknown) => {
+    const key = String(properties ?? "").trim();
+    const u = fixUrl(String(url ?? ""));
+    if (key && u && !map.has(key)) map.set(key, u);
+  };
+  for (const im of item.prop_imgs?.prop_img || (Array.isArray(item.prop_imgs) ? item.prop_imgs : [])) {
+    set(im?.properties, im?.url ?? im?.pic ?? im);
+  }
+  if (item.props_img && typeof item.props_img === "object" && !Array.isArray(item.props_img)) {
+    for (const [k, v] of Object.entries(item.props_img)) set(k, v);
+  }
+  return map;
+}
+
 function variantNameFromSku(s: any): string {
   // OneBound: properties_name = "pid:vid:propName:valueName;..." OR "propName:valueName;..."
   const raw = firstString(s.properties_name, s.propertiesName, s.properties, s.spec, s.sku_name);
@@ -125,14 +150,26 @@ function collectVariants(item: any): ProductVariant[] {
     item.quantity_prices ||
     [];
 
+  const propImgs = propImageMap(item);
   const list: ProductVariant[] = [];
   for (const s of skus) {
     if (!s) continue;
+    const ownPic = fixUrl(s.sku_pic || s.pic || "");
+    // `properties` on a sku is a compound key like "1:2;3:4" (one part per
+    // prop dimension) — try the whole thing first, then each part, since the
+    // swatch photo is usually keyed to just the colour/style dimension.
+    const propsKey = firstString(s.properties, s.propertiesName, s.properties_name);
+    const byProps =
+      propImgs.get(propsKey) ||
+      propsKey
+        .split(";")
+        .map((part) => propImgs.get(part.trim()))
+        .find((u): u is string => !!u);
     list.push({
       name: variantNameFromSku(s) || "Varsayılan",
       price: num(s.price) ?? num(s.total_price) ?? num(s.orginal_price) ?? num(s.sku_price),
       sku: firstString(s.sku_id, s.skuId, s.id) || undefined,
-      imageUrl: fixUrl(s.sku_pic || s.pic || "") || undefined,
+      imageUrl: ownPic || byProps || undefined,
       stock: num(s.quantity ?? s.stock ?? s.can_book_count),
     });
   }
