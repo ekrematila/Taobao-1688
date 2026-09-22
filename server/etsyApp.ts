@@ -15,6 +15,33 @@ import type { GeneratedListing, NormalisedProduct } from "@shared/types.ts";
 
 const PATH = "/api/integrations/product-studio";
 
+/**
+ * The companion app is a SEPARATE service — it can only ever load an image by
+ * fetching a real https URL, never our app-relative `/api/media/...` path
+ * (that's only reachable within THIS server's own request handling, e.g. the
+ * Visual Workspace running in the same origin). An operator's local edit
+ * (crop / erase / translate / logo) is saved under exactly that relative
+ * path, so sending the draft as-is silently drops every edited image — the
+ * Etsy app just can't reach it. Made absolute against our own public origin
+ * (which really does serve /api/media/* publicly), the same bytes the
+ * operator is looking at become fetchable from anywhere.
+ */
+function absolutizeMedia(u: string | undefined): string | undefined {
+  const s = String(u ?? "").trim();
+  if (!s || /^https?:\/\//i.test(s) || s.startsWith("//")) return u;
+  if (s.startsWith("/")) return `${env.appPublicUrl}${s}`;
+  return u;
+}
+
+export function withAbsoluteMedia(product: NormalisedProduct): NormalisedProduct {
+  return {
+    ...product,
+    images: product.images.map((im) => ({ ...im, url: absolutizeMedia(im.url) ?? im.url })),
+    variants: product.variants.map((v) => (v.imageUrl ? { ...v, imageUrl: absolutizeMedia(v.imageUrl) } : v)),
+    videoUrl: absolutizeMedia(product.videoUrl),
+  };
+}
+
 export class EtsyAppError extends Error {
   constructor(
     message: string,
@@ -122,7 +149,7 @@ export async function pushToEtsyApp(
     res = await fetch(`${base}${PATH}/product${opts.dryRun ? "?dryRun=1" : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Product-Studio-Key": key },
-      body: JSON.stringify({ product, listing, shopId }),
+      body: JSON.stringify({ product: withAbsoluteMedia(product), listing, shopId }),
       signal: AbortSignal.timeout(30000),
     });
   } catch {
