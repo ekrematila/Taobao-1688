@@ -6,14 +6,53 @@
 // (`server/src/services/productstudio.js` over there), so all we do is POST it.
 //
 // Nothing Shopify-specific is sent: the Etsy `GeneratedListing` carries only
-// Etsy fields (title / title_alt / description plain-text / tags / tags_pool),
-// and the receiver ignores `descHtml`.
+// Etsy fields (title / title_alt / description plain-text / tags), and the
+// receiver ignores `descHtml`. `tags_pool` (up to 50 CANDIDATE tags, kept
+// only for this app's own chip picker) is stripped before it ever leaves —
+// it has no purpose on the receiving end and risks the companion app using
+// it instead of the operator's actual, capped `tags` selection.
 
 import { env } from "./env.ts";
 import { getSetting, setSetting } from "./db.ts";
+import { cleanTag } from "@shared/listingFormat.ts";
 import type { GeneratedListing, NormalisedProduct } from "@shared/types.ts";
 
 const PATH = "/api/integrations/product-studio";
+
+/**
+ * Etsy hard-caps a listing at 13 tags, 20 chars each. `tags` is normally
+ * already exactly the operator's top-13 pick (finalizeEtsyTags() in
+ * listingFormat.ts caps it at generation time, and the chip-picker enforces
+ * the cap on every toggle) — but the field is also a free-text `<input>` in
+ * the editor with NO enforcement on manual typing, so a hand-edit can drift
+ * past 13, carry duplicates, or an over-length tag. Clamp defensively here
+ * so whatever reaches the companion app is exactly what Etsy itself accepts.
+ */
+function sanitizeEtsyTags(raw: string): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of String(raw || "").split(/[,\n]/)) {
+    const t = part.trim();
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t.length > 20 ? cleanTag(t) || t.slice(0, 20).trim() : t);
+    if (out.length >= 13) break;
+  }
+  return out.join(", ");
+}
+
+/** Drop Shopify-only / UI-only fields and clamp `tags` before the draft
+ *  crosses to the companion app — see module header + sanitizeEtsyTags(). */
+export function withCleanEtsyFields(listing: GeneratedListing): GeneratedListing {
+  return {
+    ...listing,
+    fields: listing.fields
+      .filter((f) => f.key !== "seo_description" && f.key !== "tags_pool")
+      .map((f) => (f.key === "tags" ? { ...f, value: sanitizeEtsyTags(f.value) } : f)),
+  };
+}
 
 /**
  * The companion app is a SEPARATE service — it can only ever load an image by
@@ -149,7 +188,7 @@ export async function pushToEtsyApp(
     res = await fetch(`${base}${PATH}/product${opts.dryRun ? "?dryRun=1" : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Product-Studio-Key": key },
-      body: JSON.stringify({ product: withAbsoluteMedia(product), listing, shopId }),
+      body: JSON.stringify({ product: withAbsoluteMedia(product), listing: withCleanEtsyFields(listing), shopId }),
       signal: AbortSignal.timeout(30000),
     });
   } catch {

@@ -15,6 +15,7 @@ import {
   researchHsCode,
   suggestProductType,
   checkTrademarks,
+  checkListingConsistency,
   nameVariantsForChannel,
   translateVariants,
   generateAltTexts,
@@ -816,6 +817,21 @@ router.post(
     const draft = getDraft(draftId);
     if (!draft?.listing) return res.status(400).json({ error: "Listeleme yok." });
     const r = await checkTrademarks(draft.listing.fields, draft.listing.meta?.brand, { model, draftId: draft.id });
+    res.json(r);
+  }),
+);
+
+/** Fact-checks the generated listing (title/title_alt/description/tags)
+ *  against the REAL source product (photos + specs) — flags genuine
+ *  mismatches (wrong colour/material/feature/count) with a suggested fix.
+ *  Called right before an Etsy push. */
+router.post(
+  "/api/ai/check-consistency",
+  wrap(async (req, res) => {
+    const { draftId, model } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.product || !draft.listing) return res.status(400).json({ error: "Ürün veya listeleme eksik." });
+    const r = await checkListingConsistency(draft.product, draft.listing, { model, draftId: draft.id });
     res.json(r);
   }),
 );
@@ -1769,12 +1785,9 @@ router.post(
           (shops.length ? ` (${shops.map((s) => s.name).join(", ")}).` : "."),
       });
     }
-    // never carry Shopify-only material across
-    const listing: typeof draft.listing = {
-      ...draft.listing,
-      fields: draft.listing.fields.filter((f) => f.key !== "seo_description"),
-    };
-    const out = await pushToEtsyApp(draft.product, listing, { dryRun: Boolean(req.body?.dryRun), shopId });
+    // Shopify-only / UI-only field stripping + tag clamping now lives inside
+    // pushToEtsyApp() itself (withCleanEtsyFields) — applies to every caller.
+    const out = await pushToEtsyApp(draft.product, draft.listing, { dryRun: Boolean(req.body?.dryRun), shopId });
     res.json(out);
   }),
 );

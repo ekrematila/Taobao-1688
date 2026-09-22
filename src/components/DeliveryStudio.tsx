@@ -143,6 +143,10 @@ export default function DeliveryStudio({
   const [etsyShopId, setEtsyShopId] = useState("");
   const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
   const [trademarkWarn, setTrademarkWarn] = useState<{ flagged: string[]; resolve: (proceed: boolean) => void } | null>(null);
+  const [consistencyWarn, setConsistencyWarn] = useState<{
+    issues: { field: string; current: string; issue: string; suggestion: string }[];
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
   const [hoverLayout, setHoverLayout] = useState<string | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState("");
@@ -575,6 +579,23 @@ export default function DeliveryStudio({
     }
   }
 
+  /** Etsy-only: fact-checks the generated listing against the REAL source
+   *  product (photos + specs) right before push — flags a wrong colour/
+   *  material/feature/claim with a suggested fix. Same warn-and-override
+   *  shape as trademarkGateOk(); a failed check never blocks the push. */
+  async function consistencyGateOk(): Promise<boolean> {
+    setBusy("check-consistency");
+    try {
+      const r = await api.checkConsistency(draft.id);
+      if (r.issues.length === 0) return true;
+      return await new Promise<boolean>((resolve) => setConsistencyWarn({ issues: r.issues, resolve }));
+    } catch {
+      return true;
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function push() {
     if (!(await trademarkGateOk())) return;
     setBusy("push");
@@ -598,6 +619,7 @@ export default function DeliveryStudio({
       return;
     }
     if (!(await trademarkGateOk())) return;
+    if (!(await consistencyGateOk())) return;
     const shopName = etsyShops.find((s) => s.id === etsyShopId)?.name || etsyShopId;
     setEtsyPushConfirm({ shopId: etsyShopId, shopName });
   }
@@ -1588,6 +1610,71 @@ export default function DeliveryStudio({
                 }}
               >
                 {t("delivery.trademarkWarnProceed")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {consistencyWarn && (
+        <div
+          className="modal-scrim"
+          onClick={() => {
+            consistencyWarn.resolve(false);
+            setConsistencyWarn(null);
+          }}
+        >
+          <div className="modal" style={{ width: "min(640px, 94vw)", padding: 18 }} onClick={(e) => e.stopPropagation()}>
+            <h3>{t("delivery.consistencyWarnTitle")}</h3>
+            <p className="sub">{t("delivery.consistencyWarnBody")}</p>
+            <div className="col" style={{ gap: 10, maxHeight: 360, overflow: "auto", margin: "8px 0" }}>
+              {consistencyWarn.issues.map((it, i) => (
+                <div key={i} style={{ border: "1px solid var(--line, #e2e2e8)", borderRadius: 8, padding: 10 }}>
+                  <div className="tiny muted" style={{ textTransform: "uppercase", letterSpacing: 0.3 }}>
+                    {t(`delivery.field.${it.field}` as any)}
+                  </div>
+                  <p className="tiny" style={{ margin: "4px 0", color: "var(--danger)" }}>
+                    ✕ {it.current}
+                  </p>
+                  <p className="tiny muted" style={{ margin: "0 0 6px" }}>{it.issue}</p>
+                  {it.suggestion && (
+                    <div className="row" style={{ alignItems: "flex-start", gap: 6 }}>
+                      <p className="tiny" style={{ margin: 0, flex: 1, color: "var(--ok, #1a7f37)" }}>
+                        ✓ {it.suggestion}
+                      </p>
+                      <button
+                        className="btn ghost sm"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(it.suggestion);
+                          toast(t("delivery.consistencyCopied"), "ok");
+                        }}
+                      >
+                        ⧉
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 4 }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  consistencyWarn.resolve(false);
+                  setConsistencyWarn(null);
+                }}
+              >
+                {t("delivery.consistencyWarnBack")}
+              </button>
+              <button
+                className="btn primary"
+                style={{ background: "var(--danger)" }}
+                onClick={() => {
+                  consistencyWarn.resolve(true);
+                  setConsistencyWarn(null);
+                }}
+              >
+                {t("delivery.consistencyWarnProceed")}
               </button>
             </div>
           </div>

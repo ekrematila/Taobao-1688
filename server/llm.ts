@@ -1733,6 +1733,104 @@ export async function checkTrademarks(
   return { flagged, model };
 }
 
+export interface ListingConsistencyIssue {
+  /** which generated field the problem is in */
+  field: string;
+  /** the exact phrase/claim from the generated listing that's wrong */
+  current: string;
+  /** why it doesn't match the real source product, in Turkish (operator-facing) */
+  issue: string;
+  /** an alternative phrase that DOES match the real product */
+  suggestion: string;
+}
+
+export interface ListingConsistencyResult {
+  issues: ListingConsistencyIssue[];
+  model: string;
+}
+
+/**
+ * Last-check gate before an Etsy draft leaves this app: does the GENERATED
+ * listing (title/title_alt/description/tags) actually describe the REAL
+ * source product (its real specs and, from photos, its real look) — or did
+ * generation invent/misread a colour, material, feature, count, or
+ * compatibility claim? Looks at both the source text specs AND the actual
+ * product photos (photos are ground truth), same as suggestProductType().
+ * Only flags genuine factual mismatches, never stylistic differences.
+ */
+export async function checkListingConsistency(
+  product: NormalisedProduct,
+  listing: GeneratedListing,
+  opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
+): Promise<ListingConsistencyResult> {
+  const galleryImages = product.images.filter((im) => im.role === "gallery" || im.role === "variant").slice(0, 4);
+  const images: { data: string; mime: string }[] = [];
+  for (const im of galleryImages) {
+    const src = im.url || im.srcUrl;
+    if (!src) continue;
+    try {
+      images.push(await imageToBase64(src));
+    } catch (e) {
+      console.error("[checkListingConsistency] could not download a product photo, skipping:", e);
+    }
+  }
+
+  const relevantFields = listing.fields.filter((f) =>
+    ["title", "title_alt", "description", "tags"].includes(f.key),
+  );
+
+  const system = [
+    "You fact-check a GENERATED e-commerce listing against the REAL source product it was written from — the product photos (ground truth for look/colour/materials) and the original specs/title below.",
+    "Flag ONLY genuine factual mismatches the generated text introduced: a colour/material/pattern the photos don't show, a feature or compatibility claim the specs don't support, a wrong quantity/count, a wrong product type, or a claim that plainly contradicts the source.",
+    "Do NOT flag: marketing tone, word choice, SEO phrasing, shortened/simplified descriptions, or anything that's merely less detailed than the source — those are fine. Only flag things that are factually WRONG about the actual product.",
+    "For each real mismatch, quote the exact offending phrase from the field (`current`), explain in TURKISH why it's wrong (`issue`), and give a replacement phrase in the SAME language/style as the original field that correctly matches the real product (`suggestion`).",
+    'Reply as strict JSON only: {"issues":[{"field":"title"|"title_alt"|"description"|"tags","current":"...","issue":"...","suggestion":"..."}]} — empty array if the listing genuinely matches the product.',
+  ].join("\n");
+
+  const user = [
+    `Source product title (zh): ${product.title}`,
+    product.titleTranslated ? `Source title (translated): ${product.titleTranslated}` : "",
+    `Real specs: ${cleanSpecs(product.props, 14).map((s) => `${s.label}: ${s.value}`).join("; ")}`,
+    product.variants?.length
+      ? `Real variants/colours: ${product.variants.map((v) => v.nameTranslated || v.name).filter(Boolean).join(", ")}`
+      : "",
+    images.length ? `${images.length} real product photo(s) attached above — ground truth for look/colour.` : "(no product photos available)",
+    "",
+    "GENERATED listing to fact-check:",
+    ...relevantFields.map((f) => `${f.key}: ${f.value}`),
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 10000);
+
+  const { text: out, model } = await ask(system, user, "checkListingConsistency", {
+    model: opts.model,
+    maxTokens: 1200,
+    signal: opts.signal,
+    draftId: opts.draftId,
+    images,
+  });
+
+  let parsed: any = {};
+  try {
+    parsed = JSON.parse((out.match(/\{[\s\S]*\}/) || ["{}"])[0]);
+  } catch {
+    /* fall through */
+  }
+  const issues: ListingConsistencyIssue[] = Array.isArray(parsed.issues)
+    ? parsed.issues
+        .map((x: any) => ({
+          field: String(x?.field || "").slice(0, 20),
+          current: String(x?.current || "").slice(0, 300),
+          issue: String(x?.issue || "").slice(0, 300),
+          suggestion: String(x?.suggestion || "").slice(0, 300),
+        }))
+        .filter((x: ListingConsistencyIssue) => x.field && x.current && x.issue)
+        .slice(0, 15)
+    : [];
+  return { issues, model };
+}
+
 /* -------------------- Shopify taxonomy attribute picks -------------------- */
 
 export interface AttrForAI {

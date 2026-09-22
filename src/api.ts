@@ -101,6 +101,11 @@ export const api = {
     post<{ productType: string; isNew: boolean; rationale: string }>("/ai/suggest-product-type", { draftId, model }),
   checkTrademarks: (draftId: string, model?: string) =>
     post<{ flagged: string[]; model: string }>("/ai/check-trademarks", { draftId, model }),
+  checkConsistency: (draftId: string, model?: string) =>
+    post<{
+      issues: { field: string; current: string; issue: string; suggestion: string }[];
+      model: string;
+    }>("/ai/check-consistency", { draftId, model }),
   resolveTaxonomy: (draftId: string, productType: string) =>
     req<{ path: string; gid: string }>(
       "/taxonomy/resolve?" + new URLSearchParams({ draftId, productType }).toString(),
