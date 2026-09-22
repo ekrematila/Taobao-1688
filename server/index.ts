@@ -14,6 +14,7 @@ import {
   researchCategory,
   researchHsCode,
   suggestProductType,
+  checkTrademarks,
   nameVariantsForChannel,
   translateVariants,
   generateAltTexts,
@@ -801,6 +802,20 @@ router.post(
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     const r = await suggestProductType(draft.product, readProductTypes(), { model, draftId: draft.id });
+    res.json(r);
+  }),
+);
+
+/** Scans the generated listing text for third-party trademarks/brand/franchise
+ *  names before it's allowed to reach Etsy or Shopify — only the operator's own
+ *  configured brand is allowed. Called right before push. */
+router.post(
+  "/api/ai/check-trademarks",
+  wrap(async (req, res) => {
+    const { draftId, model } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.listing) return res.status(400).json({ error: "Listeleme yok." });
+    const r = await checkTrademarks(draft.listing.fields, draft.listing.meta?.brand, { model, draftId: draft.id });
     res.json(r);
   }),
 );

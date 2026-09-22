@@ -6,7 +6,7 @@
 
 export const ETSY_TITLE_EXAMPLES = [
   "Cute White Crystal Jelly Cat Keycap Set | Kawaii Artisan Keycaps, MAO Profile Design – KeyArtisan®",
-  "One Piece Theme Anime Artisan Keycap Set | Pirate Adventure Keycaps, MOA & Cherry Profile, PBT Dye-Sub – KeyArtisan®",
+  "Pirate Adventure Anime Artisan Keycap Set | Treasure Hunt Keycaps, MOA & Cherry Profile, PBT Dye-Sub – KeyArtisan®",
   "Cozy Cafe Theme Coffee Latte Keycap Set | Mocha & Plaid Design Keycaps – KeyArtisan®",
   "Cute Ita Bag Kawaii School Backpack with Clear Window | Anime Pin Plush Display Bag – CutieGiftsUS®",
 ].join("\n");
@@ -14,7 +14,7 @@ export const ETSY_TITLE_EXAMPLES = [
 export const ETSY_DESC_EXAMPLE = [
   "✨ Ever wanted your mechanical keyboard to feel like a pirate adventure?",
   "",
-  "The One Piece Anime Artisan Keycap Set brings colorful chibi characters, treasure motifs, and ocean-voyage vibes straight to your desk. Inspired by epic journeys and beloved crewmates, every key feels like a tiny scene from a grand adventure.",
+  "This Pirate Adventure Anime Artisan Keycap Set brings colorful chibi characters, treasure motifs, and ocean-voyage vibes straight to your desk. Inspired by epic journeys and beloved crewmates, every key feels like a tiny scene from a grand adventure.",
   "",
   "With expressive character novelties, map details, barrels, ships, and iconic symbols, this set blends warm reds, sandy beiges, ocean blues, and wood-tone browns for a playful yet collectible look.",
   "",
@@ -50,7 +50,7 @@ export const ETSY_DESC_EXAMPLE = [
   "",
   "🌊 𝐒𝐞𝐭 𝐒𝐚𝐢𝐥 𝐟𝐨𝐫 𝐀𝐝𝐯𝐞𝐧𝐭𝐮𝐫𝐞",
   "Bold, playful, and full of adventure.",
-  "The One Piece Theme Anime Artisan Keycap Set is perfect for anime fans, collectors, and mechanical keyboard lovers who want a fun, story-driven setup that stands out.",
+  "This Pirate Adventure Anime Artisan Keycap Set is perfect for anime fans, collectors, and mechanical keyboard lovers who want a fun, story-driven setup that stands out.",
 ].join("\n");
 
 /** ~250 real Etsy tag phrases the operator uses — the search vocabulary. */
@@ -66,7 +66,7 @@ keycap set, rgb keyboard, tri mode keyboard, bunny keycaps, gothic keycap set, p
 pink keyboard, white keycaps, iso keycaps, pbt keycap set, keyboard caps, mda keycaps,
 gamer girl gift, key cap set, backlit keycap set, iso keycap set, purple keycap set, cherry keycap set,
 japanese keycaps, purple keycaps, cartoon keycaps, colorful keycaps, gamer gifts, gradient keycap set,
-green keycap set, black keycaps, chiikawa keycaps, graffiti keycap set, iso keycap, japanese keycap set,
+green keycap set, black keycaps, mochi bunny keycaps, graffiti keycap set, iso keycap, japanese keycap set,
 keyboard keycap, matcha keycap set, matcha keycaps, clear window bag, kawaii ita bag, cute ita bag,
 anime ita bag, display ita bag, cute display bag, anime display bag, kawaii display bag, pin display bag,
 cute shoulder bag, display anime bag, cute backpack, kawaii school bag, kawaii backpack,
@@ -88,8 +88,8 @@ export const SHOPIFY_TITLE_EXAMPLES = [
   "PIIFOX Eva Unit Metallic Style Keycap Set",
   "Ancient Chinese Theme Artisan Keycap Set",
   "MU Mountain Seclusion Mechanical Keyboard",
-  "Super Mario Bros Layered Resin Artisan Keycap",
-  "Harry Potter Themed Artisan Keycap Set",
+  "Retro Platformer Layered Resin Artisan Keycap",
+  "Wizard School Themed Artisan Keycap Set",
 ].join("\n");
 
 /** A slice of the operator's large Shopify tag list — the search vocabulary. */
@@ -100,15 +100,15 @@ Anime Keycap Set, Anime Keycaps, anime keycap collection, Backlit Keycap, backli
 Bear Keycaps, bear keycap set, beige keycap set, beige keycaps, Black Keycap Set, Black Keycaps,
 Blue Keycap Set, Blue Keycaps, Bold Keycaps, Brown Keycap Set, Brown Keycaps, Cafe Keycap Set,
 Cafe Keycaps, Capybara Keycap Set, Cat Keycap Set, Cat Keycaps, Cherry MX, Cherry Profile Keycap Set,
-Cherry Profile Keycaps, Chiikawa Keycap Set, Coffee Keycap Set, Coffee Keycaps, Colorful Keyboard,
+Cherry Profile Keycaps, Mochi Bunny Keycap Set, Coffee Keycap Set, Coffee Keycaps, Colorful Keyboard,
 Cool Keycap Set, Cool Keycaps, Cozy Keycap Set, Cozy Keycaps, custom keyboard, Custom Keycaps,
 custom keycap set, cute keycap set, Cute Keycaps, Dog Keycap Set, Dog Keycaps, dye sub keycaps,
 Dye Sublimation, dye-sublimation keycaps, dye sub keycap set, durable keycaps, premium keycaps,
 premium keycap set, PBT keycap set, PBT keycap, Floral Keycap Set, Floral Keycaps, FOA Keycaps,
 FOA Profile, Full Dye-Sub Keycaps, Gamer Keycap Set, Gaming Keycap Set, gaming keycaps,
 Gothic Keycap Set, Gothic Keycaps, Gradient Keycap Set, Gradient Keycaps, Graffiti Keycap Set,
-Green Keycap Set, green keycaps, Harry Potter Keycap Set, Hatsune Miku Keycap Set,
-Hello Kitty Keycap Set, ISO Keycap Set, ISO Keycaps, Japanese Keycaps, japanese keycap set,
+Green Keycap Set, green keycaps, Wizard School Keycap Set, Virtual Idol Keycap Set,
+Kawaii Cat Keycap Set, ISO Keycap Set, ISO Keycaps, Japanese Keycaps, japanese keycap set,
 Jelly Keycap Set, Jelly Keycaps, jelly style keycaps, kawaii keycap set, kawaii keycaps,
 Keycap, keycaps, keyboard keycaps, MAO Keycap Set, MAO Keycaps, MAO Profile, Matcha Keycap Set,
 Matcha Keycaps, MDA Keycaps, MDA Profile, mechanical keyboard keycaps, Metallic Keycap Set,
@@ -470,11 +470,11 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm">
 <div class="bm-c1"><div class="bm-inner">
 <div class="bm-hero bm-reveal">
-<span class="bm-eyebrow">Chiikawa Usagi Collection</span>
-<h2>🐰 Chiikawa Usagi Cute Cartoon Keycaps 🍯</h2>
+<span class="bm-eyebrow">Mochi Bunny Collection</span>
+<h2>🐰 Mochi Bunny Cute Cartoon Keycaps 🍯</h2>
 <p class="sub">140 Keys · PBT Dye-Sublimation · Cherry &amp; KOA Profile · Side Print Legends</p>
 <div class="bm-badges">
-<span>🔢 140 Keys</span> <span>🧵 PBT Dye-Sub</span> <span>🎹 Cherry &amp; KOA Profile</span> <span>🖨️ Side Print</span> <span>🐰 Chiikawa Theme</span> <span>🍯 Kawaii Aesthetic</span>
+<span>🔢 140 Keys</span> <span>🧵 PBT Dye-Sub</span> <span>🎹 Cherry &amp; KOA Profile</span> <span>🖨️ Side Print</span> <span>🐰 Mochi Bunny Theme</span> <span>🍯 Kawaii Aesthetic</span>
 </div>
 </div>
 </div></div>
@@ -488,12 +488,12 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-c2"><div class="bm-inner">
 <div class="bm-info bm-reveal">
 
-<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring Chiikawa's ever-charming Usagi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — it includes the pieces both layouts need, so you can build your keyboard either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
-<p class="bm-trivia">🐹 Fun fact: the titular Chiikawa character is hamster-inspired — <strong>Usagi</strong> is his rabbit-loving best friend, and the star of this set.</p>
+<p class="bm-lede">Turn your keyboard into an instant conversation piece with this <strong>keycap set</strong> starring an ever-charming bunny mascot named Mochi. Every legend is <strong>dye-sublimated</strong> deep into thick, textured PBT, so the tiny cartoon faces never fade, chip, or wash out no matter how many hours you type. The set is <strong>ANSI &amp; ISO layout compatible</strong> — it includes the pieces both layouts need, so you can build your keyboard either way with no extra kit — and the <strong>Cherry &amp; KOA Profile</strong> options let you dial in the sculpted feel you like best. ✨</p>
+<p class="bm-trivia">🐹 Fun fact: the set is built around a round little forest mascot — <strong>Mochi</strong> is his rabbit-loving best friend, and the star of this set.</p>
 
 <h3>Highlights</h3>
 <ul class="bm-feat">
-<li><span class="ico">🐰</span><span class="tx"><b>Chiikawa Usagi artwork</b><span class="t">Adorable Usagi and cast illustrations spread across the whole keyboard.</span></span></li>
+<li><span class="ico">🐰</span><span class="tx"><b>Mochi Bunny artwork</b><span class="t">Adorable Mochi and cast illustrations spread across the whole keyboard.</span></span></li>
 <li><span class="ico">🧵</span><span class="tx"><b>Thick PBT plastic</b><span class="t">Resists shine and grease far longer than standard ABS keycaps.</span></span></li>
 <li><span class="ico">🖨️</span><span class="tx"><b>Dye-sublimated legends</b><span class="t">Ink is fused into the plastic itself, not printed on top.</span></span></li>
 <li><span class="ico">🎹</span><span class="tx"><b>Cherry &amp; KOA profile options</b><span class="t">Pick the sculpted feel that matches your typing style.</span></span></li>
@@ -535,7 +535,7 @@ export const STACKED_DESC_EXAMPLE = `<style>
 <div class="bm-r"><span class="bm-k">Layout support</span><span class="bm-v">ANSI &amp; ISO layout compatible</span></div>
 <div class="bm-r"><span class="bm-k">Keyboard sizes</span><span class="bm-v">60% / 65% / 75% / TKL / 96% / full-size / Alice</span></div>
 <div class="bm-r"><span class="bm-k">Spacebar support</span><span class="bm-v">6.25U, 7U, 2.75U, 2.25U</span></div>
-<div class="bm-r"><span class="bm-k">Theme</span><span class="bm-v">Chiikawa Usagi cartoon (Usagi &amp; friends, pastel line work)</span></div>
+<div class="bm-r"><span class="bm-k">Theme</span><span class="bm-v">Mochi Bunny cartoon (Mochi &amp; friends, pastel line work)</span></div>
 <span class="bm-sub">Care</span>
 <div class="bm-r"><span class="bm-k">Cleaning</span><span class="bm-v">Hand-wash, mild soap, air-dry fully</span></div>
 <div class="bm-r"><span class="bm-k">Avoid</span><span class="bm-v">Hot water, dishwashers, harsh solvents</span></div>
@@ -892,14 +892,14 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <div class="pd-ck" lang="en">
 
 <div class="pd-ck__strip">
-<span>🐰 Chiikawa Usagi</span><span>🧵 PBT Dye-Sub</span><span>🎹 Cherry &amp; KOA Profile</span><span>🔢 140 Keys</span><span>🖨️ Side-Print Option</span><span>⌨️ MX Compatible</span>
+<span>🐰 Mochi Bunny</span><span>🧵 PBT Dye-Sub</span><span>🎹 Cherry &amp; KOA Profile</span><span>🔢 140 Keys</span><span>🖨️ Side-Print Option</span><span>⌨️ MX Compatible</span>
 </div>
 
 <section class="pd-ck__section pd-ck__hero">
-<h1>🐰 Chiikawa Usagi Cartoon Keycap Set 🍯</h1>
-<p class="pd-ck__sub">A 140-piece PBT set built around Chiikawa's rabbit-loving best friend — dye-sublimated art that never fades, on a soft Cherry or KOA sculpt.</p>
+<h1>🐰 Mochi Bunny Cartoon Keycap Set 🍯</h1>
+<p class="pd-ck__sub">A 140-piece PBT set built around a forest mascot's rabbit-loving best friend — dye-sublimated art that never fades, on a soft Cherry or KOA sculpt.</p>
 <div class="pd-ck__badges">
-<span>🐰 Usagi &amp; friends</span><span>🧵 Thick PBT</span><span>🖨️ Dye-sublimation</span><span>🎹 Cherry / KOA</span><span>🍯 Kawaii pastel</span>
+<span>🐰 Mochi &amp; friends</span><span>🧵 Thick PBT</span><span>🖨️ Dye-sublimation</span><span>🎹 Cherry / KOA</span><span>🍯 Kawaii pastel</span>
 </div>
 </section>
 
@@ -921,7 +921,7 @@ export const OTHER_DESC_EXAMPLE = `<style>
 <div class="pd-ck__rule"></div>
 </div>
 <div class="pd-ck__features">
-<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🐰</div><h3>Chiikawa Usagi artwork</h3><p>Usagi and the whole cast, spread across the board with soft pastel detailing.</p></article>
+<article class="pd-ck__feature"><div class="pd-ck__feature-ic">🐰</div><h3>Mochi Bunny artwork</h3><p>Mochi and the whole cast, spread across the board with soft pastel detailing.</p></article>
 <article class="pd-ck__feature"><div class="pd-ck__feature-ic">🧵</div><h3>Thick PBT plastic</h3><p>Resists shine and grease far longer than standard ABS keycaps.</p></article>
 <article class="pd-ck__feature"><div class="pd-ck__feature-ic">🖨️</div><h3>Dye-sublimated legends</h3><p>Ink is fused into the plastic itself, not printed on top — it cannot rub off.</p></article>
 <article class="pd-ck__feature"><div class="pd-ck__feature-ic">🎹</div><h3>Cherry &amp; KOA profiles</h3><p>Pick the sculpted feel that matches your typing style — low Cherry or taller KOA.</p></article>

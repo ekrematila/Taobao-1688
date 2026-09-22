@@ -759,6 +759,13 @@ export async function generateListing(
     ? `MARKA: "${input.brand.trim()}" — Etsy başlığının EN SONUNA " – ${input.brand.trim()}®" ekle (bir kez).`
     : 'MARKA: verilmedi — başlıkta marka kullanma (uydurma).';
 
+  const trademarkLine =
+    "MARKA/TESCİLLİ İSİM YASAĞI — KESİN KURAL: title, title_alt, description ve tags/tags_pool alanlarının HİÇBİRİNDE operatörün KENDİ markası (ayrı bir MARKA talimatı varsa o) DIŞINDA hiçbir marka, üretici, oyun, anime, film, dizi, çizgi film, karakter, franchise veya şirket ismi GEÇMEYECEK " +
+    "(örnek — bunlarla sınırlı değil: Pokemon, Minecraft, One Piece, Naruto, Pikachu, Hello Kitty, Sanrio, Hatsune Miku, Kirby, Disney, Marvel, Nintendo, Star Wars, Harry Potter). " +
+    "Kaynak üründe (başlıkta, açıklamada, özelliklerde) böyle bir isim geçiyor olsa BİLE onu ASLA aynen kopyalama veya çevirme — bunun yerine ürünün GERÇEK görsel/temasal özelliklerini jenerik kelimelerle tarif et " +
+    "(ör. \"Minecraft temalı\" DEĞİL \"pixel/blok dünyası temalı\"; \"One Piece temalı\" DEĞİL \"korsan macera temalı\"; \"Pokemon temalı\" DEĞİL \"yakalanabilir canavar temalı\"; \"Hello Kitty\" DEĞİL \"sevimli kedi karakteri\"). " +
+    "Görsellere bakıp ürünün GERÇEKTEN neye benzediğini (renkler, motifler, karakter türü) anlat, marka/franchise ismini ASLA yazma. ÖRNEK dosyalarında/verilerinde böyle bir isim görsen bile onu ASLA örnek alıp tekrarlama.";
+
   const channelRules = isShopify
     ? [
         "KANAL KURALLARI (Shopify):",
@@ -954,6 +961,7 @@ export async function generateListing(
       : "",
     shopifyDescRule,
     !isShopify ? brandLine : "",
+    trademarkLine,
     vocabLine,
     kbLine,
     input.advice?.trim()
@@ -1668,6 +1676,61 @@ export async function suggestProductType(
     model,
     usage,
   };
+}
+
+export interface TrademarkCheckResult {
+  /** third-party brand/trademark/franchise terms found in the listing text — empty means clean */
+  flagged: string[];
+  model: string;
+}
+
+/**
+ * Last-check gate before a listing goes out: scans the generated title/
+ * title_alt/description/tags text for third-party trademarks, brand names,
+ * or franchise/character names that shouldn't be there — only the
+ * operator's OWN brand (if any) is allowed. A static keyword list can never
+ * cover every franchise that exists, so this asks the model directly; it's
+ * text-only and cheap (no images), meant to run right before push.
+ */
+export async function checkTrademarks(
+  fields: { key: string; value: string }[],
+  ownBrand: string | undefined,
+  opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
+): Promise<TrademarkCheckResult> {
+  const text = fields
+    .map((f) => `${f.key}: ${f.value}`)
+    .join("\n\n")
+    .slice(0, 8000);
+
+  const system = [
+    "You review e-commerce listing text (title, description, tags) for THIRD-PARTY trademarks, brand names, franchise names, character names, or company names that should not be there.",
+    ownBrand
+      ? `The seller's OWN brand is "${ownBrand}" — that one is expected and allowed, do not flag it.`
+      : "The seller has no brand name configured for this listing — flag ANY brand/company name you see, including generic-sounding ones that read as a made-up brand.",
+    "Flag things like: video game titles, anime/movie/TV franchise names, cartoon or game character names, toy lines, celebrity names, or any registered company/product brand OTHER than the seller's own brand above.",
+    "Do NOT flag: generic descriptive words (cute, kawaii, anime, gaming, retro, vintage, pixel, fantasy), material/technical terms (PBT, Cherry Profile, MOA, ABS, dye-sublimation), colors, animal names (cat, bunny, dragon), or the seller's own brand.",
+    'Reply as strict JSON only: {"flagged":["term1","term2",...]} — the exact term(s) as they appear in the text. Empty array if nothing found.',
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { text: out, model } = await ask(system, text, "checkTrademarks", {
+    model: opts.model,
+    maxTokens: 300,
+    signal: opts.signal,
+    draftId: opts.draftId,
+  });
+
+  let parsed: any = {};
+  try {
+    parsed = JSON.parse((out.match(/\{[\s\S]*\}/) || ["{}"])[0]);
+  } catch {
+    /* fall through */
+  }
+  const flagged = Array.isArray(parsed.flagged)
+    ? [...new Set(parsed.flagged.map((x: unknown) => String(x).trim()).filter(Boolean))].slice(0, 20) as string[]
+    : [];
+  return { flagged, model };
 }
 
 /* -------------------- Shopify taxonomy attribute picks -------------------- */

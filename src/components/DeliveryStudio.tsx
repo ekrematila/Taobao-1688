@@ -142,6 +142,7 @@ export default function DeliveryStudio({
   const [confirmGate, setConfirmGate] = useState<null | boolean>(null);
   const [etsyShopId, setEtsyShopId] = useState("");
   const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
+  const [trademarkWarn, setTrademarkWarn] = useState<{ flagged: string[]; resolve: (proceed: boolean) => void } | null>(null);
   const [hoverLayout, setHoverLayout] = useState<string | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState("");
@@ -557,7 +558,25 @@ export default function DeliveryStudio({
     return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${title}</title>\n</head>\n<body>\n${body}\n</body>\n</html>\n`;
   }
 
+  /** Last check before a listing leaves this app: scans title/description/tags
+   *  for third-party brand/franchise/character names (only the operator's own
+   *  brand is allowed). Resolves true to proceed, false if the operator backed
+   *  out. A failed check never blocks the push — it's a warning, not a gate. */
+  async function trademarkGateOk(): Promise<boolean> {
+    setBusy("check-trademarks");
+    try {
+      const r = await api.checkTrademarks(draft.id);
+      if (r.flagged.length === 0) return true;
+      return await new Promise<boolean>((resolve) => setTrademarkWarn({ flagged: r.flagged, resolve }));
+    } catch {
+      return true;
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function push() {
+    if (!(await trademarkGateOk())) return;
     setBusy("push");
     try {
       const r = await api.pushShopify(draft.id);
@@ -573,11 +592,12 @@ export default function DeliveryStudio({
   /** Multiple Etsy shops can be paired on the companion app now — a push must
    *  always name one explicitly, and the operator gets one last "emin misiniz?"
    *  look at exactly which shop + category it's headed to before it fires. */
-  function pushEtsy() {
+  async function pushEtsy() {
     if (!etsyShopId) {
       toast(t("delivery.etsyShopRequired"), "err");
       return;
     }
+    if (!(await trademarkGateOk())) return;
     const shopName = etsyShops.find((s) => s.id === etsyShopId)?.name || etsyShopId;
     setEtsyPushConfirm({ shopId: etsyShopId, shopName });
   }
@@ -1527,6 +1547,47 @@ export default function DeliveryStudio({
               </button>
               <button className="btn primary" onClick={() => doPushEtsy(etsyPushConfirm.shopId)}>
                 {t("common.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {trademarkWarn && (
+        <div
+          className="modal-scrim"
+          onClick={() => {
+            trademarkWarn.resolve(false);
+            setTrademarkWarn(null);
+          }}
+        >
+          <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("delivery.trademarkWarnTitle")}</h3>
+            <p className="sub">{t("delivery.trademarkWarnBody")}</p>
+            <ul className="tiny" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+              {trademarkWarn.flagged.map((term, i) => (
+                <li key={i}>{term}</li>
+              ))}
+            </ul>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  trademarkWarn.resolve(false);
+                  setTrademarkWarn(null);
+                }}
+              >
+                {t("delivery.trademarkWarnBack")}
+              </button>
+              <button
+                className="btn primary"
+                style={{ background: "var(--danger)" }}
+                onClick={() => {
+                  trademarkWarn.resolve(true);
+                  setTrademarkWarn(null);
+                }}
+              >
+                {t("delivery.trademarkWarnProceed")}
               </button>
             </div>
           </div>
