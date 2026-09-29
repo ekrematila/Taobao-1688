@@ -4,7 +4,7 @@ import { db, getSetting, now } from "./db.ts";
 import { CHARS_PER_LINE, claudePricing, DESC_STYLES, htmlBudgetFactor, TITLE_VOCAB } from "@shared/models.ts";
 import { isSelfContainedLayout, cleanDescValue } from "@shared/descLayouts.ts";
 import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
-import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
+import { applyKeycapGlossary, detectKeyboardLayout, layoutNote, CHERRY_PROFILE_DIRECTIVE } from "@shared/keycaps.ts";
 import { cleanPropsRecord, cleanSpecs } from "@shared/specs.ts";
 import {
   buildTagCandidates,
@@ -1783,6 +1783,7 @@ export async function checkListingConsistency(
     "You fact-check a GENERATED e-commerce listing against the REAL source product it was written from — the product photos (ground truth for look/colour/materials) and the original specs/title below.",
     "Flag ONLY genuine factual mismatches the generated text introduced: a colour/material/pattern the photos don't show, a feature or compatibility claim the specs don't support, a wrong quantity/count, a wrong product type, or a claim that plainly contradicts the source.",
     "Do NOT flag: marketing tone, word choice, SEO phrasing, shortened/simplified descriptions, or anything that's merely less detailed than the source — those are fine. Only flag things that are factually WRONG about the actual product.",
+    `Do NOT flag this store's own established terminology mapping, which is CORRECT and intentional, not a mismatch: ${CHERRY_PROFILE_DIRECTIVE}`,
     "For each real mismatch, quote the exact offending phrase from the field (`current`), explain in TURKISH why it's wrong (`issue`), and give a replacement phrase in the SAME language/style as the original field that correctly matches the real product (`suggestion`).",
     'Reply as strict JSON only: {"issues":[{"field":"title"|"title_alt"|"description"|"tags","current":"...","issue":"...","suggestion":"..."}]} — empty array if the listing genuinely matches the product.',
   ].join("\n");
