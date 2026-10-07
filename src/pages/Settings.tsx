@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, type Effort } from "@shared/models.ts";
+import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, providerOf, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
@@ -19,6 +19,8 @@ export default function SettingsPage() {
   const [obKey, setObKey] = useState("");
   const [obSecret, setObSecret] = useState("");
   const [claudeKey, setClaudeKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [vOpenai, setVOpenai] = useState<VerifyClaudeResult | "loading" | null>(null);
   const [manusKey, setManusKey] = useState("");
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState<Effort>("high");
@@ -131,6 +133,7 @@ export default function SettingsPage() {
         oneboundKey: obKey || undefined,
         oneboundSecret: obSecret || undefined,
         anthropicKey: claudeKey || undefined,
+        openaiKey: openaiKey || undefined,
         manusKey: manusKey || undefined,
         shopifyDomain: shopDomain.trim() || undefined,
         shopifyToken: shopToken.trim() || undefined,
@@ -142,6 +145,7 @@ export default function SettingsPage() {
       setObKey("");
       setObSecret("");
       setClaudeKey("");
+      setOpenaiKey("");
       setManusKey("");
       setShopToken("");
       setShopClientSecret("");
@@ -168,6 +172,23 @@ export default function SettingsPage() {
       }
     } catch (e) {
       setVClaude({ ok: false, models: [], activeModel: "", effort: "", thinking: "", fast: false, fastModels: [], error: (e as Error).message });
+    }
+  }
+  const fastModelsLabel = [...FAST_MODELS.filter((m) => providerOf(m) === "anthropic"), "gpt-*"].join(" / ");
+  async function runVerifyOpenai() {
+    setVOpenai("loading");
+    try {
+      await flushPrefs();
+      const r = await api.verifyOpenAI(openaiKey || undefined);
+      setVOpenai(r);
+      if (r.ok && openaiKey) {
+        await api.saveSettings({ openaiKey });
+        setOpenaiKey("");
+        toast(t("settings.verifiedSaved"), "ok");
+        s.refetch();
+      }
+    } catch (e) {
+      setVOpenai({ ok: false, models: [], activeModel: "", effort: "", thinking: "", fast: false, fastModels: [], error: (e as Error).message });
     }
   }
   async function runVerifyManus() {
@@ -303,14 +324,21 @@ export default function SettingsPage() {
             <label className="field">
               {t("settings.claudeModel")}
               <select value={model} onChange={(e) => setModel(e.target.value)}>
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id} — {m.label} (${m.inPer1M}/${m.outPer1M} /M)
-                  </option>
+                {(["anthropic", "openai"] as const).map((prov) => (
+                  <optgroup key={prov} label={prov === "openai" ? "ChatGPT (OpenAI)" : "Claude (Anthropic)"}>
+                    {CLAUDE_MODELS.filter((m) => providerOf(m.id) === prov).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id} — {m.label} (${m.inPer1M}/${m.outPer1M} /M)
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </label>
             <p className="tiny muted">{t("settings.claudeModelHint")}</p>
+            {providerOf(model) === "openai" && !s.data?.hasOpenaiKey && (
+              <p className="tiny err-t">{t("settings.openaiNeedKey")}</p>
+            )}
 
             <div className="metafield" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <b className="tiny">{t("settings.claudeAdvanced")}</b>
@@ -337,9 +365,9 @@ export default function SettingsPage() {
               <label className="row" style={{ gap: 8 }}>
                 <input type="checkbox" style={{ width: 15 }} checked={fast} onChange={(e) => setFast(e.target.checked)} />
                 <span className="tiny">{t("settings.fast")}</span>
-                {fast && !FAST_MODELS.includes(model) && <span className="badge warn">{FAST_MODELS.join(" / ")}</span>}
+                {fast && !FAST_MODELS.includes(model) && <span className="badge warn">{fastModelsLabel}</span>}
               </label>
-              <p className="tiny muted" style={{ margin: 0 }}>{t("settings.fastHint", { models: FAST_MODELS.join(" / ") })}</p>
+              <p className="tiny muted" style={{ margin: 0 }}>{t("settings.fastHint", { models: fastModelsLabel })}</p>
               <p className="tiny muted" style={{ margin: 0 }}>{t("settings.cachingNote")}</p>
             </div>
 
@@ -388,6 +416,64 @@ export default function SettingsPage() {
                           {m}
                         </span>
                       ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ChatGPT (OpenAI) */}
+        <div className="card">
+          <div className="card-h">
+            <h3>◎ {t("settings.secOpenai")}</h3>
+            <span className={"badge " + (s.data?.hasOpenaiKey ? "ok" : "warn")}>
+              {s.data?.hasOpenaiKey ? t("settings.has") : t("settings.source.none")}
+            </span>
+          </div>
+          <div className="card-b col" style={{ gap: 12 }}>
+            <div className="row">
+              <span className="badge">key: {s.data?.openaiKeyHint || "—"}</span>
+              <span className="badge">
+                {t("usage.colProvider")}: {s.data ? srcLabel(s.data.openaiKeySource) : "—"}
+              </span>
+            </div>
+            <label className="field">
+              OPENAI_API_KEY — {t("settings.newKey")}
+              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="sk-…" />
+            </label>
+            <p className="tiny muted">{t("settings.openaiHint")}</p>
+            <div className="row">
+              <button className="btn sm" onClick={runVerifyOpenai} disabled={vOpenai === "loading"}>
+                {vOpenai === "loading" ? t("settings.verifying") : t("settings.verify")}
+              </button>
+              {s.data?.openaiKeySource === "ui" && (
+                <button className="btn ghost sm" onClick={() => save({ clearOpenaiKey: true })} disabled={busy}>
+                  {t("settings.clear")}
+                </button>
+              )}
+            </div>
+            {vOpenai && vOpenai !== "loading" && (
+              <div className="verifybox">
+                <b className={vOpenai.ok ? "ok-t" : "err-t"}>
+                  {vOpenai.ok ? "✓ " + t("settings.verifyOk") : "✗ " + t("settings.verifyFail")}
+                </b>
+                {vOpenai.error && <div className="tiny err-t">{vOpenai.error}</div>}
+                {vOpenai.ok && (
+                  <>
+                    <div className="tiny muted" style={{ margin: "6px 0 4px" }}>
+                      {t("settings.claudeModelsProof")} — {vOpenai.models.length}
+                    </div>
+                    <div className="chips">
+                      {vOpenai.models
+                        .filter((m) => providerOf(m) === "openai")
+                        .slice(0, 60)
+                        .map((m) => (
+                          <span key={m} className={"chip" + (m === vOpenai.activeModel ? " active" : "")} style={{ cursor: "default" }}>
+                            {m}
+                          </span>
+                        ))}
                     </div>
                   </>
                 )}

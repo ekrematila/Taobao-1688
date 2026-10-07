@@ -296,6 +296,9 @@ export interface Settings {
   hasLlmKey: boolean;
   llmKeyHint: string;
   llmKeySource: KeySource;
+  hasOpenaiKey: boolean;
+  openaiKeyHint: string;
+  openaiKeySource: KeySource;
   llmEffort: "low" | "medium" | "high" | "xhigh" | "max";
   llmThinking: "adaptive" | "off";
   llmFast: boolean;
@@ -344,8 +347,10 @@ export interface SettingsPatch {
   oneboundKey?: string;
   oneboundSecret?: string;
   anthropicKey?: string;
+  openaiKey?: string;
   manusKey?: string;
   clearAnthropicKey?: boolean;
+  clearOpenaiKey?: boolean;
   clearManusKey?: boolean;
   shopifyDomain?: string;
   shopifyToken?: string;
@@ -403,6 +408,7 @@ export interface UsageDashboard {
   to: string | null;
   totalCostUsd: number;
   claudeCostUsd: number;
+  openaiCostUsd: number;
   manusCostUsd: number;
   totalInputTokens: number;
   totalOutputTokens: number;

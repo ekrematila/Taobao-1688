@@ -71,7 +71,7 @@ export default function Usage() {
   // credits this app burned cost no extra money — don't add them to the total.
   const manusHasCredits = (mu?.available ?? 0) > 0;
   const manusBillableUsd = manusHasCredits ? 0 : manusUsd;
-  const totalCostUsd = (d?.claudeCostUsd ?? 0) + manusBillableUsd;
+  const totalCostUsd = (d?.claudeCostUsd ?? 0) + (d?.openaiCostUsd ?? 0) + manusBillableUsd;
 
   return (
     <>
@@ -106,6 +106,7 @@ export default function Usage() {
         <div className="row">
           <Stat label={t("usage.totalCost")} value={usd(totalCostUsd)} big sub={t("usage.appOnly")} />
           <Stat label={t("usage.claudeToken")} value={usd(d?.claudeCostUsd ?? 0)} />
+          <Stat label={t("usage.openaiToken")} value={usd(d?.openaiCostUsd ?? 0)} />
           <Stat
             label={t("usage.manusCredit")}
             value={usd(manusBillableUsd)}

@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
 import { db, getSetting, now } from "./db.ts";
-import { CHARS_PER_LINE, claudePricing, DESC_STYLES, htmlBudgetFactor, TITLE_VOCAB } from "@shared/models.ts";
+import { CHARS_PER_LINE, CLAUDE_MODELS, claudePricing, DESC_STYLES, FAST_MODELS, htmlBudgetFactor, providerOf, TITLE_VOCAB } from "@shared/models.ts";
+import { openaiConfigured, openaiListModels, openaiRespond, OpenAIHttpError, type OpenAIResult } from "./openai.ts";
 import { isSelfContainedLayout, cleanDescValue } from "@shared/descLayouts.ts";
 import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote, CHERRY_PROFILE_DIRECTIVE } from "@shared/keycaps.ts";
@@ -52,8 +53,8 @@ export class LlmError extends Error {
 export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type Effort = (typeof EFFORT_LEVELS)[number];
 export type ThinkingMode = "adaptive" | "off";
-/** Fast mode is a research preview limited to these models. */
-export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8"];
+/** Fast mode: Claude research-preview models + every ChatGPT model (service_tier=priority). */
+export { FAST_MODELS };
 
 /** Shopify HTML-description build rule — "Diğer HTML düzenler". */
 function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
@@ -232,6 +233,15 @@ export function claudeConfigured(): boolean {
   return Boolean(activeAnthropicKey());
 }
 
+/** Is the API for THIS model (default: the active one) ready? Claude ids need the
+ *  Anthropic key, gpt-* ids the OpenAI key — what every "key set?" gate should ask. */
+export function llmConfigured(model?: string): boolean {
+  return providerOf(model || activeModel()) === "openai" ? openaiConfigured() : claudeConfigured();
+}
+export function llmKeyName(model?: string): string {
+  return providerOf(model || activeModel()) === "openai" ? "OpenAI (ChatGPT)" : "Claude";
+}
+
 function client(overrideKey?: string): Anthropic {
   const key = overrideKey || activeAnthropicKey();
   if (!key) throw new LlmError("ANTHROPIC_API_KEY ayarlı değil.", 400);
@@ -265,6 +275,102 @@ export async function verifyClaude(overrideKey?: string): Promise<{
   } catch (e: any) {
     return { ok: false, models: [], ...meta, error: e?.message || String(e) };
   }
+}
+
+/** Same idea as verifyClaude() for the ChatGPT key (Settings → "Doğrula"). */
+export async function verifyOpenAI(overrideKey?: string): Promise<{
+  ok: boolean;
+  models: string[];
+  activeModel: string;
+  effort: Effort;
+  thinking: ThinkingMode;
+  fast: boolean;
+  fastModels: string[];
+  error?: string;
+}> {
+  const meta = {
+    activeModel: activeModel(),
+    effort: activeEffort(),
+    thinking: activeThinking(),
+    fast: activeFast(),
+    fastModels: FAST_MODELS,
+  };
+  try {
+    return { ok: true, models: await openaiListModels(overrideKey), ...meta };
+  } catch (e: any) {
+    return { ok: false, models: [], ...meta, error: e?.message || String(e) };
+  }
+}
+
+/** USD for one OpenAI call — standard rates, x2 when it was actually served on the priority ("fast") tier. */
+function priceOpenAI(m: string, r: OpenAIResult): LlmUsage {
+  const p = CLAUDE_MODELS.find((x) => x.id === m);
+  const inR = p?.inPer1M ?? 2;
+  const outR = p?.outPer1M ?? 10;
+  const cachedR = p?.cachedInPer1M ?? inR * 0.1;
+  const fresh = Math.max(0, r.inputTokens - r.cachedTokens);
+  const mult = r.serviceTier === "priority" ? 2 : 1;
+  const costUsd = mult * ((fresh / 1e6) * inR + (r.cachedTokens / 1e6) * cachedR + (r.outputTokens / 1e6) * outR);
+  return { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd };
+}
+
+/** Our Effort/thinking knobs → what this GPT model accepts for reasoning.effort. */
+function openaiEffort(m: string, effort: Effort, thinking: ThinkingMode): string {
+  const meta = CLAUDE_MODELS.find((x) => x.id === m);
+  if (thinking === "off") return meta?.allowsNone ? "none" : "low";
+  // gpt-5.5 tops out at xhigh; the 6.x family adds "max"
+  if (effort === "max" && m === "gpt-5.5") return "xhigh";
+  return effort;
+}
+
+async function askOpenAI(
+  m: string,
+  system: string,
+  user: string,
+  kind: string,
+  opts: { effort: Effort; thinking: ThinkingMode; maxTokens: number; signal?: AbortSignal; draftId?: string; images?: { data: string; mime: string }[] },
+) {
+  const wantFast = activeFast() && FAST_MODELS.includes(m);
+  const call = async (effort: string, fast: boolean): Promise<OpenAIResult> => {
+    try {
+      return await openaiRespond({
+        model: m,
+        system,
+        user,
+        images: opts.images,
+        maxOutputTokens: opts.maxTokens,
+        effort,
+        fast,
+        signal: opts.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === "AbortError") throw e;
+      // org without priority processing → quietly use the standard tier
+      if (fast && e instanceof OpenAIHttpError && /service.?tier|priority/i.test(e.message)) {
+        console.warn("[llm] OpenAI priority tier unavailable, falling back to standard");
+        return call(effort, false);
+      }
+      if (e instanceof OpenAIHttpError) {
+        if (e.status === 401) throw new LlmError("OpenAI API anahtarı geçersiz.", 401);
+        if (e.status === 429) throw new LlmError("OpenAI hız sınırı / kota — biraz sonra tekrar deneyin.", 429);
+        throw new LlmError(`LLM hatası: ${e.message}`);
+      }
+      throw new LlmError(`LLM hatası: ${e?.message || e}`);
+    }
+  };
+
+  const effort = openaiEffort(m, opts.effort, opts.thinking);
+  let r = await call(effort, wantFast);
+  // reasoning can eat the whole output budget and leave no text — retry once with minimal thinking
+  if (!r.text.trim() && r.status === "incomplete" && r.incompleteReason === "max_output_tokens") {
+    console.warn(`[llm] ${kind}: empty reply (reasoning exhausted max_output_tokens) — retrying with low effort`);
+    const meta = CLAUDE_MODELS.find((x) => x.id === m);
+    const retry = await call(meta?.allowsNone ? "none" : "low", wantFast).catch(() => null);
+    if (retry?.text.trim()) r = retry;
+  }
+  const usage = priceOpenAI(m, r);
+  logClaudeUsage(kind, m, usage, opts.draftId, r.text, "openai");
+  return { text: r.text, usage, model: m };
 }
 
 function priceUsage(m: string, u: Anthropic.Usage): LlmUsage {
@@ -302,10 +408,11 @@ export function logClaudeUsage(
   u: LlmUsage,
   draftId?: string,
   result?: unknown,
+  provider: "claude" | "openai" = "claude",
 ) {
   db.prepare(
-    "INSERT INTO usage_log (at, kind, model, input_tokens, output_tokens, cost_usd, provider, credits, estimated, draft_id, result) VALUES (?,?,?,?,?,?,'claude',0,0,?,?)",
-  ).run(now(), kind, m, u.inputTokens, u.outputTokens, u.costUsd, draftId ?? null, clampResult(result));
+    "INSERT INTO usage_log (at, kind, model, input_tokens, output_tokens, cost_usd, provider, credits, estimated, draft_id, result) VALUES (?,?,?,?,?,?,?,0,0,?,?)",
+  ).run(now(), kind, m, u.inputTokens, u.outputTokens, u.costUsd, provider, draftId ?? null, clampResult(result));
 }
 
 export function manusUsdPerCredit(): number {
@@ -458,6 +565,18 @@ export async function ask(
   let effort: Effort = opts.effort && EFFORT_LEVELS.includes(opts.effort) ? opts.effort : activeEffort();
   // {type:"disabled"} thinking is rejected above effort "high" — cap it.
   if (thinking === "off" && EFFORT_ORDER[effort] > EFFORT_ORDER.high) effort = "high";
+
+  // ChatGPT models take their own transport (Responses API) — same inputs/outputs.
+  if (providerOf(m) === "openai") {
+    return askOpenAI(m, system, user, kind, {
+      effort: opts.effort && EFFORT_LEVELS.includes(opts.effort) ? opts.effort : activeEffort(),
+      thinking,
+      maxTokens: opts.maxTokens ?? 8000,
+      signal: opts.signal,
+      draftId: opts.draftId,
+      images: opts.images,
+    });
+  }
 
   // Images (if any) go BEFORE the text, per Anthropic's own guidance — the
   // model reads them as visual context for what follows rather than an

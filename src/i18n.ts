@@ -1005,6 +1005,9 @@ const tr = {
     "Anahtarlar bu sayfadan girildiğinde veritabanında saklanır ve .env'deki değerin önüne geçer. Gerçek değerler istemciye hiç gönderilmez, yalnızca maskeli görünür.",
   "settings.secOnebound": "OneBound (Taobao / 1688 verisi)",
   "settings.secClaude": "Claude (Anthropic) — içerik & metin çevirisi",
+  "settings.secOpenai": "ChatGPT (OpenAI) — alternatif yapay zeka",
+  "settings.openaiHint": "Anahtarı platform.openai.com/api-keys adresinden alın. Yukarıdaki model listesinden bir gpt-* modeli seçtiğinizde TÜM yapay zeka işlemleri (içerik, çeviri, kontroller, blog…) ChatGPT ile çalışır; her ekrandaki model seçicisinde de gpt-* modelleri çıkar. Düşünme düzeyi ve Hızlı mod (öncelikli işleme, 2× fiyat) aynı ayarlardan yönetilir.",
+  "settings.openaiNeedKey": "Seçili model ChatGPT — aşağıdaki ChatGPT bölümüne OpenAI API anahtarını ekleyin.",
   "settings.secManus": "Manus — görsel çevirisi & görsel üretimi",
   "settings.secManusAccounts": "Ek Manus Hesapları",
   "settings.manusAccountsHint":
@@ -1071,6 +1074,7 @@ const tr = {
 
   "usage.totalCost": "Toplam maliyet",
   "usage.claudeToken": "Claude (token)",
+  "usage.openaiToken": "ChatGPT (token)",
   "usage.manusCredit": "Manus (kredi)",
   "usage.manusCovered": "{c} kredi · plan kredisinden karşılandı (≈ {v} değerinde, ek maliyet yok)",
   "usage.manusCreditNote": "Manus kredi bakiyeniz olduğu için, harcanan krediler maliyete eklenmez — kredi bitince eklenmeye başlar.",
@@ -2183,6 +2187,9 @@ const en: Record<keyof typeof tr, string> = {
     "Keys entered on this page are stored in the database and take precedence over the .env value. Real values are never sent to the client — only a masked hint.",
   "settings.secOnebound": "OneBound (Taobao / 1688 data)",
   "settings.secClaude": "Claude (Anthropic) — content & text translation",
+  "settings.secOpenai": "ChatGPT (OpenAI) — alternative AI",
+  "settings.openaiHint": "Get the key from platform.openai.com/api-keys. Pick any gpt-* model in the list above and EVERY AI operation (content, translation, checks, blog…) runs on ChatGPT; every per-screen model picker lists the gpt-* models too. Reasoning level and Fast mode (priority processing, 2x price) are managed from the same settings.",
+  "settings.openaiNeedKey": "The selected model is ChatGPT — add your OpenAI API key in the ChatGPT section below.",
   "settings.secManus": "Manus — image translation & image generation",
   "settings.secManusAccounts": "Additional Manus accounts",
   "settings.manusAccountsHint":
@@ -2249,6 +2256,7 @@ const en: Record<keyof typeof tr, string> = {
 
   "usage.totalCost": "Total cost",
   "usage.claudeToken": "Claude (tokens)",
+  "usage.openaiToken": "ChatGPT (tokens)",
   "usage.manusCredit": "Manus (credits)",
   "usage.manusCovered": "{c} credits · covered by plan credits (≈ {v} value, no extra cost)",
   "usage.manusCreditNote": "You still have Manus credits, so credits spent aren't added to the cost — they start counting once credits run out.",

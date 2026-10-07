@@ -6,8 +6,16 @@ export interface ClaudeModel {
   /** USD per 1M tokens */
   inPer1M: number;
   outPer1M: number;
-  tier: "opus" | "sonnet" | "haiku" | "fable";
+  tier: "opus" | "sonnet" | "haiku" | "fable" | "gpt";
+  /** which API serves this model — derived from the id, set explicitly for GPT */
+  provider?: LlmProvider;
+  /** OpenAI cached-input price per 1M (Anthropic's cache math is separate) */
+  cachedInPer1M?: number;
+  /** OpenAI models that accept reasoning.effort "none" (no thinking at all) */
+  allowsNone?: boolean;
 }
+
+export type LlmProvider = "anthropic" | "openai";
 
 // Cached from the Anthropic pricing table. Any id here is selectable in the UI.
 // Keep this in sync with new Anthropic model releases (check the model IDs the
@@ -27,8 +35,32 @@ export const CLAUDE_MODELS: ClaudeModel[] = [
   { id: "claude-fable-5", label: "Fable 5 (previous)", inPer1M: 10, outPer1M: 50, tier: "fable" },
 ];
 
+
+// OpenAI / ChatGPT models (Responses API). Prices per 1M tokens from
+// developers.openai.com/api/docs/models — short-context (<=272K) standard rates;
+// "fast" (service_tier=priority) bills 2x. Every dropdown that lists
+// CLAUDE_MODELS therefore offers these too.
+export const GPT_MODELS: ClaudeModel[] = [
+  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol · near-Astra, lower cost", inPer1M: 2, outPer1M: 10, cachedInPer1M: 0.1, tier: "gpt", provider: "openai" },
+  { id: "gpt-6-astra", label: "GPT-6 Astra · most capable", inPer1M: 10, outPer1M: 50, cachedInPer1M: 1, tier: "gpt", provider: "openai" },
+  { id: "gpt-6-sol", label: "GPT-6 Sol", inPer1M: 2, outPer1M: 10, cachedInPer1M: 0.2, tier: "gpt", provider: "openai", allowsNone: true },
+  { id: "gpt-6-luna", label: "GPT-6 Luna · cheapest", inPer1M: 0.1, outPer1M: 0.5, cachedInPer1M: 0.01, tier: "gpt", provider: "openai", allowsNone: true },
+  { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", inPer1M: 4, outPer1M: 20, cachedInPer1M: 0.4, tier: "gpt", provider: "openai", allowsNone: true },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", inPer1M: 2, outPer1M: 12, cachedInPer1M: 0.2, tier: "gpt", provider: "openai", allowsNone: true },
+  { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", inPer1M: 0.2, outPer1M: 1.2, cachedInPer1M: 0.02, tier: "gpt", provider: "openai", allowsNone: true },
+  { id: "gpt-5.5", label: "GPT-5.5", inPer1M: 5, outPer1M: 30, cachedInPer1M: 0.5, tier: "gpt", provider: "openai", allowsNone: true },
+];
+CLAUDE_MODELS.push(...GPT_MODELS);
+
 export function claudePricing(id: string): { inPer1M: number; outPer1M: number } {
   return CLAUDE_MODELS.find((m) => m.id === id) ?? { inPer1M: 2, outPer1M: 10 };
+}
+
+/** The model id decides the API: `gpt-*` / `o*` ids go to OpenAI, everything else to Anthropic. */
+export function providerOf(modelId: string): LlmProvider {
+  const known = CLAUDE_MODELS.find((m) => m.id === modelId)?.provider;
+  if (known) return known;
+  return /^(gpt-|o\d|chatgpt-)/i.test(modelId) ? "openai" : "anthropic";
 }
 
 export const MANUS_AGENT_PROFILES = ["manus-1.6-lite", "manus-1.6", "manus-1.6-max"] as const;
@@ -45,7 +77,7 @@ export const EFFORT_LABEL: Record<Effort, string> = {
   max: "max · en zeki",
 };
 /** Fast mode (2.5x output speed, premium price) — research preview, these models only. */
-export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8"];
+export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8", ...GPT_MODELS.map((m) => m.id)];
 
 /** Claude "thinking" (adaptive extended reasoning) on/off. */
 export const THINKING_MODES = ["adaptive", "off"] as const;

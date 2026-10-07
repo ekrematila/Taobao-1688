@@ -66,6 +66,7 @@ export const api = {
     }>("/examples"),
   saveSettings: (patch: SettingsPatch) => post<Settings>("/settings", patch),
   verifyClaude: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/claude", { key }),
+  verifyOpenAI: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/openai", { key }),
   verifyManus: (key?: string) => post<import("@shared/types.ts").VerifyManusResult>("/verify/manus", { key }),
   addManusAccount: (label: string, key: string) => post<Settings>("/settings/manus-accounts", { label, key }),
   removeManusAccount: (index: number) => req<Settings>(`/settings/manus-accounts/${index}`, { method: "DELETE" }),

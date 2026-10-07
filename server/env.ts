@@ -39,6 +39,9 @@ export const env = {
   anthropicKey: process.env.ANTHROPIC_API_KEY || "",
   llmModel: process.env.LLM_MODEL || "claude-sonnet-5",
 
+  openaiKey: process.env.OPENAI_API_KEY || "",
+  openaiBase: (process.env.OPENAI_BASE || "https://api.openai.com/v1").replace(/\/$/, ""),
+
   manusKey: process.env.MANUS_API_KEY || "",
   manusBase: (process.env.MANUS_BASE || "https://api.manus.ai").replace(/\/$/, ""),
   manusAgentProfile: process.env.MANUS_AGENT_PROFILE || "manus-1.6",

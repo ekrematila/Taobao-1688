@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
+import { activeOpenAIKey } from "./openai.ts";
 import { callOnebound, OneboundError, oneboundCreds } from "./onebound.ts";
 import { normaliseItem } from "./normalize.ts";
 import {
@@ -28,7 +29,10 @@ import {
   activeThinking,
   activeFast,
   claudeConfigured,
+  llmConfigured,
+  llmKeyName,
   verifyClaude,
+  verifyOpenAI,
   EFFORT_LEVELS,
   FAST_MODELS,
   LlmError,
@@ -239,6 +243,9 @@ async function currentSettings(): Promise<Settings> {
     hasLlmKey: claudeConfigured(),
     llmKeyHint: mask(activeAnthropicKey()),
     llmKeySource: anthropicFromDb ? "ui" : env.anthropicKey ? "env" : "none",
+    hasOpenaiKey: Boolean(activeOpenAIKey()),
+    openaiKeyHint: mask(activeOpenAIKey()),
+    openaiKeySource: getSetting("openai_key") ? "ui" : env.openaiKey ? "env" : "none",
     hasManusKey: manusConfigured(),
     manusKeyHint: mask(activeManusKey()),
     manusKeySource: manusFromDb ? "ui" : env.manusKey ? "env" : "none",
@@ -321,6 +328,7 @@ router.post(
       env.manusAgentProfile = p.manusAgentProfile.trim();
     }
     if (typeof p.anthropicKey === "string" && p.anthropicKey.trim()) setSetting("anthropic_key", p.anthropicKey.trim());
+    if (typeof p.openaiKey === "string" && p.openaiKey.trim()) setSetting("openai_key", p.openaiKey.trim());
     if (typeof p.manusKey === "string" && p.manusKey.trim()) setSetting("manus_key", p.manusKey.trim());
     if (typeof p.llmEffort === "string" && (EFFORT_LEVELS as readonly string[]).includes(p.llmEffort))
       setSetting("llm_effort", p.llmEffort);
@@ -339,6 +347,7 @@ router.post(
       setSetting("shopify_client_secret", p.shopifyClientSecret.trim());
     // explicit clears
     if (p.clearAnthropicKey === true) setSetting("anthropic_key", "");
+    if (p.clearOpenaiKey === true) setSetting("openai_key", "");
     if (p.clearManusKey === true) setSetting("manus_key", "");
     if (p.clearShopify === true) {
       setSetting("shopify_token", "");
@@ -415,6 +424,10 @@ router.post(
 router.post(
   "/api/verify/claude",
   wrap(async (req, res) => res.json(await verifyClaude(String(req.body?.key || "") || undefined))),
+);
+router.post(
+  "/api/verify/openai",
+  wrap(async (req, res) => res.json(await verifyOpenAI(String(req.body?.key || "") || undefined))),
 );
 router.post(
   "/api/verify/manus",
@@ -1412,7 +1425,7 @@ router.post(
     const draft = getDraft(draftId);
     if (!draft?.product?.videoUrl) return res.status(400).json({ error: "Üründe video yok." });
     if (mode === "manus" && !manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
-    if (mode === "claude" && !claudeConfigured()) return res.status(400).json({ error: "Claude API anahtarı ayarlı değil." });
+    if (mode === "claude" && !llmConfigured(req.body?.model)) return res.status(400).json({ error: `${llmKeyName(req.body?.model)} API anahtarı ayarlı değil.` });
     const p = draft.product;
     const context = `${p.titleTranslated || p.title}`;
     const lang = targetLanguage || "English";
@@ -1550,7 +1563,7 @@ router.post(
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     if (!String(reqText || "").trim()) return res.status(400).json({ error: "Ne yapılacağını yaz." });
-    if (!claudeConfigured()) return res.status(400).json({ error: "Claude API anahtarı ayarlı değil." });
+    if (!llmConfigured(req.body?.model)) return res.status(400).json({ error: `${llmKeyName(req.body?.model)} API anahtarı ayarlı değil.` });
     const p = draft.product;
     const dur = Number(meta?.duration) || 0;
     const jobId = startJob("video-plan", async (ctx) => {
@@ -1689,7 +1702,7 @@ router.post(
   wrap(async (req, res) => {
     const rec = getBlog(String(req.body?.blogId || ""));
     if (!rec) return res.status(404).json({ error: "Blog bulunamadı" });
-    if (!claudeConfigured()) return res.status(400).json({ error: "Claude API anahtarı ayarlı değil." });
+    if (!llmConfigured(req.body?.model)) return res.status(400).json({ error: `${llmKeyName(req.body?.model)} API anahtarı ayarlı değil.` });
     const draft = rec.draftId ? getDraft(rec.draftId) : null;
     const jobId = startJob("blog-seo", async (ctx) => {
       ctx.plan(["Anahtar kelimeler ve rakip açıları araştırılıyor"]);
@@ -1716,7 +1729,7 @@ router.post(
   wrap(async (req, res) => {
     const rec = getBlog(String(req.body?.blogId || ""));
     if (!rec) return res.status(404).json({ error: "Blog bulunamadı" });
-    if (!claudeConfigured()) return res.status(400).json({ error: "Claude API anahtarı ayarlı değil." });
+    if (!llmConfigured(req.body?.model)) return res.status(400).json({ error: `${llmKeyName(req.body?.model)} API anahtarı ayarlı değil.` });
     if (rec.kind === "product" && !getDraft(rec.draftId || "")?.product)
       return res.status(400).json({ error: "Ürün taslağı bulunamadı." });
     if (rec.kind === "category" && !rec.config.siteUrl)
@@ -1832,6 +1845,7 @@ router.get("/api/usage", (req, res) => {
       `SELECT
          COALESCE(SUM(cost_usd),0) c,
          COALESCE(SUM(CASE WHEN provider='claude' THEN cost_usd ELSE 0 END),0) cc,
+         COALESCE(SUM(CASE WHEN provider='openai' THEN cost_usd ELSE 0 END),0) oc,
          COALESCE(SUM(CASE WHEN provider='manus' THEN cost_usd ELSE 0 END),0) mc,
          COALESCE(SUM(input_tokens),0) i,
          COALESCE(SUM(output_tokens),0) o,
@@ -1842,7 +1856,7 @@ router.get("/api/usage", (req, res) => {
   const perDraftRows = db
     .prepare(
       `SELECT draft_id,
-         COALESCE(SUM(CASE WHEN provider='claude' THEN cost_usd ELSE 0 END),0) claude_usd,
+         COALESCE(SUM(CASE WHEN provider IN ('claude','openai') THEN cost_usd ELSE 0 END),0) claude_usd,
          COALESCE(SUM(CASE WHEN provider='manus' THEN cost_usd ELSE 0 END),0) manus_usd,
          COALESCE(SUM(credits),0) credits
        FROM usage_log ${where} GROUP BY draft_id ORDER BY (claude_usd + manus_usd) DESC LIMIT 50`,
@@ -1873,6 +1887,7 @@ router.get("/api/usage", (req, res) => {
     to,
     totalCostUsd: agg.c,
     claudeCostUsd: agg.cc,
+    openaiCostUsd: agg.oc,
     manusCostUsd: agg.mc,
     totalInputTokens: agg.i,
     totalOutputTokens: agg.o,
@@ -2175,7 +2190,7 @@ app.listen(env.port, () => {
   if (!env.isProd) console.log(`  Web (dev)                  ->  http://localhost:5173`);
   const warn: string[] = [];
   if (!oneboundCreds().key) warn.push("OneBound key yok — .env veya Ayarlar sayfasından ekleyin.");
-  if (!claudeConfigured()) warn.push("Claude API anahtarı yok — .env veya Ayarlar sayfasından ekleyin.");
+  if (!llmConfigured()) warn.push(`${llmKeyName()} API anahtarı yok — .env veya Ayarlar sayfasından ekleyin.`);
   if (!manusConfigured()) warn.push("Manus API anahtarı yok — .env veya Ayarlar sayfasından ekleyin.");
   if (warn.length) console.log("  ! " + warn.join("\n  ! "));
 });
