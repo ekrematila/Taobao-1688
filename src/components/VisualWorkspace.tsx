@@ -717,7 +717,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     const targetLang: string = dc.targetLang || "en";
     const layout = dc.layout || "stacked-plain";
     const productType: string = dc.productType || "";
-    const model: string = settings.data?.llmModel || "claude-sonnet-5";
+    const model: string = settings.data?.llmModel || "claude-sonnet-5-5";
     const fieldCfg = (dc.fieldCfg ?? {}) as Record<string, { examples?: string; rules?: string }>;
     const defaultExample = (k: string): string => {
       if (k === "description" && channel === "shopify") {

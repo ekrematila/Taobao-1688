@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env.ts";
 import { db, getSetting, now } from "./db.ts";
-import { CHARS_PER_LINE, CLAUDE_MODELS, claudePricing, DESC_STYLES, FAST_MODELS, htmlBudgetFactor, providerOf, TITLE_VOCAB } from "@shared/models.ts";
+import { CHARS_PER_LINE, CLAUDE_MODELS, claudePricing, DESC_STYLES, FAST_MODELS, htmlBudgetFactor, providerOf, supportsFast, TITLE_VOCAB } from "@shared/models.ts";
 import { openaiConfigured, openaiListModels, openaiRespond, OpenAIHttpError, type OpenAIResult } from "./openai.ts";
 import { isSelfContainedLayout, cleanDescValue } from "@shared/descLayouts.ts";
 import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
@@ -208,7 +208,7 @@ function manusDescRuleCompact(isStacked: boolean, isKeycapSet: boolean): string 
 }
 
 export function activeModel(): string {
-  return getSetting("llm_model") || env.llmModel || "claude-sonnet-5";
+  return getSetting("llm_model") || env.llmModel || "claude-sonnet-5-5";
 }
 export function activeEffort(): Effort {
   // Default is "high" — fully overridable per-generation or in Settings.
@@ -277,6 +277,12 @@ export async function verifyClaude(overrideKey?: string): Promise<{
   }
 }
 
+/** Every model this Anthropic key can use right now, with release time (ms). */
+export async function listClaudeModelsLive(): Promise<{ id: string; displayName: string; createdAt: number }[]> {
+  const list = await client().models.list({ limit: 100 });
+  return list.data.map((m) => ({ id: m.id, displayName: m.display_name, createdAt: Date.parse(m.created_at) || 0 }));
+}
+
 /** Same idea as verifyClaude() for the ChatGPT key (Settings → "Doğrula"). */
 export async function verifyOpenAI(overrideKey?: string): Promise<{
   ok: boolean;
@@ -330,7 +336,7 @@ async function askOpenAI(
   kind: string,
   opts: { effort: Effort; thinking: ThinkingMode; maxTokens: number; signal?: AbortSignal; draftId?: string; images?: { data: string; mime: string }[] },
 ) {
-  const wantFast = activeFast() && FAST_MODELS.includes(m);
+  const wantFast = activeFast() && supportsFast(m);
   const call = async (effort: string, fast: boolean): Promise<OpenAIResult> => {
     try {
       return await openaiRespond({
@@ -349,6 +355,10 @@ async function askOpenAI(
       if (fast && e instanceof OpenAIHttpError && /service.?tier|priority/i.test(e.message)) {
         console.warn("[llm] OpenAI priority tier unavailable, falling back to standard");
         return call(effort, false);
+      }
+      if (e instanceof OpenAIHttpError && e.status === 400 && /effort/i.test(e.message) && effort !== "medium") {
+        console.warn(`[llm] ${m} rejected reasoning.effort=${effort} — retrying at medium`);
+        return call("medium", fast);
       }
       if (e instanceof OpenAIHttpError) {
         if (e.status === 401) throw new LlmError("OpenAI API anahtarı geçersiz.", 401);
@@ -373,17 +383,21 @@ async function askOpenAI(
   return { text: r.text, usage, model: m };
 }
 
-function priceUsage(m: string, u: Anthropic.Usage): LlmUsage {
+function priceUsage(m: string, u: Anthropic.Usage, fast = false): LlmUsage {
   const p = claudePricing(m);
+  const cacheReadX = CLAUDE_MODELS.find((x) => x.id === m)?.cacheReadX ?? 0.1;
+  // fast mode bills 2x on every token category (Opus 5.5: $8/$40, Opus 5 / 4.8: $10/$50)
+  const mult = fast ? 2 : 1;
   const fresh = u.input_tokens ?? 0;
   const cacheRead = u.cache_read_input_tokens ?? 0;
   const cacheWrite = u.cache_creation_input_tokens ?? 0;
   const out = u.output_tokens ?? 0;
   const costUsd =
-    (fresh / 1e6) * p.inPer1M +
-    (cacheWrite / 1e6) * p.inPer1M * 1.25 +
-    (cacheRead / 1e6) * p.inPer1M * 0.1 +
-    (out / 1e6) * p.outPer1M;
+    mult *
+    ((fresh / 1e6) * p.inPer1M +
+      (cacheWrite / 1e6) * p.inPer1M * 1.25 +
+      (cacheRead / 1e6) * p.inPer1M * cacheReadX +
+      (out / 1e6) * p.outPer1M);
   return { inputTokens: fresh + cacheRead + cacheWrite, outputTokens: out, costUsd };
 }
 function zeroUsage(): LlmUsage {
@@ -610,24 +624,56 @@ export async function ask(
     thinking: thinking === "off" ? { type: "disabled" } : { type: "adaptive" },
   };
 
-  const useFast = activeFast() && FAST_MODELS.includes(m);
+  const useFast = activeFast() && supportsFast(m);
   // The SDK refuses a NON-streaming request whose max_tokens is big enough that
   // it could run past 10 min. Above ~8k tokens we must stream and reassemble.
   const mustStream = (base.max_tokens ?? 0) > 8192;
-  const run = (params: any): Promise<Anthropic.Message> =>
+  const once = (params: any): Promise<Anthropic.Message> =>
     mustStream
       ? (client().messages.stream(params, { signal: opts.signal }) as any).finalMessage()
       : (client().messages.create(params, { signal: opts.signal }) as Promise<Anthropic.Message>);
-  const runFast = (params: any): Promise<Anthropic.Message> =>
+  const onceFast = (params: any): Promise<Anthropic.Message> =>
     mustStream
       ? (client().beta.messages.stream(params, { signal: opts.signal }) as any).finalMessage()
       : (client().beta.messages.create(params, { signal: opts.signal }) as Promise<Anthropic.Message>);
+  // New models keep changing which knobs they accept (thinking can't be disabled
+  // on the always-adaptive ones, Haiku has no effort…). On a 400 that names the
+  // knob, retry ONCE without/with the offending setting instead of failing.
+  const adapt = (params: any, e: any): any | null => {
+    if (e?.status !== 400) return null;
+    const msg = String(e?.message || "");
+    if (/thinking/i.test(msg) && /disabled/i.test(msg) && params.thinking?.type === "disabled")
+      return { ...params, thinking: { type: "adaptive" } };
+    if (/effort|output_config/i.test(msg) && params.output_config) {
+      const { output_config: _drop, ...rest } = params;
+      return rest;
+    }
+    if (/thinking/i.test(msg) && params.thinking) {
+      const { thinking: _drop, ...rest } = params;
+      return rest;
+    }
+    return null;
+  };
+  const withAdapt = (fn: (p: any) => Promise<Anthropic.Message>) => async (params: any): Promise<Anthropic.Message> => {
+    try {
+      return await fn(params);
+    } catch (e: any) {
+      const fixed = adapt(params, e);
+      if (!fixed) throw e;
+      console.warn(`[llm] ${kind}: ${m} rejected a setting (${String(e?.message).slice(0, 120)}) — retrying adjusted`);
+      return fn(fixed);
+    }
+  };
+  const run = withAdapt(once);
+  const runFast = withAdapt(onceFast);
+  let servedFast = false;
 
   let resp: Anthropic.Message | any;
   try {
     if (useFast) {
       try {
         resp = await runFast({ ...(base as any), speed: "fast", betas: ["fast-mode-2026-02-01"] });
+        servedFast = true;
       } catch (fe: any) {
         // org not enabled for fast mode (0 fast-mode tokens/min) -> fall back to standard
         if (fe?.status === 429 && /fast mode/i.test(fe?.message || "")) {
@@ -669,8 +715,11 @@ export async function ask(
     const retryEffort = EFFORT_ORDER[effort] > EFFORT_ORDER.high ? "high" : effort;
     const retryBase = { ...base, thinking: { type: "disabled" as const }, output_config: { effort: retryEffort } };
     try {
+      servedFast = false;
       const resp2 = useFast
-        ? await runFast({ ...(retryBase as any), speed: "fast", betas: ["fast-mode-2026-02-01"] }).catch(() => run(retryBase))
+        ? await runFast({ ...(retryBase as any), speed: "fast", betas: ["fast-mode-2026-02-01"] })
+            .then((r) => ((servedFast = true), r))
+            .catch(() => run(retryBase))
         : await run(retryBase);
       const text2 = textOf(resp2);
       if (text2.trim()) {
@@ -682,7 +731,7 @@ export async function ask(
     }
   }
 
-  const usage = priceUsage(m, resp.usage as Anthropic.Usage);
+  const usage = priceUsage(m, resp.usage as Anthropic.Usage, servedFast);
   logClaudeUsage(kind, m, usage, opts.draftId, text);
   return { text, usage, model: m };
 }

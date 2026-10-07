@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
 import { activeOpenAIKey } from "./openai.ts";
+import { initModelCatalog, modelCatalog } from "./modelCatalog.ts";
 import { callOnebound, OneboundError, oneboundCreds } from "./onebound.ts";
 import { normaliseItem } from "./normalize.ts";
 import {
@@ -424,6 +425,12 @@ router.post(
 router.post(
   "/api/verify/claude",
   wrap(async (req, res) => res.json(await verifyClaude(String(req.body?.key || "") || undefined))),
+);
+/** Priced catalogue + every model the configured keys can use right now (new
+ *  releases appear here by themselves). `?refresh=1` re-asks the providers. */
+router.get(
+  "/api/models",
+  wrap(async (req, res) => res.json(await modelCatalog(req.query.refresh === "1"))),
 );
 router.post(
   "/api/verify/openai",
@@ -2188,6 +2195,7 @@ app.use(process.env.BASE_PATH || "/", router);
 app.listen(env.port, () => {
   console.log(`  Taobao Product Studio API  ->  http://localhost:${env.port}`);
   if (!env.isProd) console.log(`  Web (dev)                  ->  http://localhost:5173`);
+  initModelCatalog();
   const warn: string[] = [];
   if (!oneboundCreds().key) warn.push("OneBound key yok — .env veya Ayarlar sayfasından ekleyin.");
   if (!llmConfigured()) warn.push(`${llmKeyName()} API anahtarı yok — .env veya Ayarlar sayfasından ekleyin.`);

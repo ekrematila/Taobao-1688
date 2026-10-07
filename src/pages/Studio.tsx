@@ -294,7 +294,7 @@ export default function Studio() {
 
         {step === 2 && draft && (
           <>
-            <AdvicePanel draft={draft} defaultModel={settings.data?.llmModel || "claude-sonnet-5"} onSaved={() => draftQ.refetch()} />
+            <AdvicePanel draft={draft} defaultModel={settings.data?.llmModel || "claude-sonnet-5-5"} onSaved={() => draftQ.refetch()} />
             <div className="row" style={{ marginTop: 16, justifyContent: "flex-end" }}>
               <button className="btn primary" onClick={() => persistStep(3)}>
                 {t("common.next")}
@@ -322,7 +322,7 @@ export default function Studio() {
             <DeliveryStudio
               draft={draft}
               hasShopify={!!settings.data?.hasShopify}
-              defaultModel={settings.data?.llmModel || "claude-sonnet-5"}
+              defaultModel={settings.data?.llmModel || "claude-sonnet-5-5"}
               onSaved={() => draftQ.refetch()}
             />
             <div className="row" style={{ marginTop: 16, justifyContent: "flex-end" }}>

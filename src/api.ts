@@ -66,6 +66,10 @@ export const api = {
     }>("/examples"),
   saveSettings: (patch: SettingsPatch) => post<Settings>("/settings", patch),
   verifyClaude: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/claude", { key }),
+  models: (refresh = false) =>
+    req<{ models: import("@shared/models.ts").ClaudeModel[]; discovered: string[]; checkedAt: number; errors: string[] }>(
+      "/models" + (refresh ? "?refresh=1" : ""),
+    ),
   verifyOpenAI: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/openai", { key }),
   verifyManus: (key?: string) => post<import("@shared/types.ts").VerifyManusResult>("/verify/manus", { key }),
   addManusAccount: (label: string, key: string) => post<Settings>("/settings/manus-accounts", { label, key }),

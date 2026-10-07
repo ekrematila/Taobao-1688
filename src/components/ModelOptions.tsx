@@ -1,7 +1,9 @@
-import { CLAUDE_MODELS, providerOf } from "@shared/models.ts";
+import { providerOf } from "@shared/models.ts";
+import { useModels } from "../lib/useModels";
 
 /** The AI model <option>s every picker shares, grouped by who serves them
- *  (claude-* → Claude, gpt-* → ChatGPT). Drop it inside a <select>. */
+ *  (claude-* → Claude, gpt-* → ChatGPT). Drop it inside a <select>. Brand-new
+ *  releases found live by the server come first in their group. */
 export default function ModelOptions({
   withLabel = false,
   withPrice = false,
@@ -12,7 +14,8 @@ export default function ModelOptions({
   /** ids not in the catalogue (e.g. a saved default) — kept selectable */
   extraIds?: string[];
 }) {
-  const known = new Set(CLAUDE_MODELS.map((m) => m.id));
+  const { models } = useModels();
+  const known = new Set(models.map((m) => m.id));
   const extras = extraIds.filter((id, i, a) => id && !known.has(id) && a.indexOf(id) === i);
   return (
     <>
@@ -21,17 +24,21 @@ export default function ModelOptions({
           {id}
         </option>
       ))}
-      {(["anthropic", "openai"] as const).map((prov) => (
-        <optgroup key={prov} label={prov === "openai" ? "ChatGPT (OpenAI)" : "Claude (Anthropic)"}>
-          {CLAUDE_MODELS.filter((m) => providerOf(m.id) === prov).map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id}
-              {withLabel ? ` — ${m.label}` : ""}
-              {withPrice ? ` ($${m.inPer1M}/$${m.outPer1M} /M)` : ""}
-            </option>
-          ))}
-        </optgroup>
-      ))}
+      {(["anthropic", "openai"] as const).map((prov) => {
+        const group = models.filter((m) => providerOf(m.id) === prov);
+        const ordered = [...group.filter((m) => m.isNew), ...group.filter((m) => !m.isNew)];
+        return (
+          <optgroup key={prov} label={prov === "openai" ? "ChatGPT (OpenAI)" : "Claude (Anthropic)"}>
+            {ordered.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}
+                {withLabel ? ` — ${m.label}` : ""}
+                {withPrice ? ` (${m.priceKnown === false ? "~" : ""}$${m.inPer1M}/$${m.outPer1M} /M)` : ""}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
     </>
   );
 }

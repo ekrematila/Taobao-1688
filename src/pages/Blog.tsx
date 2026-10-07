@@ -141,7 +141,7 @@ export default function Blog() {
           {blogId ? (
             <BlogStudio
               blogId={blogId}
-              defaultModel={settings.data?.llmModel || "claude-sonnet-5"}
+              defaultModel={settings.data?.llmModel || "claude-sonnet-5-5"}
               defaultSiteUrl={settings.data?.brandUrl || ""}
               onSaved={() => blogsQ.refetch()}
             />

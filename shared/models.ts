@@ -13,28 +13,36 @@ export interface ClaudeModel {
   cachedInPer1M?: number;
   /** OpenAI models that accept reasoning.effort "none" (no thinking at all) */
   allowsNone?: boolean;
+  /** Claude cache-read price as a fraction of the input price (default 0.1) */
+  cacheReadX?: number;
+  /** found live from the provider's models endpoint and not yet in this catalogue */
+  isNew?: boolean;
+  /** false = id discovered live, price not in the catalogue yet (estimate only) */
+  priceKnown?: boolean;
 }
 
 export type LlmProvider = "anthropic" | "openai";
 
-// Cached from the Anthropic pricing table. Any id here is selectable in the UI.
-// Keep this in sync with new Anthropic model releases (check the model IDs the
-// runtime environment reports as "most recent" and add them here — never
-// remove an older id outright, since drafts already saved with it must keep
-// working; just make the newest release the clearly-labeled default choice).
+// Cached from platform.claude.com/docs/en/about-claude/pricing. Any id here is
+// selectable in the UI, newest first. This is only the PRICED baseline: every
+// model the provider's own models endpoint reports is merged in live on top
+// (server/modelCatalog.ts), so a brand-new release shows up without a deploy —
+// it just estimates cost at a default rate until its price is added here.
+// Never remove an older id outright: drafts already saved with it must keep working.
 export const CLAUDE_MODELS: ClaudeModel[] = [
-  { id: "claude-opus-5", label: "Opus 5 · most capable", inPer1M: 5, outPer1M: 25, tier: "opus" },
+  { id: "claude-fable-5-1", label: "Fable 5.1 · top tier", inPer1M: 10, outPer1M: 50, tier: "fable", cacheReadX: 0.025 },
+  { id: "claude-opus-5-5", label: "Opus 5.5 · recommended", inPer1M: 4, outPer1M: 20, tier: "opus", cacheReadX: 0.05 },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5 · balanced (default)", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 · cheapest", inPer1M: 1, outPer1M: 5, tier: "haiku" },
+  { id: "claude-opus-5", label: "Opus 5", inPer1M: 5, outPer1M: 25, tier: "opus" },
+  { id: "claude-sonnet-5", label: "Sonnet 5", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
+  { id: "claude-fable-5", label: "Fable 5 (previous)", inPer1M: 10, outPer1M: 50, tier: "fable" },
   { id: "claude-opus-4-8", label: "Opus 4.8", inPer1M: 5, outPer1M: 25, tier: "opus" },
   { id: "claude-opus-4-7", label: "Opus 4.7", inPer1M: 5, outPer1M: 25, tier: "opus" },
   { id: "claude-opus-4-6", label: "Opus 4.6", inPer1M: 5, outPer1M: 25, tier: "opus" },
-  { id: "claude-sonnet-5", label: "Sonnet 5 · balanced (default)", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", inPer1M: 3, outPer1M: 15, tier: "sonnet" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 · cheapest", inPer1M: 1, outPer1M: 5, tier: "haiku" },
   { id: "claude-haiku-4-5", label: "Haiku 4.5 (rolling alias)", inPer1M: 1, outPer1M: 5, tier: "haiku" },
-  { id: "claude-fable-5-1", label: "Fable 5.1 · top tier", inPer1M: 10, outPer1M: 50, tier: "fable" },
-  { id: "claude-fable-5", label: "Fable 5 (previous)", inPer1M: 10, outPer1M: 50, tier: "fable" },
 ];
-
 
 // OpenAI / ChatGPT models (Responses API). Prices per 1M tokens from
 // developers.openai.com/api/docs/models — short-context (<=272K) standard rates;
@@ -51,6 +59,16 @@ export const GPT_MODELS: ClaudeModel[] = [
   { id: "gpt-5.5", label: "GPT-5.5", inPer1M: 5, outPer1M: 30, cachedInPer1M: 0.5, tier: "gpt", provider: "openai", allowsNone: true },
 ];
 CLAUDE_MODELS.push(...GPT_MODELS);
+
+/** Merge models discovered live (see server/modelCatalog.ts) into the catalogue so
+ *  pricing / provider / effort lookups work for them too. Idempotent. */
+export function registerDiscovered(list: ClaudeModel[]): void {
+  for (const m of list) {
+    const i = CLAUDE_MODELS.findIndex((x) => x.id === m.id);
+    if (i < 0) CLAUDE_MODELS.push(m);
+    else if (CLAUDE_MODELS[i].isNew || CLAUDE_MODELS[i].priceKnown === false) CLAUDE_MODELS[i] = m;
+  }
+}
 
 export function claudePricing(id: string): { inPer1M: number; outPer1M: number } {
   return CLAUDE_MODELS.find((m) => m.id === id) ?? { inPer1M: 2, outPer1M: 10 };
@@ -76,8 +94,14 @@ export const EFFORT_LABEL: Record<Effort, string> = {
   xhigh: "xhigh",
   max: "max · en zeki",
 };
-/** Fast mode (2.5x output speed, premium price) — research preview, these models only. */
-export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8", ...GPT_MODELS.map((m) => m.id)];
+/** Claude fast mode (2.5x output speed, 2x price) — research preview, these models only. */
+export const CLAUDE_FAST_MODELS = ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"];
+/** Fast mode everywhere it exists: those Claude models + every ChatGPT model (service_tier=priority). */
+export const FAST_MODELS = [...CLAUDE_FAST_MODELS, ...GPT_MODELS.map((m) => m.id)];
+/** True for any gpt-* id — including ones discovered live that the catalogue doesn't know yet. */
+export function supportsFast(modelId: string): boolean {
+  return providerOf(modelId) === "openai" || CLAUDE_FAST_MODELS.includes(modelId);
+}
 
 /** Effort levels a given model actually accepts (GPT-5.5 tops out at xhigh). */
 export function effortLevelsFor(modelId: string): Effort[] {

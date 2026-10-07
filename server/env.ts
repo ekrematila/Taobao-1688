@@ -37,7 +37,7 @@ export const env = {
   oneboundBase: (process.env.ONEBOUND_BASE || "https://api-gw.onebound.cn").replace(/\/$/, ""),
 
   anthropicKey: process.env.ANTHROPIC_API_KEY || "",
-  llmModel: process.env.LLM_MODEL || "claude-sonnet-5",
+  llmModel: process.env.LLM_MODEL || "claude-sonnet-5-5",
 
   openaiKey: process.env.OPENAI_API_KEY || "",
   openaiBase: (process.env.OPENAI_BASE || "https://api.openai.com/v1").replace(/\/$/, ""),

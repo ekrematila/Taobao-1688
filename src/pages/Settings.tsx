@@ -1,10 +1,12 @@
 import ModelOptions from "../components/ModelOptions";
+import { useModels } from "../lib/useModels";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, effortLevelsFor, providerOf, type Effort } from "@shared/models.ts";
+import { EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, effortLevelsFor, providerOf, supportsFast, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
@@ -175,6 +177,21 @@ export default function SettingsPage() {
       setVClaude({ ok: false, models: [], activeModel: "", effort: "", thinking: "", fast: false, fastModels: [], error: (e as Error).message });
     }
   }
+  const qc = useQueryClient();
+  const catalog = useModels();
+  const [refreshingModels, setRefreshingModels] = useState(false);
+  async function refreshModels() {
+    setRefreshingModels(true);
+    try {
+      const r = await api.models(true);
+      qc.setQueryData(["models"], r);
+      toast(r.discovered.length ? t("settings.modelsFound", { n: r.discovered.length, ids: r.discovered.join(", ") }) : t("settings.modelsUpToDate"), "ok");
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setRefreshingModels(false);
+    }
+  }
   const activeProvider = providerOf(model);
   const activeKeyOk = activeProvider === "openai" ? Boolean(s.data?.hasOpenaiKey) : Boolean(s.data?.hasLlmKey);
   const effortLevels = effortLevelsFor(model);
@@ -327,6 +344,19 @@ export default function SettingsPage() {
               </select>
             </label>
             <p className="tiny muted">{t("settings.claudeModelHint")}</p>
+            <div className="row" style={{ alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn ghost sm" onClick={refreshModels} disabled={refreshingModels}>
+                {refreshingModels ? <span className="spin" /> : t("settings.modelsRefresh")}
+              </button>
+              <span className="tiny muted">
+                {catalog.discovered.length
+                  ? t("settings.modelsFound", { n: catalog.discovered.length, ids: catalog.discovered.join(", ") })
+                  : t("settings.modelsLiveNote")}
+              </span>
+            </div>
+            {catalog.errors.map((er) => (
+              <p key={er} className="tiny err-t" style={{ margin: 0 }}>{er}</p>
+            ))}
             {!activeKeyOk && (
               <p className="tiny err-t">{t(activeProvider === "openai" ? "settings.openaiNeedKey" : "settings.claudeNeedKey")}</p>
             )}
@@ -357,7 +387,7 @@ export default function SettingsPage() {
               <label className="row" style={{ gap: 8 }}>
                 <input type="checkbox" style={{ width: 15 }} checked={fast} onChange={(e) => setFast(e.target.checked)} />
                 <span className="tiny">{t("settings.fast")}</span>
-                {fast && !FAST_MODELS.includes(model) && <span className="badge warn">{fastModelsLabel}</span>}
+                {fast && !supportsFast(model) && <span className="badge warn">{fastModelsLabel}</span>}
               </label>
               <p className="tiny muted" style={{ margin: 0 }}>{t("settings.fastHint", { models: fastModelsLabel })}</p>
               <p className="tiny muted" style={{ margin: 0 }}>{t("settings.cachingNote")}</p>

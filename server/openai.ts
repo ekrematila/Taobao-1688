@@ -138,6 +138,11 @@ function parseResponse(j: any): OpenAIResult {
 
 /** Live check for the Settings page — the model ids this key can use. */
 export async function openaiListModels(overrideKey?: string): Promise<string[]> {
+  return (await openaiListModelsDetailed(overrideKey)).map((m) => m.id).sort();
+}
+
+/** id + release time (unix seconds) of every model this key can use. */
+export async function openaiListModelsDetailed(overrideKey?: string): Promise<{ id: string; created: number }[]> {
   const key = overrideKey || activeOpenAIKey();
   if (!key) throw new OpenAIHttpError("OPENAI_API_KEY ayarlı değil.", 400);
   let res: Response;
@@ -148,5 +153,5 @@ export async function openaiListModels(overrideKey?: string): Promise<string[]> 
   }
   if (!res.ok) throw await errorOf(res);
   const j: any = await res.json();
-  return (j?.data ?? []).map((m: any) => String(m.id)).sort();
+  return (j?.data ?? []).map((m: any) => ({ id: String(m.id), created: Number(m.created) || 0 }));
 }
