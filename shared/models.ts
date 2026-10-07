@@ -81,8 +81,6 @@ export function providerOf(modelId: string): LlmProvider {
   return /^(gpt-|o\d|chatgpt-)/i.test(modelId) ? "openai" : "anthropic";
 }
 
-export const MANUS_AGENT_PROFILES = ["manus-1.6-lite", "manus-1.6", "manus-1.6-max"] as const;
-export type ManusAgentProfile = (typeof MANUS_AGENT_PROFILES)[number];
 
 /** Claude effort: "faster" (low) -> "smarter" (max). GA, no beta header. */
 export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -116,9 +114,36 @@ export const THINKING_LABEL: Record<ThinkingMode, string> = {
   off: "düşünme: kapalı",
 };
 
-/** Manus agent profile (version / capacity) for every Manus-backed action. */
-export const MANUS_PROFILES = ["manus-1.6-lite", "manus-1.6", "manus-1.6-max"] as const;
+/**
+ * Manus agent_profile — the stable values from open.manus.ai/docs/v2/task.create.
+ * Model versions are NOT selected independently (a version segment such as
+ * "2.0-max" is accepted but ignored), so every request already runs on the
+ * current model (Manus 2.0); the profile only picks capacity / reasoning depth.
+ * `max` = `max-extra`; `max-ultra` is the deepest, slowest and most expensive.
+ * Free personal accounts are downgraded to `lite` by Manus itself.
+ */
+export const MANUS_PROFILES = ["standard", "lite", "max", "max-medium", "max-high", "max-extra", "max-ultra"] as const;
 export type ManusProfile = (typeof MANUS_PROFILES)[number];
+export const MANUS_AGENT_PROFILES = MANUS_PROFILES;
+export type ManusAgentProfile = ManusProfile;
+export const MANUS_PROFILE_LABEL: Record<ManusProfile, string> = {
+  standard: "Manus 2.0 · Standard (dengeli)",
+  lite: "Manus 2.0 · Lite (en hızlı / ucuz)",
+  max: "Manus 2.0 · Max (yüksek kalite)",
+  "max-medium": "Manus 2.0 · Max medium",
+  "max-high": "Manus 2.0 · Max high",
+  "max-extra": "Manus 2.0 · Max extra",
+  "max-ultra": "Manus 2.0 · Max ultra (en derin · en yavaş · en pahalı)",
+};
+
+/** Map any saved / legacy spelling ("manus-1.6", "manus-1.6-lite", "2.0-max-ultra", "standard"…) to a current profile. */
+export function normalizeManusProfile(v?: string | null): ManusProfile | undefined {
+  let s = String(v ?? "").trim().toLowerCase();
+  if (!s) return undefined;
+  s = s.replace(/^manus-?/, "").replace(/^\d+(\.\d+)*-?/, "");
+  if (!s) return "standard"; // a bare version ("manus-1.6", "2.0") means standard
+  return (MANUS_PROFILES as readonly string[]).includes(s) ? (s as ManusProfile) : undefined;
+}
 
 /* --------------------------- listing generation --------------------------- */
 

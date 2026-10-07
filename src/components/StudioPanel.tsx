@@ -1,3 +1,4 @@
+import ManusProfileOptions from "./ManusProfileOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, composeImageJob, proxied, researchBrandJob, type Draft } from "../api";
@@ -83,7 +84,7 @@ export default function StudioPanel({
   const [customW, setCustomW] = useState(1500);
   const [customH, setCustomH] = useState(1500);
   const [quality, setQuality] = useState<"standard" | "high" | "maximum">("high");
-  const [profile, setProfile] = useState<"manus-1.6-lite" | "manus-1.6" | "manus-1.6-max">("manus-1.6");
+  const [profile, setProfile] = useState<string>("standard");
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);
@@ -596,9 +597,7 @@ export default function StudioPanel({
                 <label className="field">
                   {t("ws.manusProfile")}
                   <select value={profile} onChange={(e) => setProfile(e.target.value as any)}>
-                    <option value="manus-1.6-lite">manus-1.6-lite</option>
-                    <option value="manus-1.6">manus-1.6</option>
-                    <option value="manus-1.6-max">manus-1.6-max</option>
+                    <ManusProfileOptions />
                   </select>
                 </label>
               </div>

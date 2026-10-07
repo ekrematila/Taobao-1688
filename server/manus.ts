@@ -4,6 +4,7 @@ import { env } from "./env.ts";
 import { getSetting } from "./db.ts";
 import { mediaPath } from "./imagestore.ts";
 import { CHERRY_PROFILE_DIRECTIVE } from "@shared/keycaps.ts";
+import { MANUS_PROFILES, normalizeManusProfile } from "@shared/models.ts";
 import { dropCJK, stripCJK } from "@shared/listingFormat.ts";
 import { pickImageAttachment, saidNoChange } from "@shared/manusResult.ts";
 
@@ -577,9 +578,9 @@ export async function verifyManus(overrideKey?: string): Promise<{
 }> {
   const base = env.manusBase;
   const key = overrideKey || activeManusKey();
-  const agentProfiles = ["manus-1.6", "manus-1.6-lite", "manus-1.6-max"];
+  const agentProfiles: string[] = [...MANUS_PROFILES];
   const note =
-    "Sürüm/kapasite seçimi tek resmî parametre: agent_profile (manus-1.6 / -lite / -max). " +
+    "Kapasite seçimi tek resmî parametre: agent_profile (standard / lite / max / max-medium…max-ultra). Model sürümü ayrıca seçilmez — her istek güncel Manus 2.0 ile çalışır. " +
     "Görsel modeli (Nano Banana Pro / GPT Image) için API'de parametre yoktur; ajan kendi seçer.";
   const fail = (error: string) => ({ ok: false, credits: null, base, authMode: null, agentProfiles, note, error });
   if (!key) return fail("MANUS_API_KEY ayarlı değil.");
@@ -618,8 +619,6 @@ export async function verifyManus(overrideKey?: string): Promise<{
  * Run a Manus agent task to completion.
  * `parts` is the message content; poll listMessages until agent_status is terminal.
  */
-const AGENT_PROFILES = new Set(["manus-1.6-lite", "manus-1.6", "manus-1.6-max"]);
-
 export async function runManusTask(
   parts: ContentPart[],
   opts: {
@@ -633,7 +632,7 @@ export async function runManusTask(
   } = {},
 ): Promise<ManusResult> {
   const { ctx, structuredSchema, locale, pollMs = 3000, timeoutMs = 6 * 60 * 1000 } = opts;
-  const profile = opts.agentProfile && AGENT_PROFILES.has(opts.agentProfile) ? opts.agentProfile : env.manusAgentProfile;
+  const profile = normalizeManusProfile(opts.agentProfile) ?? normalizeManusProfile(env.manusAgentProfile) ?? "standard";
 
   // a sliced emoji in the source data can leave a lone UTF-16 surrogate, which
   // makes strict JSON body parsers 400 — scrub text parts before sending.
@@ -777,12 +776,12 @@ export async function stopManusTask(taskId: string, key?: string): Promise<void>
 export type ManusSpeed = "fast" | "medium" | "slow";
 /** Map a speed knob to an agent_profile + a prompt directive. Explicit profile wins. */
 function speedConfig(speed?: ManusSpeed, explicitProfile?: string): { profile?: string; hint: string } {
-  const p = explicitProfile && AGENT_PROFILES.has(explicitProfile) ? explicitProfile : undefined;
+  const p = normalizeManusProfile(explicitProfile);
   if (speed === "fast")
-    return { profile: p ?? "manus-1.6-lite", hint: "Prioritize SPEED over everything: a fast, acceptable result is fine; do not over-refine." };
+    return { profile: p ?? "lite", hint: "Prioritize SPEED over everything: a fast, acceptable result is fine; do not over-refine." };
   if (speed === "slow")
-    return { profile: p ?? "manus-1.6-max", hint: "Prioritize MAXIMUM fidelity and quality: take the time needed, match fonts/colours/edges precisely." };
-  return { profile: p ?? "manus-1.6", hint: "Balance speed and quality." };
+    return { profile: p ?? "max", hint: "Prioritize MAXIMUM fidelity and quality: take the time needed, match fonts/colours/edges precisely." };
+  return { profile: p ?? "standard", hint: "Balance speed and quality." };
 }
 
 const KEYCAP_GLOSSARY =

@@ -1,3 +1,4 @@
+import ManusProfileOptions from "./ManusProfileOptions";
 import ModelOptions from "./ModelOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,7 @@ import ListingPreview from "./ListingPreview";
 import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
-import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, MANUS_PROFILES } from "@shared/models.ts";
+import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
@@ -103,7 +104,7 @@ export default function DeliveryStudio({
   const [genEffort, setGenEffort] = useState<string>(""); // "" = app default
   const [genThinking, setGenThinking] = useState<string>("");
   const [descProvider, setDescProvider] = useState<"claude" | "manus">("claude");
-  const [descManusProfile, setDescManusProfile] = useState("manus-1.6");
+  const [descManusProfile, setDescManusProfile] = useState("standard");
   const [descEffort, setDescEffort] = useState<string>("");
   const [descThinking, setDescThinking] = useState<string>("");
   const [descStyle, setDescStyle] = useState("product");
@@ -139,7 +140,7 @@ export default function DeliveryStudio({
   const [applyResearch, setApplyResearch] = useState(false);
   const [research, setResearch] = useState("");
   const [researchQ, setResearchQ] = useState("");
-  const [researchManusProfile, setResearchManusProfile] = useState<"manus-1.6-lite" | "manus-1.6" | "manus-1.6-max">("manus-1.6");
+  const [researchManusProfile, setResearchManusProfile] = useState<string>("standard");
   const [confirmGate, setConfirmGate] = useState<null | boolean>(null);
   const [etsyShopId, setEtsyShopId] = useState("");
   const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
@@ -219,7 +220,7 @@ export default function DeliveryStudio({
       setGenEffort(typeof dc.genEffort === "string" ? dc.genEffort : "");
       setGenThinking(typeof dc.genThinking === "string" ? dc.genThinking : "");
       setDescProvider(dc.descProvider === "manus" ? "manus" : "claude");
-      setDescManusProfile(typeof dc.descManusProfile === "string" ? dc.descManusProfile : "manus-1.6");
+      setDescManusProfile(normalizeManusProfile(dc.descManusProfile) ?? "standard");
       setDescEffort(typeof dc.descEffort === "string" ? dc.descEffort : "");
       setDescThinking(typeof dc.descThinking === "string" ? dc.descThinking : "");
       setDescStyle(dc.descStyle ?? "product");
@@ -850,9 +851,7 @@ export default function DeliveryStudio({
                 <label className="field" style={{ flex: 1 }}>
                   {t("delivery.researchManusVer")}
                   <select value={researchManusProfile} onChange={(e) => setResearchManusProfile(e.target.value as any)}>
-                    <option value="manus-1.6-lite">manus-1.6-lite</option>
-                    <option value="manus-1.6">manus-1.6</option>
-                    <option value="manus-1.6-max">manus-1.6-max</option>
+                    <ManusProfileOptions />
                   </select>
                 </label>
               </div>
@@ -1164,11 +1163,7 @@ export default function DeliveryStudio({
                 </div>
               ) : (
                 <select value={descManusProfile} onChange={(e) => setDescManusProfile(e.target.value)}>
-                  {MANUS_PROFILES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
+                  <ManusProfileOptions />
                 </select>
               )}
               <span className="tiny muted" style={{ marginTop: 3 }}>{t("delivery.descModelHint")}</span>

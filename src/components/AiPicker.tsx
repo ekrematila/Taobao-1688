@@ -1,10 +1,11 @@
+import ManusProfileOptions from "./ManusProfileOptions";
 import ModelOptions from "./ModelOptions";
 import {
   EFFORT_LEVELS,
   EFFORT_LABEL,
   THINKING_MODES,
   THINKING_LABEL,
-  MANUS_PROFILES,
+  normalizeManusProfile,
   type Effort,
   type ThinkingMode,
 } from "@shared/models.ts";
@@ -79,12 +80,8 @@ export default function AiPicker({
           </select>
         </>
       ) : (
-        <select value={v.manusProfile || "manus-1.6"} onChange={(e) => set({ manusProfile: e.target.value })} title="Manus sürümü">
-          {MANUS_PROFILES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
+        <select value={normalizeManusProfile(v.manusProfile) ?? "standard"} onChange={(e) => set({ manusProfile: e.target.value })} title="Manus sürümü">
+          <ManusProfileOptions />
         </select>
       )}
     </div>

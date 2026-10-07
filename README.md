@@ -44,7 +44,7 @@ npm run build && npm start   # http://localhost:8787 tek portta servis eder
 | `OPENAI_API_KEY` | opsiyonel | ChatGPT (OpenAI) — herhangi bir `gpt-*` modeli seçildiğinde TÜM yapay zeka işlemleri bu anahtarla çalışır. Ayarlar sayfasından da girilebilir. |
 | `LLM_MODEL` | hayır | Varsayılan model id (`claude-sonnet-5-5`). Claude: fable-5-1 / opus-5-5 / sonnet-5-5 / opus-5 / opus-4-8 / opus-4-7 / opus-4-6 / sonnet-4-6 / haiku-4-5 / fable-5. ChatGPT: gpt-6.1-sol / gpt-6-astra / gpt-6-sol / gpt-6-luna / gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna / gpt-5.5 |
 | `MANUS_API_KEY` | görsel çevirisi için | Manus API v2 (`api.manus.ai`, `x-manus-api-key`). Görsellerdeki Çince yazıların çevirisi ajan görevi olarak çalışır. |
-| `MANUS_AGENT_PROFILE` | hayır | `manus-1.6` (varsayılan) / `-lite` / `-max` |
+| `MANUS_AGENT_PROFILE` | hayır | `standard` (varsayılan) / `lite` / `max` / `max-medium` / `max-high` / `max-extra` / `max-ultra` (eski `manus-1.6*` değerleri otomatik çevrilir) |
 | `MANUS_USD_PER_CREDIT` | hayır | Maliyet paneli için 1 Manus kredisinin USD değeri (varsayılan 0.01) |
 | `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_ADMIN_TOKEN` | opsiyonel | "Shopify'a taslak gönder" düğmesi |
 | `PREVIEW_REFERENCE_URL` | hayır | Final önizleme düzeni için referans mağaza ürün URL'i |
@@ -78,7 +78,7 @@ ile canlı doğrular. Fiyatlar model başına girdi / önbellekli girdi / çıkt
 Maliyet paneli cache-read/cache-write token fiyatlandırmasını da hesaba katar.
 
 **Manus:**
-- **Sürüm/kapasite:** `agent_profile` — `manus-1.6` / `manus-1.6-lite` / `manus-1.6-max`. Bu, Manus v2
+- **Sürüm/kapasite:** `agent_profile` — `standard` / `lite` / `max` (+ `max-medium|high|extra|ultra`). Manus 2.0'da model sürümü ayrıca seçilmez (sürüm eki yok sayılır), her görev güncel modelle çalışır. Bu, Manus v2
   OpenAPI şemasındaki **tek** resmî model/sürüm parametresidir (`task.create` gövdesi). Ayarlardan seçilir.
 - **Belirli görsel modeli (Nano Banana Pro / GPT Image) seçimi KALDIRILDI** — Manus v2 API'sinde böyle
   bir parametre yok; `task.create` yalnızca `agent_profile` alır, hangi görsel modelinin kullanılacağına

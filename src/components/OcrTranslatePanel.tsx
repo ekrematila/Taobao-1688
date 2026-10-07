@@ -1,3 +1,4 @@
+import ManusProfileOptions from "./ManusProfileOptions";
 import { useEffect, useRef, useState } from "react";
 import { altTextsManusJob, api, proxied, translateImagesJob, type Draft } from "../api";
 import { useI18n } from "../i18n";
@@ -61,7 +62,7 @@ export default function OcrTranslatePanel({
   const [focus, setFocus] = useState(0);
   const [drawMode, setDrawMode] = useState(false);
   const [drag, setDrag] = useState<null | { x: number; y: number; x2: number; y2: number }>(null);
-  const [manusProfile, setManusProfile] = useState<"manus-1.6-lite" | "manus-1.6" | "manus-1.6-max">("manus-1.6");
+  const [manusProfile, setManusProfile] = useState<string>("standard");
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);
   const beforeRef = useRef<HTMLCanvasElement | null>(null);
@@ -342,9 +343,7 @@ export default function OcrTranslatePanel({
             <label className="row tiny muted" style={{ gap: 4, margin: 0 }}>
               {t("ws.manusProfile")}
               <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)} disabled={!hasManusKey}>
-                <option value="manus-1.6-lite">manus-1.6-lite</option>
-                <option value="manus-1.6">manus-1.6</option>
-                <option value="manus-1.6-max">manus-1.6-max</option>
+                <ManusProfileOptions />
               </select>
             </label>
           </div>

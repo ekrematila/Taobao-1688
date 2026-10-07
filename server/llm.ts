@@ -447,7 +447,7 @@ export function logManusUsage(
   ).run(
     now(),
     kind,
-    "manus-1.6",
+    "manus",
     credits * manusUsdPerCredit(),
     credits,
     estimated ? 1 : 0,

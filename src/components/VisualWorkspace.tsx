@@ -1,3 +1,4 @@
+import ManusProfileOptions from "./ManusProfileOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { useQuery } from "@tanstack/react-query";
@@ -219,7 +220,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   const [customW, setCustomW] = useState(1500);
   const [customH, setCustomH] = useState(1500);
   const [customQ, setCustomQ] = useState<"standard" | "high" | "maximum">("high");
-  const [manusProfile, setManusProfile] = useState<"manus-1.6-lite" | "manus-1.6" | "manus-1.6-max">("manus-1.6");
+  const [manusProfile, setManusProfile] = useState<string>("standard");
   const [aiCmd, setAiCmd] = useState("");
   const [bulkTrPrompt, setBulkTrPrompt] = useState("");
   const [bulkAltPrompt, setBulkAltPrompt] = useState("");
@@ -1496,9 +1497,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               <label className="field">
                 {t("ws.manusProfile")}
                 <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)}>
-                  <option value="manus-1.6-lite">manus-1.6-lite</option>
-                  <option value="manus-1.6">manus-1.6</option>
-                  <option value="manus-1.6-max">manus-1.6-max</option>
+                  <ManusProfileOptions />
                 </select>
               </label>
               <p className="tiny muted" style={{ margin: 0 }}>{t("ws.manusProfileHint")}</p>
@@ -1813,9 +1812,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
             <label className="field">
               {t("ws.manusProfile")}
               <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)}>
-                <option value="manus-1.6-lite">manus-1.6-lite</option>
-                <option value="manus-1.6">manus-1.6</option>
-                <option value="manus-1.6-max">manus-1.6-max</option>
+                <ManusProfileOptions />
               </select>
             </label>
             <div className="row" style={{ gap: 6, alignItems: "flex-start" }}>
@@ -2178,7 +2175,7 @@ function VideoStudio({
   draft: Draft;
   videoUrl: string;
   hasManusKey: boolean;
-  manusProfile: "manus-1.6-lite" | "manus-1.6" | "manus-1.6-max";
+  manusProfile: string;
   onSaved: () => void;
 }) {
   const { t, lang } = useI18n();
@@ -3371,9 +3368,7 @@ function VideoStudio({
             <label className="field" style={{ width: 160 }}>
               {t("ws.manusProfile")}
               <select value={prof} onChange={(e) => setProf(e.target.value as any)}>
-                <option value="manus-1.6-lite">manus-1.6-lite</option>
-                <option value="manus-1.6">manus-1.6</option>
-                <option value="manus-1.6-max">manus-1.6-max</option>
+                <ManusProfileOptions />
               </select>
             </label>
           )}

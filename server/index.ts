@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
 import { activeOpenAIKey } from "./openai.ts";
+import { normalizeManusProfile } from "@shared/models.ts";
 import { initModelCatalog, modelCatalog } from "./modelCatalog.ts";
 import { callOnebound, OneboundError, oneboundCreds } from "./onebound.ts";
 import { normaliseItem } from "./normalize.ts";
@@ -255,7 +256,7 @@ async function currentSettings(): Promise<Settings> {
     llmFast: activeFast(),
     llmEffortLevels: [...EFFORT_LEVELS],
     llmFastModels: [...FAST_MODELS],
-    manusAgentProfile: getSetting("manus_agent_profile") ?? env.manusAgentProfile,
+    manusAgentProfile: normalizeManusProfile(getSetting("manus_agent_profile") ?? env.manusAgentProfile) ?? "standard",
     manusBase: env.manusBase,
     manusUsdPerCredit: manusUsdPerCredit(),
     manusCredits: await manusCredits(),
@@ -324,9 +325,10 @@ router.post(
       setSetting("llm_model", p.llmModel.trim());
       env.llmModel = p.llmModel.trim();
     }
-    if (typeof p.manusAgentProfile === "string" && p.manusAgentProfile.trim()) {
-      setSetting("manus_agent_profile", p.manusAgentProfile.trim());
-      env.manusAgentProfile = p.manusAgentProfile.trim();
+    const manusProfile = normalizeManusProfile(p.manusAgentProfile);
+    if (manusProfile) {
+      setSetting("manus_agent_profile", manusProfile);
+      env.manusAgentProfile = manusProfile;
     }
     if (typeof p.anthropicKey === "string" && p.anthropicKey.trim()) setSetting("anthropic_key", p.anthropicKey.trim());
     if (typeof p.openaiKey === "string" && p.openaiKey.trim()) setSetting("openai_key", p.openaiKey.trim());
@@ -786,7 +788,7 @@ router.post(
           logManusUsage("category-research", mr.creditsUsed, mr.creditsEstimated, draft.id, mr.taskId, {
             text: mr.research,
           });
-        r = { research: mr.research, model: agentProfile || "manus-1.6" };
+        r = { research: mr.research, model: normalizeManusProfile(agentProfile) ?? "standard" };
       }
       await withDraftLock(draft.id, async () => {
         const fresh = getDraft(draft.id)!;

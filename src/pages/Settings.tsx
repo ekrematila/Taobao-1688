@@ -1,4 +1,5 @@
 import ModelOptions from "../components/ModelOptions";
+import ManusProfileOptions from "../components/ManusProfileOptions";
 import { useModels } from "../lib/useModels";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -6,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, effortLevelsFor, providerOf, supportsFast, type Effort } from "@shared/models.ts";
+import { EFFORT_LABEL, FAST_MODELS, effortLevelsFor, providerOf, supportsFast, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
@@ -29,7 +30,7 @@ export default function SettingsPage() {
   const [effort, setEffort] = useState<Effort>("high");
   const [thinking, setThinking] = useState<"adaptive" | "off">("adaptive");
   const [fast, setFast] = useState(false);
-  const [profile, setProfile] = useState("manus-1.6");
+  const [profile, setProfile] = useState("standard");
   const [usdPerCredit, setUsdPerCredit] = useState(0.01);
   const [claudeBalance, setClaudeBalance] = useState(0);
   const [autoPush, setAutoPush] = useState(false);
@@ -549,13 +550,10 @@ export default function SettingsPage() {
             <label className="field">
               {t("settings.agentProfileProof")}
               <select value={profile} onChange={(e) => setProfile(e.target.value)}>
-                {MANUS_AGENT_PROFILES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
+                <ManusProfileOptions />
               </select>
             </label>
+            <p className="tiny muted">{t("settings.manusProfileNote")}</p>
             <p className="tiny muted">{t("settings.imageModelHint")}</p>
 
             <label className="field" style={{ maxWidth: 260 }}>
