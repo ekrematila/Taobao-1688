@@ -1,3 +1,4 @@
+import ModelOptions from "./ModelOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, categoryResearchJob, generateListingJob, nameVariantsJob, type Draft } from "../api";
@@ -10,7 +11,7 @@ import ListingPreview from "./ListingPreview";
 import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
-import { CLAUDE_MODELS, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, MANUS_PROFILES } from "@shared/models.ts";
+import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, MANUS_PROFILES } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
@@ -757,11 +758,7 @@ export default function DeliveryStudio({
           <label className="field">
             {t("delivery.model")}
             <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {CLAUDE_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id} — {m.label}
-                </option>
-              ))}
+              <ModelOptions withLabel />
             </select>
             <div className="ai-picker" style={{ marginTop: 6 }}>
               <select value={genEffort} onChange={(e) => setGenEffort(e.target.value)} title={t("ai.effort")}>
@@ -847,11 +844,7 @@ export default function DeliveryStudio({
                 <label className="field" style={{ flex: 1 }}>
                   {t("delivery.researchClaudeModel")}
                   <select value={model} onChange={(e) => setModel(e.target.value)}>
-                    {CLAUDE_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id} — {m.label}
-                      </option>
-                    ))}
+                    <ModelOptions withLabel />
                   </select>
                 </label>
                 <label className="field" style={{ flex: 1 }}>
@@ -1140,7 +1133,7 @@ export default function DeliveryStudio({
               {t("delivery.descModel")}
               <span className="seg tiny" style={{ marginBottom: 4 }}>
                 <button type="button" className={"seg-b" + (descProvider === "claude" ? " on" : "")} onClick={() => setDescProvider("claude")}>
-                  Claude
+                  AI
                 </button>
                 <button type="button" className={"seg-b" + (descProvider === "manus" ? " on" : "")} onClick={() => setDescProvider("manus")}>
                   Manus
@@ -1150,11 +1143,7 @@ export default function DeliveryStudio({
                 <div className="ai-picker">
                   <select value={descModel} onChange={(e) => setDescModel(e.target.value)}>
                     <option value="">{t("delivery.descModelSame")}</option>
-                    {CLAUDE_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id}
-                      </option>
-                    ))}
+                    <ModelOptions />
                   </select>
                   <select value={descEffort} onChange={(e) => setDescEffort(e.target.value)} title={t("ai.effort")}>
                     <option value="">{t("ai.effortDefault")}</option>

@@ -748,7 +748,7 @@ router.post(
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     if (mode === "manus" && !manusConfigured())
-      return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil — 'AI (Claude)' veya 'Yapay zekasız' seçin." });
+      return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil — 'Yapay zeka' veya 'Yapay zekasız' seçin." });
     const jobId = startJob("category-research", async (ctx) => {
       ctx.plan(["Kategori araştırılıyor"]);
       ctx.step("Kategori araştırılıyor");
@@ -1430,8 +1430,8 @@ router.post(
     const context = `${p.titleTranslated || p.title}`;
     const lang = targetLanguage || "English";
     const jobId = startJob("video-alt", async (ctx) => {
-      ctx.plan([mode === "claude" ? "Video alt metni yazılıyor (Claude)" : "Video inceleniyor"]);
-      ctx.step(mode === "claude" ? "Video alt metni yazılıyor (Claude)" : "Video inceleniyor");
+      ctx.plan([mode === "claude" ? "Video alt metni yazılıyor (AI)" : "Video inceleniyor"]);
+      ctx.step(mode === "claude" ? "Video alt metni yazılıyor (AI)" : "Video inceleniyor");
       if (mode === "claude") {
         const sys = [
           "Sen erişilebilirlik ve SEO odaklı bir asistansın. Bir ÜRÜN VİDEOSU için tek cümlelik,",
@@ -1449,7 +1449,7 @@ router.post(
         const altText = stripCJK(text).replace(/^["'\s]+|["'\s]+$/g, "").split("\n")[0].slice(0, 300);
         await withDraftLock(draft.id, async () => {
           const fresh = getDraft(draft.id)!;
-          patchDraft(draft.id, { product: { ...fresh.product!, videoAlt: altText } }, "Video alt metni (Claude)");
+          patchDraft(draft.id, { product: { ...fresh.product!, videoAlt: altText } }, "Video alt metni (AI)");
         });
         return { alt: altText, credits: 0 };
       }
@@ -1567,8 +1567,8 @@ router.post(
     const p = draft.product;
     const dur = Number(meta?.duration) || 0;
     const jobId = startJob("video-plan", async (ctx) => {
-      ctx.plan(["Claude videoyu düzenliyor"]);
-      ctx.step("Claude videoyu düzenliyor");
+      ctx.plan(["Yapay zeka videoyu düzenliyor"]);
+      ctx.step("Yapay zeka videoyu düzenliyor");
       const sys = [
         "Sen tarayıcı-içi bir video editörünü SÜREN bir asistansın. Kullanıcının doğal dildeki",
         "isteğini, uygulanacak düzenleme AYARLARINI içeren TEK bir JSON nesnesine çevir. Metin/",
@@ -1599,7 +1599,7 @@ router.post(
       try {
         parsed = extractJson(text);
       } catch {
-        throw new LlmError("Claude geçerli bir düzenleme planı döndürmedi.");
+        throw new LlmError("Yapay zeka geçerli bir düzenleme planı döndürmedi.");
       }
       return sanitiseVideoPlan(parsed);
     });

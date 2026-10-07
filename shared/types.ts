@@ -427,7 +427,7 @@ export interface UsageDashboard {
   calls: {
     at: string;
     kind: string;
-    provider: "claude" | "manus";
+    provider: "claude" | "openai" | "manus";
     model: string;
     inputTokens: number;
     outputTokens: number;

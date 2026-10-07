@@ -1,3 +1,4 @@
+import ModelOptions from "./ModelOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,7 +16,6 @@ import {
   renderBlogHtml,
 } from "@shared/blogPresets.ts";
 import type { BlogConfig, BlogRecord, JobView } from "@shared/types.ts";
-import { CLAUDE_MODELS } from "@shared/models.ts";
 
 const LANGS = ["English", "Türkçe", "Deutsch", "Français", "Español", "Italiano", "Nederlands", "日本語"];
 
@@ -326,9 +326,7 @@ export default function BlogStudio({
             <label className="field" style={{ width: 200 }}>
               {t("blog.model")}
               <select value={model} onChange={(e) => setModel(e.target.value)}>
-                {[defaultModel, ...CLAUDE_MODELS.map((m) => m.id)]
-                  .filter((v, i, a) => a.indexOf(v) === i)
-                  .map((m) => <option key={m} value={m}>{m}</option>)}
+                <ModelOptions extraIds={[defaultModel]} />
               </select>
             </label>
             <label className="tiny" style={{ display: "flex", alignItems: "center", gap: 4, paddingBottom: 6 }}>

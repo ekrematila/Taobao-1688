@@ -48,7 +48,7 @@ const TR: Section[] = [
   {
     h: "Maliyet",
     body: [
-      "Claude: yanıt token kullanımından hesaplanır (önbellek okuma ×0.1, önbellek yazma ×1.25).",
+      "Claude / ChatGPT: yanıt token kullanımından hesaplanır (Claude: önbellek okuma ×0.1, yazma ×1.25; ChatGPT: önbellekli girdi indirimli, Hızlı mod ×2).",
       "Manus: görev öncesi/sonrası kredi bakiyesi farkından; okunamazsa “tahmini” işaretlenir. Kredi→USD oranı Ayarlar’dan.",
       "Tarayıcıda çalışan işlemler ücretsizdir: kadraj, logo, filigran, alan temizleme, format çevirme, PNG/ZIP indirme.",
     ],
@@ -101,7 +101,7 @@ const EN: Section[] = [
   {
     h: "Cost",
     body: [
-      "Claude: from returned token usage (cache read ×0.1, cache write ×1.25).",
+      "Claude / ChatGPT: from returned token usage (Claude: cache read ×0.1, write ×1.25; ChatGPT: discounted cached input, Fast mode ×2).",
       "Manus: from the credit-balance delta around the task; marked “estimated” if unreadable. Credit→USD rate in Settings.",
       "Browser-side operations are free: crop, logo, watermark, area erase, format convert, PNG/ZIP download.",
     ],

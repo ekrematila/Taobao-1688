@@ -1,3 +1,4 @@
+import ModelOptions from "./ModelOptions";
 import { useEffect, useRef, useState } from "react";
 import { adviceJob, api, type Draft } from "../api";
 import { useI18n } from "../i18n";
@@ -5,7 +6,7 @@ import { useToast } from "../toast";
 import { JobCancelled, type RunningJob } from "../lib/jobs";
 import JobProgress from "./JobProgress";
 import Collapsible from "./Collapsible";
-import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL } from "@shared/models.ts";
+import { EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL } from "@shared/models.ts";
 import type { ChannelId, JobView } from "@shared/types.ts";
 
 export default function AdvicePanel({
@@ -115,11 +116,7 @@ export default function AdvicePanel({
         <label className="field">
           {t("delivery.model")}
           <select value={model} onChange={(e) => setModel(e.target.value)}>
-            {CLAUDE_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id} — {m.label}
-              </option>
-            ))}
+            <ModelOptions withLabel />
           </select>
           <div className="ai-picker" style={{ marginTop: 6 }}>
             <select value={effort} onChange={(e) => setEffort(e.target.value)} title={t("ai.effort")}>

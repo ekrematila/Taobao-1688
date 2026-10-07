@@ -1,5 +1,5 @@
+import ModelOptions from "./ModelOptions";
 import {
-  CLAUDE_MODELS,
   EFFORT_LEVELS,
   EFFORT_LABEL,
   THINKING_MODES,
@@ -48,7 +48,7 @@ export default function AiPicker({
       {allowProviderToggle && (
         <span className="seg tiny">
           <button type="button" className={"seg-b" + (provider === "claude" ? " on" : "")} onClick={() => set({ provider: "claude" })}>
-            Claude
+            AI
           </button>
           <button type="button" className={"seg-b" + (provider === "manus" ? " on" : "")} onClick={() => set({ provider: "manus" })}>
             Manus
@@ -59,11 +59,7 @@ export default function AiPicker({
         <>
           <select value={v.model || ""} onChange={(e) => set({ model: e.target.value })} title="Model">
             <option value="">model: varsayılan</option>
-            {CLAUDE_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id}
-              </option>
-            ))}
+            <ModelOptions />
           </select>
           <select value={v.effort || ""} onChange={(e) => set({ effort: (e.target.value || "") as Effort | "" })} title="Zeka / çaba">
             <option value="">çaba: varsayılan</option>

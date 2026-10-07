@@ -14,7 +14,7 @@ Taobao/1688 ürünlerini çekip **AI ile Shopify ve Etsy listelemelerine** dön�
 | Önizleme | Yok | Canlı Etsy/Shopify kart + HTML açıklama önizlemesi |
 | Dışa aktarma | Shopify CSV + Etsy klasör | + WooCommerce CSV + ham JSON, hepsi arşivlenir |
 | Dayanıklılık | — | Her adım SQLite'a yazılır; sayfa yenilense de taslak kaybolmaz + sürüm geri alma |
-| Maliyet | Token tahmini | Gerçek Anthropic token muhasebesi, işlem başına kayıt |
+| Maliyet | Token tahmini | Gerçek Claude + ChatGPT token muhasebesi, işlem başına kayıt |
 | API katmanı | tRPC | Sade tipli REST — daha az bağımlılık, daha kolay bakım |
 
 ## Kurulum
@@ -41,7 +41,8 @@ npm run build && npm start   # http://localhost:8787 tek portta servis eder
 |---|---|---|
 | `ONEBOUND_KEY`, `ONEBOUND_SECRET` | evet | Taobao/1688 verisi (onebound.cn). Ayarlar sayfasından da güncellenebilir. |
 | `ANTHROPIC_API_KEY` | içerik için | Listeleme üretimi, varyant çevirisi, alt metin. Tüm Claude modelleri UI'dan seçilebilir. |
-| `LLM_MODEL` | hayır | Varsayılan model id (`claude-sonnet-5`). Diğerleri: opus-5 / opus-4-8 / opus-4-7 / opus-4-6 / sonnet-4-6 / haiku-4-5 / fable-5 |
+| `OPENAI_API_KEY` | opsiyonel | ChatGPT (OpenAI) — herhangi bir `gpt-*` modeli seçildiğinde TÜM yapay zeka işlemleri bu anahtarla çalışır. Ayarlar sayfasından da girilebilir. |
+| `LLM_MODEL` | hayır | Varsayılan model id (`claude-sonnet-5`). Claude: opus-5 / opus-4-8 / opus-4-7 / opus-4-6 / sonnet-4-6 / haiku-4-5 / fable-5. ChatGPT: gpt-6.1-sol / gpt-6-astra / gpt-6-sol / gpt-6-luna / gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna / gpt-5.5 |
 | `MANUS_API_KEY` | görsel çevirisi için | Manus API v2 (`api.manus.ai`, `x-manus-api-key`). Görsellerdeki Çince yazıların çevirisi ajan görevi olarak çalışır. |
 | `MANUS_AGENT_PROFILE` | hayır | `manus-1.6` (varsayılan) / `-lite` / `-max` |
 | `MANUS_USD_PER_CREDIT` | hayır | Maliyet paneli için 1 Manus kredisinin USD değeri (varsayılan 0.01) |
@@ -53,20 +54,26 @@ npm run build && npm start   # http://localhost:8787 tek portta servis eder
 
 **Claude (Anthropic):** Model seçimi resmî bir istek parametresidir — `POST /v1/messages` gövdesinde
 `"model": "<id>"`. 8 modelin hepsi Ayarlar ve Teslim ekranındaki açılırda seçilebilir.
-Ayarlar → Claude → **"API'yi doğrula"** butonu `GET /v1/models` çağırır ve anahtarınızın gerçekte
+Ayarlar → Claude (veya ChatGPT) → **"Doğrula"** butonu `GET /v1/models` çağırır ve anahtarınızın gerçekte
 erişebildiği model listesini canlı gösterir (test edildi: `claude-opus-5`, `claude-sonnet-5`,
 `claude-fable-5`, `claude-opus-4-8/4-7/4-6/4-5`, `claude-sonnet-4-6/4-5`, `claude-haiku-4-5`).
 
-### Claude — hızlı ↔ zeki + tüm özellikler
+**ChatGPT (OpenAI):** Model kimliği sağlayıcıyı belirler — `claude-*` Anthropic'e, `gpt-*` OpenAI'nin
+**Responses API**'sine (`POST /v1/responses`, bağımlılıksız `fetch`) gider; böylece içerik, çeviri, kontroller,
+blog ve video planı dahil `ask()` üzerinden geçen her yapay zeka çağrısı iki sağlayıcıyla da çalışır. Görseller
+`input_image` (base64 data URL) olarak gönderilir. Ayarlar → **ChatGPT** kartı anahtarı yönetir ve `GET /v1/models`
+ile canlı doğrular. Fiyatlar model başına girdi / önbellekli girdi / çıktı olarak hesaplanır.
 
-`@anthropic-ai/sdk` 0.122'ye yükseltildi. Ayarlar → **Claude gelişmiş** (veya `.env`):
+### Yapay zeka — hızlı ↔ zeki + tüm özellikler
+
+`@anthropic-ai/sdk` 0.122'ye yükseltildi. Ayarlar → **Yapay zeka — model & düşünme** (veya `.env`); aynı kontroller Claude ve ChatGPT için çalışır:
 
 | Kontrol | Ne yapar | .env |
 |---|---|---|
-| **Effort** (low → max) | `output_config.effort` — düşük = hızlı/ucuz, yüksek = zeki | `LLM_EFFORT` |
-| **Adaptif düşünme** | `thinking: {type:"adaptive"}` ↔ `{type:"disabled"}` (xhigh/max effort'ta otomatik high'a düşürülür) | `LLM_THINKING` |
-| **Fast mode** | `speed:"fast"` + `fast-mode-2026-02-01` beta, 2.5× hız — yalnızca `claude-opus-5`/`claude-opus-4-8`. Org fast mode için etkin değilse (429) uygulama sessizce standart moda döner. | `LLM_FAST` |
-| **Prompt caching** | Sistem promptu her istekte `cache_control: ephemeral` — tekrarlı üretimlerde girdi maliyeti ~%90 düşer. Otomatik. | — |
+| **Effort** (low → max) | Claude: `output_config.effort`; ChatGPT: `reasoning.effort` (GPT-5.5'te max yok → xhigh) — düşük = hızlı/ucuz, yüksek = zeki | `LLM_EFFORT` |
+| **Düşünme** | Claude: `thinking: {type:"adaptive"}` ↔ `{type:"disabled"}` (xhigh/max effort'ta otomatik high'a düşürülür). ChatGPT: kapalı = reasoning `none` (GPT-6.1 Sol / GPT-6 Astra tam kapatamaz → `low`) | `LLM_THINKING` |
+| **Hızlı mod** | Claude: `speed:"fast"` + `fast-mode-2026-02-01` beta, 2.5× hız — yalnızca `claude-opus-5`/`claude-opus-4-8`. ChatGPT: `service_tier:"priority"`, ~1.5× hız, standart fiyatın 2 katı — tüm `gpt-*` modellerinde. Org desteklemiyorsa uygulama sessizce standart moda döner. | `LLM_FAST` |
+| **Prompt caching** | Claude: sistem promptu her istekte `cache_control: ephemeral` — girdi ~%90 ucuz. ChatGPT: OpenAI otomatik önbellekler (önbellekli girdi ~%5–10 fiyat). | — |
 
 Maliyet paneli cache-read/cache-write token fiyatlandırmasını da hesaba katar.
 

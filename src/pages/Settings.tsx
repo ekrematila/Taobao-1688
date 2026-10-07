@@ -1,9 +1,10 @@
+import ModelOptions from "../components/ModelOptions";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, withBase } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { CLAUDE_MODELS, EFFORT_LEVELS, EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, providerOf, type Effort } from "@shared/models.ts";
+import { EFFORT_LABEL, FAST_MODELS, MANUS_AGENT_PROFILES, effortLevelsFor, providerOf, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
@@ -174,6 +175,14 @@ export default function SettingsPage() {
       setVClaude({ ok: false, models: [], activeModel: "", effort: "", thinking: "", fast: false, fastModels: [], error: (e as Error).message });
     }
   }
+  const activeProvider = providerOf(model);
+  const activeKeyOk = activeProvider === "openai" ? Boolean(s.data?.hasOpenaiKey) : Boolean(s.data?.hasLlmKey);
+  const effortLevels = effortLevelsFor(model);
+  function pickModel(id: string) {
+    setModel(id);
+    const allowed = effortLevelsFor(id);
+    if (!allowed.includes(effort)) setEffort(allowed[allowed.length - 1]);
+  }
   const fastModelsLabel = [...FAST_MODELS.filter((m) => providerOf(m) === "anthropic"), "gpt-*"].join(" / ");
   async function runVerifyOpenai() {
     setVOpenai("loading");
@@ -302,42 +311,24 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Claude */}
+        {/* AI — model + reasoning (provider-neutral) */}
         <div className="card">
           <div className="card-h">
-            <h3>✦ {t("settings.secClaude")}</h3>
-            <span className={"badge " + (s.data?.hasLlmKey ? "ok" : "warn")}>
-              {s.data?.hasLlmKey ? t("settings.has") : t("settings.source.none")}
+            <h3>✦ {t("settings.secAi")}</h3>
+            <span className={"badge " + (activeKeyOk ? "ok" : "warn")}>
+              {activeProvider === "openai" ? "ChatGPT" : "Claude"} · {activeKeyOk ? t("settings.has") : t("settings.source.none")}
             </span>
           </div>
           <div className="card-b col" style={{ gap: 12 }}>
-            <div className="row">
-              <span className="badge">key: {s.data?.llmKeyHint || "—"}</span>
-              <span className="badge">
-                {t("usage.colProvider")}: {s.data ? srcLabel(s.data.llmKeySource) : "—"}
-              </span>
-            </div>
-            <label className="field">
-              ANTHROPIC_API_KEY — {t("settings.newKey")}
-              <input type="password" value={claudeKey} onChange={(e) => setClaudeKey(e.target.value)} placeholder="sk-ant-…" />
-            </label>
             <label className="field">
               {t("settings.claudeModel")}
-              <select value={model} onChange={(e) => setModel(e.target.value)}>
-                {(["anthropic", "openai"] as const).map((prov) => (
-                  <optgroup key={prov} label={prov === "openai" ? "ChatGPT (OpenAI)" : "Claude (Anthropic)"}>
-                    {CLAUDE_MODELS.filter((m) => providerOf(m.id) === prov).map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id} — {m.label} (${m.inPer1M}/${m.outPer1M} /M)
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+              <select value={model} onChange={(e) => pickModel(e.target.value)}>
+                <ModelOptions withLabel withPrice />
               </select>
             </label>
             <p className="tiny muted">{t("settings.claudeModelHint")}</p>
-            {providerOf(model) === "openai" && !s.data?.hasOpenaiKey && (
-              <p className="tiny err-t">{t("settings.openaiNeedKey")}</p>
+            {!activeKeyOk && (
+              <p className="tiny err-t">{t(activeProvider === "openai" ? "settings.openaiNeedKey" : "settings.claudeNeedKey")}</p>
             )}
 
             <div className="metafield" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -347,10 +338,10 @@ export default function SettingsPage() {
                 <input
                   type="range"
                   min={0}
-                  max={EFFORT_LEVELS.length - 1}
+                  max={effortLevels.length - 1}
                   step={1}
-                  value={EFFORT_LEVELS.indexOf(effort)}
-                  onChange={(e) => setEffort(EFFORT_LEVELS[Number(e.target.value)])}
+                  value={Math.max(0, effortLevels.indexOf(effort))}
+                  onChange={(e) => setEffort(effortLevels[Number(e.target.value)])}
                 />
                 <span className="mono tiny">{EFFORT_LABEL[effort]}</span>
               </label>
@@ -362,6 +353,7 @@ export default function SettingsPage() {
                   <option value="off">{t("settings.thinkingOff")}</option>
                 </select>
               </label>
+              <p className="tiny muted" style={{ margin: 0 }}>{t("settings.thinkingHint")}</p>
               <label className="row" style={{ gap: 8 }}>
                 <input type="checkbox" style={{ width: 15 }} checked={fast} onChange={(e) => setFast(e.target.checked)} />
                 <span className="tiny">{t("settings.fast")}</span>
@@ -370,6 +362,28 @@ export default function SettingsPage() {
               <p className="tiny muted" style={{ margin: 0 }}>{t("settings.fastHint", { models: fastModelsLabel })}</p>
               <p className="tiny muted" style={{ margin: 0 }}>{t("settings.cachingNote")}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Claude — key + balance */}
+        <div className="card">
+          <div className="card-h">
+            <h3>✦ {t("settings.secClaude")}</h3>
+            <span className={"badge " + (s.data?.hasLlmKey ? "ok" : "warn")}>
+              {s.data?.hasLlmKey ? t("settings.has") : t("settings.source.none")}
+            </span>
+          </div>
+          <div className="card-b col" style={{ gap: 12 }}>
+            <div className="row">
+              <span className="badge">key: {s.data?.llmKeyHint || "—"}</span>
+              <span className="badge">
+                {t("settings.keySource")}: {s.data ? srcLabel(s.data.llmKeySource) : "—"}
+              </span>
+            </div>
+            <label className="field">
+              ANTHROPIC_API_KEY — {t("settings.newKey")}
+              <input type="password" value={claudeKey} onChange={(e) => setClaudeKey(e.target.value)} placeholder="sk-ant-…" />
+            </label>
 
             <label className="field" style={{ maxWidth: 260 }}>
               {t("settings.claudeBalance")}
@@ -401,12 +415,6 @@ export default function SettingsPage() {
                 {vClaude.error && <div className="tiny err-t">{vClaude.error}</div>}
                 {vClaude.ok && (
                   <>
-                    <div className="tiny" style={{ margin: "4px 0" }}>
-                      <span className="mono">
-                        model={vClaude.activeModel} · effort={vClaude.effort} · thinking={vClaude.thinking} · fast=
-                        {String(vClaude.fast)}
-                      </span>
-                    </div>
                     <div className="tiny muted" style={{ margin: "6px 0 4px" }}>
                       {t("settings.claudeModelsProof")} — {vClaude.models.length}
                     </div>
@@ -436,7 +444,7 @@ export default function SettingsPage() {
             <div className="row">
               <span className="badge">key: {s.data?.openaiKeyHint || "—"}</span>
               <span className="badge">
-                {t("usage.colProvider")}: {s.data ? srcLabel(s.data.openaiKeySource) : "—"}
+                {t("settings.keySource")}: {s.data ? srcLabel(s.data.openaiKeySource) : "—"}
               </span>
             </div>
             <label className="field">
@@ -494,7 +502,7 @@ export default function SettingsPage() {
             <div className="row">
               <span className="badge">key: {s.data?.manusKeyHint || "—"}</span>
               <span className="badge">
-                {t("usage.colProvider")}: {s.data ? srcLabel(s.data.manusKeySource) : "—"}
+                {t("settings.keySource")}: {s.data ? srcLabel(s.data.manusKeySource) : "—"}
               </span>
               <span className="badge mono">{s.data?.manusBase}</span>
               {s.data?.manusCredits != null && (
@@ -651,7 +659,7 @@ export default function SettingsPage() {
               <span className="badge mono">API {s.data?.shopifyApiVersion}</span>
               {s.data?.shopifyTokenHint && <span className="badge mono">token: {s.data.shopifyTokenHint}</span>}
               {s.data && s.data.shopifySource !== "none" && (
-                <span className="tiny muted">{t("usage.colProvider")}: {srcLabel(s.data.shopifySource as KeySource)}</span>
+                <span className="tiny muted">{t("settings.keySource")}: {srcLabel(s.data.shopifySource as KeySource)}</span>
               )}
             </div>
             <label className="field">

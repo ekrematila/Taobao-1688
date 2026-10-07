@@ -79,6 +79,11 @@ export const EFFORT_LABEL: Record<Effort, string> = {
 /** Fast mode (2.5x output speed, premium price) — research preview, these models only. */
 export const FAST_MODELS = ["claude-opus-5", "claude-opus-4-8", ...GPT_MODELS.map((m) => m.id)];
 
+/** Effort levels a given model actually accepts (GPT-5.5 tops out at xhigh). */
+export function effortLevelsFor(modelId: string): Effort[] {
+  return modelId === "gpt-5.5" ? EFFORT_LEVELS.filter((e) => e !== "max") : [...EFFORT_LEVELS];
+}
+
 /** Claude "thinking" (adaptive extended reasoning) on/off. */
 export const THINKING_MODES = ["adaptive", "off"] as const;
 export type ThinkingMode = (typeof THINKING_MODES)[number];

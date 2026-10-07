@@ -160,10 +160,12 @@ export default function Usage() {
             <div className="row">
               <Stat
                 label={t("usage.claudeSpentRange")}
-                value={usd(d?.claudeCostUsd ?? 0)}
+                value={usd((d?.claudeCostUsd ?? 0) + (d?.openaiCostUsd ?? 0))}
                 sub={`${(d?.totalInputTokens ?? 0).toLocaleString()} / ${(d?.totalOutputTokens ?? 0).toLocaleString()} token`}
                 big
               />
+              <Stat label="Claude" value={usd(d?.claudeCostUsd ?? 0)} />
+              <Stat label="ChatGPT" value={usd(d?.openaiCostUsd ?? 0)} />
               {claudeBalance > 0 ? (
                 <Stat
                   label={t("usage.claudeRemaining")}
@@ -308,7 +310,7 @@ export default function Usage() {
                 <thead>
                   <tr>
                     <th>{t("usage.colProduct")}</th>
-                    <th>Claude</th>
+                    <th>AI</th>
                     <th>Manus</th>
                     <th>{t("usage.colCredits")}</th>
                     <th>{t("usage.colTotal")}</th>
@@ -362,7 +364,9 @@ export default function Usage() {
                         <td className="tiny muted">{new Date(c.at).toLocaleString()}</td>
                         <td className="mono">{c.kind}</td>
                         <td>
-                          <span className={"badge " + (c.provider === "manus" ? "brand" : "")}>{c.provider}</span>
+                          <span className={"badge " + (c.provider === "manus" ? "brand" : "")}>
+                            {c.provider === "claude" ? "Claude" : c.provider === "openai" ? "ChatGPT" : "Manus"}
+                          </span>
                         </td>
                         <td className="mono">{c.model}</td>
                         <td>

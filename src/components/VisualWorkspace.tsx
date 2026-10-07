@@ -3346,7 +3346,7 @@ function VideoStudio({
             <div className="chips">
               {(["manus", "claude"] as const).map((e) => (
                 <button key={e} className={"chip" + (engine === e ? " active" : "")} onClick={() => setEngine(e)}>
-                  {e === "manus" ? "Manus" : "Claude"}
+                  {e === "manus" ? "Manus" : "AI"}
                 </button>
               ))}
             </div>
