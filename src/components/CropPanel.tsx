@@ -29,19 +29,28 @@ export default function CropPanel({
   const { t } = useI18n();
   const toast = useToast();
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const [rect, setRect] = useState<Rect>({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  const [active, setActive] = useState(0); // which image is shown in the stage
+  const [each, setEach] = useState(false); // false: one crop for all; true: every image keeps its own crop
+  const [shared, setShared] = useState<Rect>({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  const [own, setOwn] = useState<Record<string, Rect>>({});
   const [aspect, setAspect] = useState<number | null>(null);
+  const url = urls[Math.min(active, urls.length - 1)];
+  const rect: Rect = each ? own[url] ?? shared : shared;
+  const setRect = (r: Rect) => (each ? setOwn((o) => ({ ...o, [url]: r })) : setShared(r));
   const [busy, setBusy] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<null | { mode: "new" | "move" | "nw" | "ne" | "sw" | "se"; sx: number; sy: number; start: Rect }>(null);
 
   useEffect(() => {
-    loadImage(urls[0]).then(setImg).catch(() => toast(t("crop.loadFail"), "err"));
-  }, [urls[0]]);
+    setImg(null);
+    loadImage(url).then(setImg).catch(() => toast(t("crop.loadFail"), "err"));
+  }, [url]);
 
-  function applyAspect(r: Rect): Rect {
-    if (!aspect || !img) return r;
-    const ar = img.naturalWidth / img.naturalHeight; // px aspect
+  /** fit a crop to the chosen ratio for an image of pixel aspect `ar` (w/h) */
+  function applyAspect(r: Rect, arPx?: number): Rect {
+    if (!aspect) return r;
+    const ar = arPx ?? (img ? img.naturalWidth / img.naturalHeight : 0); // px aspect
+    if (!ar) return r;
     // rect is in fractions of the image; convert w:h fraction ratio to px ratio = (w/h)*(ar)
     // we want (w*W)/(h*H) = aspect  ->  w/h = aspect / ar
     const targetWH = aspect / ar;
@@ -102,12 +111,16 @@ export default function CropPanel({
     drag.current = null;
   }
 
-  useEffect(() => setRect((r) => (aspect ? applyAspect(r) : r)), [aspect]);
+  // a new ratio re-fits the crop of the image on screen; the others are fitted to their own pixels when applied
+  useEffect(() => {
+    if (aspect && img) setRect(applyAspect(rect));
+  }, [aspect, img, each]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cropOne(url: string): Promise<string> {
     const im = await loadImage(url);
     const W = im.naturalWidth || im.width;
     const H = im.naturalHeight || im.height;
+    const rect = applyAspect(each ? own[url] ?? shared : shared, W / H);
     const sx = Math.round(rect.x * W);
     const sy = Math.round(rect.y * H);
     const sw = Math.max(1, Math.round(rect.w * W));
@@ -175,7 +188,7 @@ export default function CropPanel({
                 onPointerMove={move}
                 onPointerUp={up}
               >
-                <img src={proxied(urls[0])} alt="" draggable={false} />
+                <img src={proxied(url)} alt="" draggable={false} />
                 <div className="crop-shade" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 ${pct(rect.y)}, ${pct(rect.x)} ${pct(rect.y)}, ${pct(rect.x)} ${pct(rect.y + rect.h)}, ${pct(rect.x + rect.w)} ${pct(rect.y + rect.h)}, ${pct(rect.x + rect.w)} ${pct(rect.y)}, 0 ${pct(rect.y)})` }} />
                 <div
                   className="crop-rect"
@@ -192,14 +205,49 @@ export default function CropPanel({
           </div>
 
           {urls.length > 1 && (
-            <div className="bulk-strip">
-              {urls.map((u) => (
-                <img key={u} src={proxied(u)} alt="" loading="lazy" />
-              ))}
-            </div>
+            <>
+              <div className="bulk-strip">
+                {urls.map((u, i) => (
+                  <img
+                    key={u}
+                    src={proxied(u)}
+                    alt=""
+                    loading="lazy"
+                    onClick={() => setActive(i)}
+                    title={`${i + 1}/${urls.length}`}
+                    style={{
+                      cursor: "pointer",
+                      outline: i === active ? "2px solid var(--brand, #e03131)" : each && own[u] ? "2px solid #17935a" : "none",
+                      outlineOffset: -2,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <div className="chips">
+                  <button className={"chip" + (!each ? " active" : "")} onClick={() => setEach(false)}>
+                    {t("crop.modeShared")}
+                  </button>
+                  <button className={"chip" + (each ? " active" : "")} onClick={() => setEach(true)}>
+                    {t("crop.modeEach")}
+                  </button>
+                </div>
+                {each && (
+                  <button
+                    className="btn ghost sm"
+                    onClick={() => {
+                      setShared(rect);
+                      setOwn({});
+                    }}
+                  >
+                    {t("crop.copyAll")}
+                  </button>
+                )}
+              </div>
+            </>
           )}
           <p className="tiny muted" style={{ margin: 0 }}>
-            {t("crop.hint", { n: urls.length })}
+            {urls.length > 1 ? t(each ? "crop.hintEach" : "crop.hint", { n: urls.length }) : t("crop.hint", { n: urls.length })}
           </p>
           <button className="btn primary sm" onClick={apply} disabled={busy || !img}>
             {busy ? <span className="spin" /> : t("crop.apply")}
