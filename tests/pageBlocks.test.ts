@@ -130,3 +130,25 @@ test("pageBlocksFor builds the verified blocks from the saved profile; option th
   const noProfile = buildPageBlocks({ product: p, variantImageUrl: () => null });
   assert.equal(noProfile.ship, "");
 });
+
+test("description pictures: nothing opens, no 'Tap to zoom', no zoom on hover — only a small brightness lift", () => {
+  // a page stored before this rule: zoom cursor + zoom tag + lightbox node + zoom hooks, as the old template produced
+  const old =
+    "<style>.bm{--ink:#222}.bm-media img{cursor:zoom-in}.bm-media img:hover{transform:scale(1.2)}.bm-lightbox{display:none}.bm-reveal{opacity:1}</style>" +
+    '<div class="bm"><div class="bm-grid"><div class="bm-media"><div class="bm-stage" data-bm-zoom><img src="x" data-bm-zoom><span class="bm-zoomtag">🔍 Tap to zoom</span></div></div>' +
+    '<div class="bm-c2"><div class="bm-cta"><button data-bm-goto-atc>Add</button></div></div></div>' +
+    '<div class="bm-lightbox" data-bm-lightbox><button class="bm-close" data-bm-close>✕</button><img src="" data-bm-lightbox-img></div></div>';
+  const out = renderImportBody("stacked-plain", old, [{ url: "https://img.example.com/a.jpg", alt: "a" }, { url: "https://img.example.com/b.jpg", alt: "b" }]);
+  assert.doesNotMatch(out, /Tap to zoom/);
+  assert.doesNotMatch(out, /<div[^>]*data-bm-lightbox/);
+  assert.doesNotMatch(out, /<span[^>]*bm-zoomtag/);
+  assert.doesNotMatch(out, / data-bm-zoom/);
+  assert.doesNotMatch(out, /data-bm-lightbox-img/);
+  assert.match(out, /<img src="https:\/\/img\.example\.com\/a\.jpg"/, "the pictures are still there");
+  const flat = out.replace(/\s+/g, "");
+  assert.match(flat, /\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/);
+  assert.match(flat, /\.bm-mediaimg,\.bm-media\.bm-stage,\.pd-mediaimg\{cursor:default!important\}/);
+  assert.match(flat, /\.bm-zoomtag,\.bm-lightbox,\[data-bm-lightbox\]\{display:none!important\}/);
+  // the runtime no longer opens anything
+  assert.doesNotMatch(out, /data-bm-zoom\]|bm-lightbox\.is-open/);
+});

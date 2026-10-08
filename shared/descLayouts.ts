@@ -501,16 +501,6 @@ ${FIND_ATC_FN}
       if(item.hasAttribute('open')) closeFaq(item); else openFaq(item);
       return;
     }
-    var z = t.closest && t.closest('.bm [data-bm-zoom]');
-    if(z){
-      var im = z.tagName === 'IMG' ? z : z.querySelector('img');
-      var lb = document.querySelector('.bm-lightbox');
-      if(im && lb){ var li = lb.querySelector('[data-bm-lightbox-img]') || lb.querySelector('img'); if(li){ li.src = im.currentSrc || im.src; lb.classList.add('is-open'); } }
-      return;
-    }
-    if((t.closest && t.closest('.bm-lightbox [data-bm-close]')) || (t.classList && t.classList.contains('bm-lightbox'))){
-      var o = document.querySelector('.bm-lightbox.is-open'); if(o) o.classList.remove('is-open'); return;
-    }
     var cta = t.closest && t.closest('[data-bm-goto-atc]');
     if(!cta) return;
     e.preventDefault();
@@ -518,9 +508,6 @@ ${FIND_ATC_FN}
     if(!atc) return;
     atc.scrollIntoView({behavior:'smooth', block:'center'});
     afterScrollSettles(function(){ glow(atc); });
-  });
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape'){ var o = document.querySelector('.bm-lightbox.is-open'); if(o) o.classList.remove('is-open'); }
   });
 })();
 </script>`;
@@ -546,16 +533,13 @@ const fmtStyle = (block: string): string =>
     return `${o}\n${body}\n${c}`;
   });
 
-/** The v2-only `.bm` rules (reveal / zoom / lightbox / FAQ / CTA). Injected by
+/** The v2-only `.bm` rules (reveal / FAQ / CTA). Injected by
  *  `ensureBmScaffold` when the block's own `<style>` predates v2 (the fallback
  *  card, or an older model block). */
 const BM_STYLE_EXTRA = fmtStyle(
   `<style>@media (prefers-reduced-motion:reduce){.bm *{animation-duration:.01ms!important;transition-duration:.01ms!important}}` +
   `.bm-reveal{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:none}` +
-  `.bm-media .bm-stage{position:relative;cursor:zoom-in}.bm-media img{transition:filter .3s cubic-bezier(.25,.8,.3,1);cursor:zoom-in;background:var(--sky,#eaeefc)}.bm-media img:hover{filter:brightness(1.06)}` +
-  `.bm-media .bm-zoomtag{position:absolute;right:10px;bottom:10px;z-index:5;font-size:11.5px;font-weight:700;color:var(--acc,#4f57c4);background:rgba(255,255,255,.92);border:1px solid var(--line,rgba(79,87,196,.16));padding:5px 10px;border-radius:99px;opacity:1;pointer-events:none}` +
-  `.bm-lightbox{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:26px;background:rgba(24,26,48,.82)}.bm-lightbox.is-open{display:flex}.bm-lightbox img{max-width:min(92vw,900px);max-height:88vh;border-radius:12px}` +
-  `.bm-lightbox .bm-close{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(20,26,48,.5);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 4px 16px rgba(0,0,0,.35);transition:background .3s,transform .3s,box-shadow .3s}.bm-lightbox .bm-close:hover{background:rgba(20,26,48,.75);transform:rotate(90deg) scale(1.08);box-shadow:0 6px 20px rgba(0,0,0,.45)}` +
+  `.bm-media .bm-stage{position:relative}.bm-media img{transition:filter .3s cubic-bezier(.25,.8,.3,1);background:var(--sky,#eaeefc)}.bm-media img:hover{filter:brightness(1.06)}` +
   `.bm-faq{margin-top:6px;border:1px solid var(--line,rgba(79,87,196,.16));border-radius:12px;overflow:hidden}.bm-faq-item{border-bottom:1px solid var(--line,rgba(79,87,196,.16))}.bm-faq-item:last-child{border-bottom:0}` +
   `.bm-faq-q{list-style:none;cursor:pointer;width:100%;display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff;border:0;text-align:left;font-size:13.4px;font-weight:700;color:var(--acc,#4f57c4)}.bm-faq-q::-webkit-details-marker{display:none}.bm-faq-q::marker{content:""}` +
   `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative;transition:transform .3s}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:opacity .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item[open] .bm-plus,.bm-faq-item.is-open .bm-plus{transform:rotate(90deg)}.bm-faq-item[open] .bm-plus::after,.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
@@ -566,24 +550,16 @@ const BM_STYLE_EXTRA = fmtStyle(
   `</style>`,
 );
 
-const BM_LIGHTBOX =
-  `<div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button>` +
-  `<img src="" alt="Zoomed product image" data-bm-lightbox-img></div>`;
-
-/** images for a `.bm-media` slot: first wrapped in `.bm-stage` (+ zoom hint), the
- *  rest plain — every one gets `data-bm-zoom` so the lightbox picks it up. A
- *  per-image `descCrop` becomes CSS aspect-ratio + cover-fit + object-position. */
+/** images for a `.bm-media` slot: plain pictures — nothing opens on click, no zoom hint, no zoom on hover
+ *  (just a small brightness lift from CSS). A per-image `descCrop` becomes CSS aspect-ratio + cover-fit + object-position. */
 function bmMediaInner(imgs: DescImg[]): string {
   return imgs
     .map((i, k) => {
       const ws = cropWrapStyle(i.crop);
       const tag = `<img src="${i.url}" alt="${esc(i.alt || "product photo")}" loading="${
         k === 0 ? "eager" : "lazy"
-      }" decoding="async" data-bm-zoom${ws ? ` style="${cropImgStyle(i.crop)}"` : ""}>`;
-      const cell = ws ? `<span class="bm-stage" data-bm-zoom style="${ws}">${tag}</span>` : tag;
-      return k === 0 && !ws
-        ? `<div class="bm-stage" data-bm-zoom>${tag}<span class="bm-zoomtag">🔍 Tap to zoom</span></div>`
-        : cell;
+      }" decoding="async"${ws ? ` style="${cropImgStyle(i.crop)}"` : ""}>`;
+      return ws ? `<span class="bm-stage" style="${ws}">${tag}</span>` : tag;
     })
     .join("");
 }
@@ -754,32 +730,17 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //     real hover affordance even when the model's own CSS forgot one.
   `.bm-trust span{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s cubic-bezier(.4,0,.2,1)!important}` +
   `.bm-trust span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,63,140,217),.28)!important;background:#fff!important}` +
-  // 4i) product photos must never zoom/scale on hover (that reads as a jarring
-  //     "magnify" effect) — only a subtle brightness lift; and the "Tap to
-  //     zoom" hint must always be visible, never hover-only, since touch
-  //     devices have no real :hover state and the tag would otherwise never
-  //     appear at all (observed complaint: "the tap-to-zoom area stays behind
-  //     the image" on mobile — it wasn't behind it, it was just permanently
-  //     opacity:0 because :hover never fires on a tap).
-  `.bm-media img{transform:none!important}` +
-  `.bm-media img:hover{transform:none!important;filter:brightness(1.06)!important}` +
-  `.bm-media .bm-zoomtag{opacity:1!important;transform:none!important;z-index:5!important}` +
+  // 4i) product photos: nothing opens, nothing zooms. No "Tap to zoom" tag, no lightbox, no zoom cursor, no scale
+  //     on hover — only a small brightness lift. Pages stored earlier (and the model's own CSS) may still carry the old
+  //     zoom bits, so they are switched off here for good.
+  `.bm-zoomtag,.bm-lightbox,[data-bm-lightbox]{display:none!important}` +
+  `.bm-media img,.bm-media .bm-stage,.pd-media img{cursor:default!important}` +
+  `.bm-media img,.pd-media img{transform:none!important;transition:filter .3s cubic-bezier(.25,.8,.3,1)!important}` +
+  `.bm-media img:hover,.pd-media img:hover{transform:none!important;filter:brightness(1.06)!important}` +
   // 4j) the root card is capped for a narrow desktop theme column — widen it
   //     on devices that actually have the room (desktop/tablet) regardless of
   //     what the model's own `.bm{}` max-width says.
   `.bm{max-width:1400px!important}` +
-  // 4h) the "🔍 Tap to zoom" tag inherits font-size:0 from `.bm-media` (that
-  //     0 is intentional there — it's the classic trick to remove whitespace
-  //     gaps between stacked inline-block images). The reference example
-  //     overrides it back with the DESCENDANT combinator `.bm-media
-  //     .bm-zoomtag{font-size:11.5px}` — observed in production: the model
-  //     regenerated this as the COMPOUND selector `.bm-media.bm-zoomtag`
-  //     (no space = "one element with both classes", which no element ever
-  //     has, since .bm-zoomtag is a descendant of .bm-media, not the same
-  //     node) — a silently dead rule, leaving the tag's text invisible at
-  //     0 font-size. Force it back regardless of which selector the model
-  //     wrote.
-  `.bm-zoomtag{font-size:11.5px!important}` +
   // 5) DESKTOP LAYOUT LOCK — images LEFT, text RIGHT, no matter what the model wrote.
   `.bm .bm-grid{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)!important;gap:18px;align-items:start}` +
   `.bm .bm-media{grid-column:1!important;grid-row:1!important}` +
@@ -909,7 +870,7 @@ function forceBmAccDisclosure(html: string): string {
   return `${before}<details class="bm-acc" open><summary class="bm-bar">${label}</summary>${middle}</details>${after}`;
 }
 
-/** Guarantee a `.bm` styled block carries the no-JS guard, the lightbox node and
+/** Guarantee a `.bm` styled block carries the no-JS guard and
  *  the runtime `<script>`. We NEVER trust a model-authored `<script>` here either
  *  (same reason as `ensurePdScaffold`): strip whatever the model wrote and inject
  *  the tested canonical `BM_SCRIPT`. */
@@ -919,18 +880,17 @@ function ensureBmScaffold(html: string): string {
   out = forceBmAccDisclosure(out);
   out = forceCtaOnclick(out, "data-bm-goto-atc", BM_CTA_ONCLICK);
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
-  if (!/\.bm-lightbox\{/i.test(out)) {
+  out = out
+    .replace(/<div\b[^>]*\bdata-bm-lightbox\b[^>]*>[\s\S]*?<\/div>/gi, "")
+    .replace(/<span\b[^>]*\bbm-zoomtag\b[^>]*>[\s\S]*?<\/span>/gi, "")
+    .replace(/\sdata-bm-zoom\b/gi, "");
+  if (!/\.bm-reveal\{/i.test(out)) {
     out = /<\/style>/i.test(out) ? out.replace(/<\/style>/i, `</style>${BM_STYLE_EXTRA}`) : BM_STYLE_EXTRA + out;
   }
   if (!/<noscript>[\s\S]*?bm-reveal/i.test(out)) {
     out = /<\/style>/i.test(out) ? out.replace(/<\/style>/i, `</style>${BM_NOSCRIPT}`) : BM_NOSCRIPT + out;
   }
   // close the .bm wrapper: the last </div> that belongs to it. We append before it.
-  if (!/data-bm-lightbox/i.test(out)) {
-    const last = out.lastIndexOf("</div>");
-    if (last >= 0) out = out.slice(0, last) + BM_LIGHTBOX + out.slice(last);
-    else out += BM_LIGHTBOX;
-  }
   return out + FAQ_CTA_GUARANTEE + BM_SCRIPT;
 }
 
@@ -963,7 +923,7 @@ function ensurePdScaffold(html: string): string {
 }
 
 /**
- * Add the runtime scaffold (guard styles, lightbox, canonical `<script>`) to a
+ * Add the runtime scaffold (guard styles, canonical `<script>`) to a
  * model-authored pre-styled block. Dispatches by block TYPE: a `.bm` block gets
  * ONLY `ensureBmScaffold` (running `ensurePdScaffold` after it used to strip the
  * freshly-added BM_SCRIPT — because FAQ_CTA_GUARANTEE's CSS mentions
@@ -978,7 +938,7 @@ function scaffoldPrestyled(html: string): string {
 /**
  * Drop the product images into a model-authored styled block.
  * - `.bm-media` (Alt alta görsel) is a single stacked-gallery slot → gets the
- *   whole zoomable image stack.
+ *   whole image stack.
  * - `pd-media` (Diğer HTML düzenler) is a ONE-IMAGE-PER-SLOT placeholder — the
  *   model arranges several of them into grids/variant-cards/a wide cinematic
  *   crop with its own CSS; we never bundle multiple photos into one slot (that

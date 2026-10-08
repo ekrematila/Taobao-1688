@@ -204,42 +204,21 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
-test("product photos never scale/zoom on hover (only brighten), and the zoom hint is always visible", () => {
-  // User complaint: hovering an image "zoomed" it (jarring), and the
-  // "Tap to zoom" hint appeared to be "stuck behind the image" on mobile —
-  // it wasn't a z-index bug, it was hover-gated opacity:0 that never fires
-  // on a touch device (no real :hover state). Fixed by making the hint
-  // always visible and swapping the hover zoom for a subtle brightness lift,
-  // both forced regardless of what the model's own CSS says.
+test("product photos never scale/zoom on hover (only brighten) and never show a zoom hint or open a lightbox", () => {
+  // The operator does not want pictures in the HTML description to open, to say "Tap to zoom", or to zoom on hover —
+  // only a small brightness lift. Forced regardless of what the model's own CSS (or an older stored page) says.
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   const flat = out.replace(/\s+/g, "");
-  assert.ok(/\.bm-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/.test(flat), "hover brightens, never scales");
-  assert.ok(/\.bm-zoomtag\{opacity:1!important/.test(flat), "zoom hint forced always-visible, not hover-only");
+  assert.ok(/\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/.test(flat), "hover brightens, never scales");
+  assert.ok(/\.bm-zoomtag,\.bm-lightbox,\[data-bm-lightbox\]\{display:none!important\}/.test(flat), "zoom tag / lightbox are switched off");
+  assert.ok(/cursor:default!important/.test(flat), "no zoom-in cursor");
+  assert.ok(!/Tapto zoom/i.test(flat) && !/ data-bm-zoom/.test(out) && !/<div[^>]*data-bm-lightbox/.test(out) && !/<span[^>]*bm-zoomtag/.test(out), "no tag, hook or lightbox node is rendered");
 });
 
 test("the .bm card is widened on desktop/tablet regardless of the model's own max-width", () => {
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   const flat = out.replace(/\s+/g, "");
   assert.ok(/\.bm\{max-width:1400px!important\}/.test(flat), "root card widened to 1400px on devices with the room for it");
-});
-
-test("the 'Tap to zoom' tag is never invisible, even if the model writes a compound selector typo", () => {
-  // Reproduces a real bug found on a live regeneration: `.bm-media` sets
-  // font-size:0 (removes whitespace gaps between stacked inline-block
-  // images), and the reference example overrides it back for the zoom tag
-  // with the DESCENDANT combinator `.bm-media .bm-zoomtag{font-size:11.5px}`.
-  // The model regenerated this as `.bm-media.bm-zoomtag` (no space = a
-  // compound selector requiring ONE element with both classes, which never
-  // exists since .bm-zoomtag is a descendant of .bm-media) — a silently dead
-  // rule that left the "🔍 Tap to zoom" label's text at 0 font-size.
-  const brokenSelector = STACKED_DESC_EXAMPLE.replace(
-    ".bm-media .bm-zoomtag{",
-    ".bm-media.bm-zoomtag{", // the exact typo observed in production
-  );
-  assert.notEqual(brokenSelector, STACKED_DESC_EXAMPLE, "fixture setup: the typo was actually introduced");
-  const out = renderDescriptionHtml("stacked-plain", brokenSelector, imgs);
-  const flat = out.replace(/\s+/g, "");
-  assert.ok(/\.bm-zoomtag\{font-size:11\.5px!important\}/.test(flat), "zoom tag font-size forced regardless of the model's selector");
 });
 
 test("Add-to-Cart glow waits long enough for a long-page smooth scroll to truly finish", () => {

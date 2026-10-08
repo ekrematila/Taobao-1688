@@ -138,7 +138,7 @@ XDA Profile, DSA Profile, SA Profile, ASA Profile, KAT Profile, XVX Profile
  * red/scarlet vars, a mint product -> green vars). Target ~29,000-30,000 characters
  * incl. spaces & symbols; the operator length band overrides that when set.
  * The renderer fills the empty <div class="bm-media"></div> with the real product
- * photos and guarantees the .bm-lightbox node + <script> are present.
+ * photos and guarantees the <script> is present.
  * NOTE: the FAQ is a native <details>/<summary> (NO JavaScript — Shopify strips
  * <script>, so a JS accordion never opens); the CTA <button> also carries an
  * inline onclick so it works even with every <script> removed.
@@ -237,35 +237,15 @@ export const STACKED_DESC_EXAMPLE = `<style>
 .bm-acc-media{grid-column:1; grid-row:1}
 .bm-acc-desc{grid-column:2; grid-row:1; position:-webkit-sticky; position:sticky; top:var(--top); align-self:start}
 .bm-media{font-size:0; line-height:0; border-radius:var(--r); overflow:hidden; border:1px solid var(--line); background:var(--milk)}
-.bm-media .bm-stage{position:relative; cursor:zoom-in}
+.bm-media .bm-stage{position:relative}
 .bm-media img{
   display:block !important; width:100% !important; height:auto;
   margin:0 !important; padding:0 !important; border:0 !important;
   vertical-align:top; border-radius:0 !important; max-width:100%;
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
-  transition:transform .5s cubic-bezier(.25,.8,.3,1); cursor:zoom-in; background:var(--sky);
+  transition:filter .3s cubic-bezier(.25,.8,.3,1); background:var(--sky);
 }
 .bm-media img:hover{filter:brightness(1.06)}
-.bm-media .bm-zoomtag{
-  position:absolute; right:10px; bottom:10px; z-index:5;
-  font-size:11.5px; font-weight:700; color:var(--head); background:rgba(255,255,255,.92);
-  border:1px solid var(--line); padding:9px 14px; border-radius:99px; line-height:1;
-  opacity:1; pointer-events:none;
-}
-.bm-lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:26px; background:rgba(20,32,50,.82); backdrop-filter:blur(2px); animation:bmFade .2s ease}
-.bm-lightbox.is-open{display:flex}
-.bm-lightbox img{max-width:min(92vw,900px); max-height:88vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.4)}
-.bm-lightbox .bm-close{
-  position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%;
-  border:1px solid rgba(255,255,255,.4); background:rgba(20,26,48,.5); color:#fff;
-  font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center;
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-  box-shadow:0 4px 16px rgba(0,0,0,.35);
-  backface-visibility:hidden; -webkit-backface-visibility:hidden;
-  transform:rotate(0deg) scale(1); transform-origin:50% 50%; will-change:transform;
-  transition:background .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s cubic-bezier(.4,0,.2,1);
-}
-.bm-lightbox .bm-close:hover{background:rgba(20,26,48,.75); transform:rotate(90deg) scale(1.08); box-shadow:0 6px 20px rgba(0,0,0,.45)}
 @keyframes bmFade{from{opacity:0} to{opacity:1}}
 .bm-info{padding:20px 18px; border:1px solid var(--line); border-radius:var(--r); background:var(--milk)}
 .bm-info h3{margin:0 0 10px; font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gold)}
@@ -576,7 +556,6 @@ export const STACKED_DESC_EXAMPLE = `<style>
 </div>
 </div></div>
 </details>
-<div class="bm-lightbox" data-bm-lightbox><button type="button" class="bm-close" data-bm-close aria-label="Close">✕</button><img src="" alt="Zoomed product image" data-bm-lightbox-img></div>
 </div>
 <script>
 /* Progressive enhancement only. The description works with NO JavaScript:
@@ -666,16 +645,6 @@ export const STACKED_DESC_EXAMPLE = `<style>
       if(faqItem.hasAttribute('open')) closeFaq(faqItem); else openFaq(faqItem);
       return;
     }
-    var zoom = t.closest && t.closest('.bm [data-bm-zoom]');
-    if(zoom){
-      var im = zoom.tagName === 'IMG' ? zoom : zoom.querySelector('img');
-      var lb = document.querySelector('.bm-lightbox');
-      if(im && lb){ var li = lb.querySelector('[data-bm-lightbox-img]') || lb.querySelector('img'); if(li){ li.src = im.currentSrc || im.src; lb.classList.add('is-open'); } }
-      return;
-    }
-    if((t.closest && t.closest('.bm-lightbox [data-bm-close]')) || (t.classList && t.classList.contains('bm-lightbox'))){
-      var open = document.querySelector('.bm-lightbox.is-open'); if(open) open.classList.remove('is-open'); return;
-    }
     var cta = t.closest && t.closest('[data-bm-goto-atc]');
     if(!cta) return;
     e.preventDefault();
@@ -683,9 +652,6 @@ export const STACKED_DESC_EXAMPLE = `<style>
     if(!atc) return;
     atc.scrollIntoView({behavior:'smooth', block:'center'});
     afterScrollSettles(function(){ glow(atc); });
-  });
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape'){ var open = document.querySelector('.bm-lightbox.is-open'); if(open) open.classList.remove('is-open'); }
   });
 })();
 </script>`;
