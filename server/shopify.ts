@@ -4,7 +4,8 @@ import { env } from "./env.ts";
 import { getSetting, setSetting } from "./db.ts";
 import type { GeneratedListing, NormalisedProduct, ProductImage } from "@shared/types.ts";
 import { renderImportBody } from "@shared/descLayouts.ts";
-import { descBodyImages, outputVariants, publicImageUrl } from "@shared/listingFormat.ts";
+import { descBodyImages, outputVariants, pageBlocksFor, publicImageUrl } from "@shared/listingFormat.ts";
+import { readStoreProfiles } from "./storeProfiles.ts";
 import { mediaPath } from "./imagestore.ts";
 import { resolveCategory, findTaxonomy, TAXONOMY } from "./taxonomy.ts";
 
@@ -181,7 +182,7 @@ export async function pushToShopify(
   // it corresponds to (`bodyKey`) so we can swap it for Shopify's CDN URL after
   // the create. A public https url is uploaded by `src`; a locally-edited
   // /api/media image is uploaded by base64 `attachment` (so nothing is dropped).
-  type Up = { src?: string; attachment?: string; filename?: string; alt: string; bodyKey?: string };
+  type Up = { src?: string; attachment?: string; filename?: string; alt: string; bodyKey?: string; extraKeys?: string[] };
   const uploads: Up[] = [];
   const seen = new Set<string>();
   const addUp = (
@@ -195,7 +196,12 @@ export async function pushToShopify(
     const pub = local ? null : publicImageUrl(im);
     if (!pub && !local) return null;
     const key = pub || im.url;
-    if (seen.has(key)) return uploads.find((u) => (u.src || `/api/media/${u.filename}`) === key) || null;
+    if (seen.has(key)) {
+      const hit = uploads.find((u) => (u.src || `/api/media/${u.filename}`) === key) || null;
+      // the same picture is wanted at another spot in the body (e.g. an option thumbnail) → remember that placeholder too
+      if (hit && bodyKey && hit.bodyKey !== bodyKey && !(hit.extraKeys ?? []).includes(bodyKey)) hit.extraKeys = [...(hit.extraKeys ?? []), bodyKey];
+      return hit;
+    }
     seen.add(key);
     const u: Up = local ? { ...local, alt: im.alt || "", bodyKey } : { src: pub!, alt: im.alt || "", bodyKey };
     uploads.push(u);
@@ -207,6 +213,15 @@ export async function pushToShopify(
 
   // Shopify description is always visual — every "Açıklama görselleri" strip goes
   // into body_html (up to 20, best-first). Local edits included via attachment.
+  // option thumbnails ("Available options") sit in the body too — their pictures upload like any other and their
+  // placeholders are swapped for the Shopify CDN url below
+  const blocks = pageBlocksFor(product, listing, readStoreProfiles());
+  if (blocks?.swatches) {
+    for (const v of product.variants ?? []) {
+      const vim = v.imageUrl ? product.images.find((i) => i.url === v.imageUrl) : undefined;
+      if (vim) addUp(vim, publicImageUrl(vim) || vim.url);
+    }
+  }
   const descImgs = descBodyImages(product.images, 20);
   const descImages: { url: string; alt: string; crop?: (typeof descImgs)[number]["descCrop"] }[] = [];
   for (const im of descImgs) {
@@ -221,7 +236,7 @@ export async function pushToShopify(
   // in the CREATE payload; local edits are uploaded ONE BY ONE right after, each
   // its own small request, then the gallery order + body_html are fixed in a
   // single follow-up PUT.
-  const remoteForCreate = uploads.filter((u) => u.src).map(({ bodyKey, ...rest }) => rest);
+  const remoteForCreate = uploads.filter((u) => u.src).map(({ bodyKey, extraKeys, ...rest }) => rest);
   const localUploads = uploads.filter((u) => u.attachment);
 
   // sanitiser-safe body — Shopify strips <style>/<input>/<label>/class from
@@ -229,6 +244,7 @@ export async function pushToShopify(
   let bodyHtml = renderImportBody(listing.layout, field(listing, "description"), descImages, {
     name: field(listing, "title") || product.titleTranslated || product.title,
     props: product.props,
+    blocks,
   });
 
   const vlist = outputVariants(product, listing);
@@ -370,8 +386,8 @@ export async function pushToShopify(
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   for (const u of uploads) {
     const created = byUpload.get(u);
-    if (!u.bodyKey || !created) continue;
-    for (const form of [u.bodyKey, esc(u.bodyKey)]) {
+    if ((!u.bodyKey && !u.extraKeys?.length) || !created) continue;
+    for (const form of [u.bodyKey, ...(u.extraKeys ?? [])].filter((k): k is string => !!k).flatMap((k) => [k, esc(k)])) {
       if (bodyHtml.includes(form)) {
         bodyHtml = bodyHtml.split(form).join(created.src);
         rewrote = true;

@@ -10,6 +10,7 @@ import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { EFFORT_LABEL, FAST_MODELS, effortLevelsFor, providerOf, supportsFast, type Effort } from "@shared/models.ts";
 import type { KeySource, VerifyClaudeResult, VerifyManusResult, VerifyShopifyResult } from "@shared/types.ts";
+import StoreProfilesCard from "../components/StoreProfilesCard";
 
 /** This operator's two Shopify stores — quick-pick instead of retyping. */
 const SHOPIFY_DOMAIN_PRESETS = ["343d10-7c.myshopify.com", "0sk8vz-7m.myshopify.com"];
@@ -937,6 +938,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        <StoreProfilesCard profiles={s.data?.storeProfiles} />
 
         <div className="row">
           <button className="btn primary" onClick={() => save()} disabled={busy}>

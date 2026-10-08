@@ -11,7 +11,9 @@ import Collapsible from "./Collapsible";
 import ListingPreview from "./ListingPreview";
 import DescCropLayer from "./DescCropLayer";
 import { downloadBlob, slugify } from "../lib/image";
-import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
+import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, setStoreProfiles, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
+import { DEFAULT_STORE_PROFILES, pickStoreProfile } from "@shared/storeProfiles.ts";
+import { productText as pageProductText } from "@shared/pageBlocks.ts";
 import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
@@ -24,6 +26,7 @@ import { proxied } from "../api";
 import type {
   ChannelId,
   DescriptionLayout,
+  GenerateListingInput,
   GeneratedField,
   GeneratedListing,
   JobView,
@@ -108,6 +111,8 @@ export default function DeliveryStudio({
   const [descEffort, setDescEffort] = useState<string>("");
   const [descThinking, setDescThinking] = useState<string>("");
   const [descStyle, setDescStyle] = useState("product");
+  const [storeProfileId, setStoreProfileId] = useState(""); // "" = pick automatically from the product
+  const [adaptNote, setAdaptNote] = useState("");
   // shipping & customs (persisted on draft.product so exports/push can read them).
   // "Type" is not its own field — it mirrors the Ürün türü (productType) value.
   const [category, setCategory] = useState("");
@@ -144,6 +149,11 @@ export default function DeliveryStudio({
   const [confirmGate, setConfirmGate] = useState<null | boolean>(null);
   const [etsyShopId, setEtsyShopId] = useState("");
   const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
+  const [imageWarn, setImageWarn] = useState<{
+    flagged: { url: string; needsCleanup: boolean; contact: boolean; reason: string }[];
+    manual: boolean;
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
   const [trademarkWarn, setTrademarkWarn] = useState<{ flagged: string[]; resolve: (proceed: boolean) => void } | null>(null);
   const [consistencyWarn, setConsistencyWarn] = useState<{
     issues: { field: string; current: string; issue: string; suggestion: string }[];
@@ -224,6 +234,7 @@ export default function DeliveryStudio({
       setDescEffort(typeof dc.descEffort === "string" ? dc.descEffort : "");
       setDescThinking(typeof dc.descThinking === "string" ? dc.descThinking : "");
       setDescStyle(dc.descStyle ?? "product");
+      setStoreProfileId(typeof dc.storeProfileId === "string" ? dc.storeProfileId : "");
       setPerVariantCustoms(!!dc.perVariantCustoms);
     }
     setApplyAdvice(!!s.useAdvice);
@@ -266,13 +277,13 @@ export default function DeliveryStudio({
         .patchDraft(draft.id, {
           imageState: {
             ...((draft.imageState as any) ?? {}),
-            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, perVariantCustoms },
+            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms },
           },
         })
         .catch(() => {});
     }, 600);
     return () => clearTimeout(id);
-  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, perVariantCustoms]);
+  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms]);
 
   // persist shipping & customs onto draft.product (debounced, silent, fresh-merged)
   useEffect(() => {
@@ -304,6 +315,13 @@ export default function DeliveryStudio({
   }, [shopType, category, originCountry, hsCode, weightKg, JSON.stringify(attrPicks)]);
 
   const keys = FIELDS_BY_CHANNEL[channel];
+  // the operator's store policies (Settings) feed the Shipping & Returns block of every page
+  const storeProfiles = settingsQ.data?.storeProfiles ?? DEFAULT_STORE_PROFILES;
+  setStoreProfiles(storeProfiles);
+  const profileOpts = storeProfiles.filter((p) => p.kind === channel);
+  const autoProfile = draft.product
+    ? pickStoreProfile(storeProfiles, { channel: channel === "etsy" ? "etsy" : "shopify", productText: pageProductText(draft.product), isKeycapSet: !!kb?.isKeycapSet })
+    : undefined;
   const examplesQ = useQuery({ queryKey: ["examples"], queryFn: api.examples, staleTime: 60 * 60 * 1000 });
   const defaultExample = (k: string): string => {
     if (k === "description" && channel === "shopify") {
@@ -316,10 +334,9 @@ export default function DeliveryStudio({
     return (examplesQ.data as any)?.[channel]?.[k] ?? (DEFAULT_FIELD_EXAMPLES as any)[channel]?.[k] ?? "";
   };
 
-  async function generate(mode: "ai" | "local" = "ai") {
-    setBusy(mode === "local" ? "gen-local" : "gen");
-    const r = generateListingJob(
-      {
+  /** the current Delivery-studio settings as one generate request */
+  function genInput(mode: "ai" | "local" = "ai"): GenerateListingInput & { model?: string; mode?: "ai" | "local" } {
+    return {
         draftId: draft.id,
         channel,
         productType,
@@ -346,6 +363,7 @@ export default function DeliveryStudio({
         descEffort: ((channel === "shopify" && descProvider === "claude" && descEffort) || undefined) as any,
         descThinking: ((channel === "shopify" && descProvider === "claude" && descThinking) || undefined) as any,
         descStyle,
+        storeProfileId: storeProfileId || undefined,
         advice: applyAdvice && adviceText ? adviceText : undefined,
         categoryResearch: applyResearch && research ? research : undefined,
         fields: keys.map((k) => ({
@@ -353,9 +371,12 @@ export default function DeliveryStudio({
           examples: (fieldCfg[k]?.examples ?? defaultExample(k)) || undefined,
           rules: fieldCfg[k]?.rules,
         })),
-      },
-      setJob,
-    );
+    };
+  }
+
+  async function generate(mode: "ai" | "local" = "ai") {
+    setBusy(mode === "local" ? "gen-local" : "gen");
+    const r = generateListingJob(genInput(mode), setJob);
     jobRef.current = r as RunningJob<unknown>;
     try {
       await r.promise;
@@ -366,6 +387,42 @@ export default function DeliveryStudio({
     } finally {
       setBusy("");
       setJob(null);
+    }
+  }
+
+  /** "Ürün sayfasını ürüne göre güncelle": the saved page is the template — every element is rewritten from THIS product's verified data */
+  async function adaptPage() {
+    setBusy("adapt");
+    const r = generateListingJob({ ...genInput("ai"), adaptPage: true, adaptNote: adaptNote.trim() || undefined, fields: [{ key: "description" }] }, setJob);
+    jobRef.current = r as RunningJob<unknown>;
+    try {
+      await r.promise;
+      toast(t("delivery.adaptDone"), "ok");
+      onSaved();
+    } catch (e) {
+      if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
+    } finally {
+      setBusy("");
+      setJob(null);
+    }
+  }
+
+  /** Pictures about to leave the app: Chinese text, seller watermark, contact details. A warning, never a hard block. */
+  async function imageGateOk(ch: "shopify" | "etsy", manual = false): Promise<boolean> {
+    setBusy("check-images");
+    try {
+      const r = await api.checkImages(draft.id, ch);
+      if (r.unchecked > 0) toast(t("delivery.imagesUnchecked", { n: r.unchecked }), "err");
+      if (r.flagged.length === 0) {
+        if (manual && !r.unchecked) toast(t("delivery.imagesClean", { n: r.scanned }), "ok");
+        return true;
+      }
+      return await new Promise<boolean>((resolve) => setImageWarn({ flagged: r.flagged, manual, resolve }));
+    } catch (e) {
+      if (manual) toast((e as Error).message, "err");
+      return true;
+    } finally {
+      setBusy("");
     }
   }
 
@@ -600,6 +657,8 @@ export default function DeliveryStudio({
 
   async function push() {
     if (!(await trademarkGateOk())) return;
+    if (!(await imageGateOk("shopify"))) return;
+    if (!(await consistencyGateOk())) return;
     setBusy("push");
     try {
       const r = await api.pushShopify(draft.id);
@@ -621,6 +680,7 @@ export default function DeliveryStudio({
       return;
     }
     if (!(await trademarkGateOk())) return;
+    if (!(await imageGateOk("etsy"))) return;
     if (!(await consistencyGateOk())) return;
     const shopName = etsyShops.find((s) => s.id === etsyShopId)?.name || etsyShopId;
     setEtsyPushConfirm({ shopId: etsyShopId, shopName });
@@ -1317,6 +1377,20 @@ export default function DeliveryStudio({
             </div>
           ))}
 
+          {profileOpts.length > 0 && (
+            <label className="field">
+              {t("delivery.storeProfile")}
+              <select value={storeProfileId} onChange={(e) => setStoreProfileId(e.target.value)}>
+                <option value="">{t("delivery.storeProfileAuto", { name: autoProfile?.name ?? "—" })}</option>
+                {profileOpts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <span className="tiny muted" style={{ marginTop: 3 }}>{t("delivery.storeProfileHint")}</span>
+            </label>
+          )}
           <p className="tiny muted" style={{ margin: 0 }}>{t("delivery.knobs")}</p>
           <div className="row">
             <button className="btn primary" onClick={() => generate("ai")} disabled={!!busy} style={{ flex: 1 }}>
@@ -1325,6 +1399,31 @@ export default function DeliveryStudio({
             <button className="btn" onClick={() => generate("local")} disabled={!!busy} title={t("delivery.generateLocalHint")}>
               {busy === "gen-local" ? <span className="spin" /> : t("delivery.generateLocal")}
             </button>
+          </div>
+          {channel === "shopify" && (
+            <div className="col" style={{ gap: 6, padding: 10, border: "1px dashed var(--line)", borderRadius: 10 }}>
+              <label className="field" style={{ margin: 0 }}>
+                {t("delivery.adaptTitle")}
+                <textarea rows={2} value={adaptNote} onChange={(e) => setAdaptNote(e.target.value)} placeholder={t("delivery.adaptPh")} />
+              </label>
+              <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  className="btn"
+                  onClick={adaptPage}
+                  disabled={!!busy || !draft.listing?.fields.some((f) => f.key === "description" && f.value.trim())}
+                  title={t("delivery.adaptHint")}
+                >
+                  {busy === "adapt" ? <span className="spin" /> : `🧩 ${t("delivery.adaptRun")}`}
+                </button>
+                <span className="tiny muted" style={{ flex: 1, minWidth: 200 }}>{t("delivery.adaptHint")}</span>
+              </div>
+            </div>
+          )}
+          <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn ghost sm" onClick={() => imageGateOk(channel === "etsy" ? "etsy" : "shopify", true)} disabled={!!busy || !draft.product}>
+              {busy === "check-images" ? <span className="spin" /> : `🖼 ${t("delivery.imagesCheck")}`}
+            </button>
+            <span className="tiny muted">{t("delivery.imagesCheckHint")}</span>
           </div>
           {job && <JobProgress job={job} onCancel={() => jobRef.current?.cancel()} />}
         </div>
@@ -1400,6 +1499,19 @@ export default function DeliveryStudio({
 
           {draft.listing ? (
             <>
+              {!!draft.listing.meta?.factWarnings?.length && (
+                <div className="note" style={{ borderLeft: "4px solid var(--danger, #e03131)", fontSize: 13 }}>
+                  <b>{t("delivery.factWarnTitle")}</b>
+                  <div className="tiny muted" style={{ margin: "2px 0 6px" }}>{t("delivery.factWarnBody")}</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {draft.listing.meta.factWarnings.map((w, i) => (
+                      <li key={i}>
+                        <i>“…{w.snippet}…”</i> — {w.why}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <ListingPreview draft={draft} />
 
               <ListingEditor
@@ -1554,6 +1666,57 @@ export default function DeliveryStudio({
               <button className="btn primary" onClick={() => doPushEtsy(etsyPushConfirm.shopId)}>
                 {t("common.confirm")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {imageWarn && (
+        <div
+          className="modal-scrim"
+          onClick={() => {
+            imageWarn.resolve(false);
+            setImageWarn(null);
+          }}
+        >
+          <div className="modal" style={{ width: "min(640px, 96vw)" }} onClick={(e) => e.stopPropagation()}>
+            <h3>{t("delivery.imageWarnTitle")}</h3>
+            <p className="sub">{t("delivery.imageWarnBody", { n: imageWarn.flagged.length })}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, maxHeight: "50vh", overflow: "auto" }}>
+              {imageWarn.flagged.map((f) => (
+                <div key={f.url} className="col" style={{ gap: 4 }}>
+                  <img src={proxied(f.url)} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid var(--line)" }} />
+                  <span className="tiny">
+                    {f.contact ? `📞 ${t("delivery.imageWarnContact")}` : ""}
+                    {f.contact && f.needsCleanup ? " · " : ""}
+                    {f.needsCleanup ? `🈶 ${t("delivery.imageWarnText")}` : ""}
+                  </span>
+                  {f.reason && <span className="tiny muted">{f.reason}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  imageWarn.resolve(false);
+                  setImageWarn(null);
+                }}
+              >
+                {imageWarn.manual ? t("common.close") : t("delivery.imageWarnBack")}
+              </button>
+              {!imageWarn.manual && (
+                <button
+                  className="btn primary"
+                  style={{ background: "var(--danger)" }}
+                  onClick={() => {
+                    imageWarn.resolve(true);
+                    setImageWarn(null);
+                  }}
+                >
+                  {t("delivery.imageWarnProceed")}
+                </button>
+              )}
             </div>
           </div>
         </div>

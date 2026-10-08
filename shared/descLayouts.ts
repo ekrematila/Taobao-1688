@@ -3,6 +3,7 @@
 
 import { cleanSpecs } from "./specs";
 import type { DescImageCrop } from "./types";
+import { ensureGlanceCss, injectPageBlocks, type PageBlocks } from "./pageBlocks";
 
 /** a description image with its optional non-destructive display crop. */
 export interface DescImg {
@@ -86,6 +87,8 @@ export interface DescMeta {
   props?: Record<string, unknown>;
   /** short "in the box / before you order / care" note; falls back to a generic one */
   note?: string;
+  /** verified blocks (shipping & returns, related links, swatches) placed above the page's call-to-action */
+  blocks?: Partial<PageBlocks>;
 }
 
 /**
@@ -109,7 +112,7 @@ export function renderDescriptionHtml(
   // it, a page (or Shopify theme) with lang="tr" turns "Highlights" into
   // "HİGHLİGHTS" (dotted capital I) at render time, which deTr can't catch
   // because the source string is plain ASCII.
-  return `<div lang="en">${deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))}</div>`;
+  return `<div lang="en">${injectPageBlocks(ensureGlanceCss(deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))), meta?.blocks)}</div>`;
 }
 
 /**
@@ -220,7 +223,7 @@ export function renderImportBody(
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
   const base0 = cleanDescValue(baseHtml);
   if (isPreStyled(base0)) {
-    return oneLine(`<div lang="en">${deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))}</div>`);
+    return oneLine(`<div lang="en">${injectPageBlocks(ensureGlanceCss(deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))), meta?.blocks)}</div>`);
   }
   if (isSelfContainedLayout(layoutId)) {
     return oneLine(renderDescriptionHtml(layoutId, baseHtml, imgs, meta));
@@ -241,7 +244,8 @@ export function renderImportBody(
           .map((s) => `<li><strong>${escT(s.label)}:</strong> ${escT(s.value)}</li>`)
           .join("")}</ul>`
       : "";
-  return flattenHtmlForImport(`<div lang="en">${base}${specHtml}${imgHtml}</div>`);
+  const extra = (["swatches", "ship", "related"] as const).map((k) => meta?.blocks?.[k] || "").join("");
+  return flattenHtmlForImport(`<div lang="en">${base}${specHtml}${extra}${imgHtml}</div>`);
 }
 
 /** The canonical `.bm` runtime — PROGRESSIVE ENHANCEMENT only. The block already

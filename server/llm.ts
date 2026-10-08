@@ -25,7 +25,10 @@ import {
 } from "@shared/listingFormat.ts";
 import { detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { readExample } from "./examples.ts";
-import { runManusTask, manusConfigured, imageToBase64 } from "./manus.ts";
+import { runManusTask, manusConfigured, imageForVision } from "./manus.ts";
+import { FACT_GUARD_ETSY, FACT_GUARD_RULE, GLANCE_RULE, adaptRule, evidenceText, findUnsupportedClaims, htmlToText, productText, storeFactsLine } from "@shared/pageBlocks.ts";
+import { pickStoreProfile, profileText } from "@shared/storeProfiles.ts";
+import { readStoreProfiles } from "./storeProfiles.ts";
 import type {
   AdviceResult,
   CategoryResearchResult,
@@ -841,7 +844,7 @@ export async function generateListing(
     const src = im.url || im.srcUrl;
     if (!src) continue;
     try {
-      mainImages.push(await imageToBase64(src));
+      mainImages.push(await imageForVision(src));
     } catch (e) {
       console.error("[generateListing] could not download a product photo for vision input, skipping:", e);
     }
@@ -1072,6 +1075,8 @@ export async function generateListing(
   // compact `.bm` (stacked) or `.pd-*` (other) block — NOT the big 5-example
   // file, which was ~75k tokens per call (a real cause of slow generation).
   const descExample = (f: { key: GeneratedField["key"]; examples?: string }): string => {
+    // "update the page for this product" — the CURRENT page is the template, no 20k-char example needed
+    if (isShopify && f.key === "description" && input.adaptPage && input.currentDescription?.trim()) return "";
     if (isShopify && f.key === "description")
       return isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE;
     // The operator's baked-in tag vocabulary/example file is their OWN shop
@@ -1109,6 +1114,23 @@ export async function generateListing(
       ? shopifyDescRuleOther(descImgN, kb.isKeycapSet)
       : shopifyDescRuleStacked(kb.isKeycapSet);
 
+  // verified store facts + the honesty rules + (optionally) "adapt the current page to this product"
+  const storeProfile = pickStoreProfile(readStoreProfiles(), {
+    channel: isShopify ? "shopify" : "etsy",
+    productText: productText(product),
+    isKeycapSet: kb.isKeycapSet,
+    preferId: input.storeProfileId,
+  });
+  const guardBlock = isShopify
+    ? [FACT_GUARD_RULE, GLANCE_RULE, storeFactsLine(storeProfile)].filter(Boolean).join("\n")
+    : [
+        FACT_GUARD_ETSY,
+        storeProfile ? `MAĞAZA GERÇEKLERİ (kargo/iade/işlem süresinden SÖZ EDECEKSEN yalnızca bunları kullan; başka rakam/vaat uydurma): ${profileText(storeProfile)}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+  const adaptBlock = isShopify && input.adaptPage && input.currentDescription?.trim() ? adaptRule(input.currentDescription, input.adaptNote) : "";
+
   const user = [
     `KANAL: ${input.channel}`,
     `ÜRÜN TÜRÜ: ${input.productType || "(modelin tanıması bekleniyor)"}`,
@@ -1128,6 +1150,8 @@ export async function generateListing(
         ].join("\n")
       : "",
     shopifyDescRule,
+    guardBlock,
+    adaptBlock,
     !isShopify ? brandLine : "",
     trademarkLine,
     vocabLine,
@@ -1274,6 +1298,8 @@ export async function generateListing(
           `Çıktı dili: ${input.targetLanguage.toUpperCase()}, Çince kalmasın. Markdown/kod bloğu yok.`,
           manusDescRuleCompact(isSelfContainedLayout(input.descriptionLayout), kb.isKeycapSet),
           htmlLenLine,
+          "GERÇEKLİK — KESİN: kaynakta/operatör notunda/fotoğrafta olmayan hiçbir özellik, ölçü, malzeme, askı, bakım, garanti, kargo/iade yazma; müşteriye 'source/supplied details' dili yok; kargo/iade bloğunu sistem ekler. Üstte 3-6 maddelik doğrulanmış `<div class=\"bm-glance\">` özet kutusu (CSS'i sistem ekler).",
+          input.adaptPage && input.currentDescription?.trim() ? `MEVCUT SAYFAYI bu ürüne göre güncelle (yapıyı koru, içeriği ürüne göre yeniden yaz, doğrulanamayanı sil): ${input.currentDescription.slice(0, 1800)}` : "",
           'SADECE şu şemada JSON ver: {"description":"..."}',
         ]
           .filter(Boolean)
@@ -1323,15 +1349,19 @@ export async function generateListing(
             ? `OPERATÖR DETAYLARI — SON SÖZ (çelişen hiçbir şey yazma):\n${input.productNote.trim().slice(0, 4000)}`
             : "",
           kbLine,
+          guardBlock,
+          adaptBlock,
           input.categoryResearch?.trim()
             ? `\nKATEGORİ ARAŞTIRMASI:\n${input.categoryResearch.trim().slice(0, 5000)}`
             : "",
           "",
-          "ÖRNEK (biçim / iskelet için — İÇERİĞİ KOPYALAMA, bu ürüne göre yeniden yaz):",
-          (
-            input.fields.find((f) => f.key === "description")?.examples?.trim() ||
-            (isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE)
-          ).slice(0, EX_CAP.description ?? 40000),
+          adaptBlock ? "" : "ÖRNEK (biçim / iskelet için — İÇERİĞİ KOPYALAMA, bu ürüne göre yeniden yaz):",
+          adaptBlock
+            ? ""
+            : (
+                input.fields.find((f) => f.key === "description")?.examples?.trim() ||
+                (isSelfContainedLayout(input.descriptionLayout) ? STACKED_DESC_EXAMPLE : OTHER_DESC_EXAMPLE)
+              ).slice(0, EX_CAP.description ?? 40000),
           "",
           "KAYNAK ÜRÜN VERİSİ:",
           `Başlık (Çince): ${product.title}`,
@@ -1480,6 +1510,12 @@ export async function generateListing(
     f.value = f.key === "description" ? dropCJK(g) : stripCJK(g);
   }
 
+  // deterministic honesty check on what was written (title + page text vs. the source data / operator note)
+  const factWarnings = findUnsupportedClaims(
+    htmlToText(`${getF("title")?.value ?? ""}. ${getF("description")?.value ?? ""}`),
+    evidenceText(product, input.productNote),
+  );
+
   return {
     channel: input.channel,
     fields,
@@ -1496,6 +1532,8 @@ export async function generateListing(
       htmlLengthUnit: input.htmlLengthUnit,
       htmlBudget: input.htmlBudget,
       descStyle: input.descStyle,
+      storeProfileId: storeProfile?.id,
+      factWarnings: factWarnings.length ? factWarnings : undefined,
     },
     model,
     usage,
@@ -1558,6 +1596,11 @@ export interface ImageClassification {
    *  on. false = already clean (no Chinese text, no watermark), so running
    *  the cleanup job on it would just burn a task for a guaranteed no-op. */
   needsCleanup: boolean;
+  /** true = the picture shows the seller's contact / promo details (phone, WeChat/QQ/Weibo handle, group number,
+   *  QR code, website, "follow us") — must not reach the store. */
+  contact: boolean;
+  /** true = ANY visible Chinese / CJK characters in the picture (class-independent — a translated slide has none) */
+  chinese: boolean;
   reason?: string;
 }
 
@@ -1577,7 +1620,7 @@ export async function classifyProductImages(
   const fetched = await Promise.all(
     capped.map(async (url) => {
       try {
-        return { url, ...(await imageToBase64(url)) };
+        return { url, ...(await imageForVision(url)) };
       } catch {
         return null;
       }
@@ -1594,7 +1637,9 @@ export async function classifyProductImages(
     "\"photo\": gerçek ürün gerçek bir sahne/arka planda fotoğraflanmış, gerçek doku/ışık/gölge/derinlik görünüyor — üzerinde biraz metin/rozet/logo olsa bile ASIL GÖRSEL İÇERİK gerçek bir fotoğrafsa yine \"photo\" say.",
     "EMİN DEĞİLSEN \"photo\" DE — yanlışlıkla gerçek bir ürün fotoğrafını silmektense pazarlama slaydını tutmak daha güvenli.",
     "2) \"needsCleanup\": bu görselin ÜZERİNDE (üründen ayrı, sonradan eklenmiş) GERÇEKTEN Çince/CJK yazı VAR MI, YA DA satıcı mağaza adı/logosu/filigran VAR MI? İkisi de yoksa false — görsel zaten temiz demektir, boşuna 'true' deme. Ürünün KENDİ üzerine basılı/dökülmüş yazısı (ör. bir tuş kapağının üstündeki harf) bu sayılmaz, sadece SONRADAN EKLENMİŞ kaplama yazı/filigran/logo sayılır. \"banner\" (class=banner) olan bir görsel için needsCleanup önemsiz, false yaz.",
-    'SADECE geçerli JSON dizi döndür: [{ "i": 0, "class": "photo" | "banner", "needsCleanup": true | false, "reason": "kısa neden (Türkçe)" }, ...] — gösterilen HER görsel için bir satır, aynı sırayla.',
+    "3) \"contact\": görselde (class ne olursa olsun) satıcının İLETİŞİM / TANITIM bilgisi görünüyor mu — telefon, WeChat/QQ/Weibo/Douyin/Xiaohongshu kimliği, grup numarası, QR kod, web sitesi/mağaza adresi, 'bizi takip et / gruba katıl' çağrısı? Varsa true, yoksa false.",
+    "4) \"chinese\": görselde (class ne olursa olsun, ürünün kendi üzerindeki yazı HARİÇ) okunabilir ÇİNCE/CJK karakter var mı? Metin zaten İngilizceye çevrilmişse false.",
+    'SADECE geçerli JSON dizi döndür: [{ "i": 0, "class": "photo" | "banner", "needsCleanup": true | false, "contact": true | false, "chinese": true | false, "reason": "kısa neden (Türkçe)" }, ...] — gösterilen HER görsel için bir satır, aynı sırayla.',
   ].join("\n");
   const user = `${valid.length} görsel gösteriliyor, sırasıyla 0'dan ${valid.length - 1}'e kadar indekslenmiş. Her biri için "photo"/"banner" VE "needsCleanup" (Çince yazı veya satıcı logosu/filigranı var mı) karar ver.`;
   const { text, usage } = await ask(system, user, "classifyProductImages", {
@@ -1604,13 +1649,15 @@ export async function classifyProductImages(
     ...opts,
     images: valid.map((im) => ({ data: im.data, mime: im.mime })),
   });
-  const rows = extractJson(text) as { i: number; class: string; needsCleanup?: boolean; reason?: string }[];
+  const rows = extractJson(text) as { i: number; class: string; needsCleanup?: boolean; contact?: boolean; chinese?: boolean; reason?: string }[];
   const results: ImageClassification[] = valid.map((im, i) => {
     const hit = rows.find((r) => Number(r.i) === i);
     return {
       url: im.url,
       meaningless: hit?.class === "banner",
       needsCleanup: hit?.class !== "banner" && !!hit?.needsCleanup,
+      contact: !!hit?.contact,
+      chinese: !!hit?.chinese,
       reason: hit?.reason,
     };
   });
@@ -1795,7 +1842,7 @@ export async function suggestProductType(
     const src = im.url || im.srcUrl;
     if (!src) continue;
     try {
-      images.push(await imageToBase64(src));
+      images.push(await imageForVision(src));
     } catch (e) {
       console.error("[suggestProductType] could not download a product photo, skipping:", e);
     }
@@ -1937,19 +1984,21 @@ export async function checkListingConsistency(
     const src = im.url || im.srcUrl;
     if (!src) continue;
     try {
-      images.push(await imageToBase64(src));
+      images.push(await imageForVision(src));
     } catch (e) {
       console.error("[checkListingConsistency] could not download a product photo, skipping:", e);
     }
   }
 
-  const relevantFields = listing.fields.filter((f) =>
-    ["title", "title_alt", "description", "tags"].includes(f.key),
-  );
+  // a Shopify description is a 25k-char HTML page — fact-check what a customer READS (text), not markup/CSS
+  const relevantFields = listing.fields
+    .filter((f) => ["title", "title_alt", "description", "tags"].includes(f.key))
+    .map((f) => (f.key === "description" ? { ...f, value: htmlToText(f.value) } : f));
 
   const system = [
     "You fact-check a GENERATED e-commerce listing against the REAL source product it was written from — the product photos (ground truth for look/colour/materials) and the original specs/title below.",
     "Flag ONLY genuine factual mismatches the generated text introduced: a colour/material/pattern the photos don't show, a feature or compatibility claim the specs don't support, a wrong quantity/count, a wrong product type, or a claim that plainly contradicts the source.",
+    "ALSO flag any INVENTED specific that neither the specs/title/variants nor the photos support: a shoulder/crossbody strap or strap rings, measurements or weight, capacity ('fits a phone'), material composition, waterproofing, care/cleaning instructions, warranty, extra included accessories, or shipping/returns promises written into the description (the store adds a verified shipping & returns block itself). Customer-facing wording such as 'the source says' / 'supplied product details' is also a defect.",
     "Do NOT flag: marketing tone, word choice, SEO phrasing, shortened/simplified descriptions, or anything that's merely less detailed than the source — those are fine. Only flag things that are factually WRONG about the actual product.",
     `Do NOT flag this store's own established terminology mapping, which is CORRECT and intentional, not a mismatch: ${CHERRY_PROFILE_DIRECTIVE}`,
     "For each real mismatch, quote the exact offending phrase from the field (`current`), explain in TURKISH why it's wrong (`issue`), and give a replacement phrase in the SAME language/style as the original field that correctly matches the real product (`suggestion`).",
@@ -1970,11 +2019,11 @@ export async function checkListingConsistency(
   ]
     .filter(Boolean)
     .join("\n")
-    .slice(0, 10000);
+    .slice(0, 16000);
 
   const { text: out, model } = await ask(system, user, "checkListingConsistency", {
     model: opts.model,
-    maxTokens: 1200,
+    maxTokens: 2000,
     signal: opts.signal,
     draftId: opts.draftId,
     images,
@@ -1997,6 +2046,18 @@ export async function checkListingConsistency(
         .filter((x: ListingConsistencyIssue) => x.field && x.current && x.issue)
         .slice(0, 15)
     : [];
+  // deterministic backstop: claims the data does not back up, even if the AI reviewer let them pass
+  const pageText = relevantFields.map((f) => f.value).join(" . ");
+  for (const c of findUnsupportedClaims(pageText, evidenceText(product, undefined))) {
+    if (issues.length >= 20) break;
+    if (issues.some((x) => x.current && c.snippet.includes(x.current.slice(0, 24)))) continue;
+    issues.push({
+      field: "description",
+      current: c.snippet.slice(0, 300),
+      issue: `${c.why}. Kaynakta/fotoğrafta doğrulanamıyorsa kaldır.`,
+      suggestion: "Bu ifadeyi/cümleyi çıkar (ya da operatör notuna gerçek bilgiyi yazıp yeniden üret).",
+    });
+  }
   return { issues, model };
 }
 

@@ -66,6 +66,10 @@ export const api = {
       shopify: { title: string; description: string; tags: string };
     }>("/examples"),
   saveSettings: (patch: SettingsPatch) => post<Settings>("/settings", patch),
+  checkImages: (draftId: string, channel: "shopify" | "etsy") =>
+    post<{ flagged: { url: string; needsCleanup: boolean; contact: boolean; reason: string }[]; scanned: number; unchecked: number }>("/ai/check-images", { draftId, channel }),
+  refreshStoreProfile: (id: string) =>
+    post<{ profile: import("@shared/storeProfiles.ts").StoreProfile }>("/store-profiles/refresh", { id }),
   verifyClaude: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/claude", { key }),
   models: (refresh = false) =>
     req<{ models: import("@shared/models.ts").ClaudeModel[]; discovered: string[]; checkedAt: number; errors: string[] }>(

@@ -234,3 +234,10 @@ src/               Vite + React
 - `data/app.sqlite` yereldir ve gitignore'dadır.
 - `npm test` — endpoint allow-list bütünlük testi.
 - Bu proje kardeş `Etsy Shop Console` projesinden bağımsızdır; ayrı klasör, ayrı bağımlılıklar.
+
+## Mağaza politikaları, sayfa güncelleme ve gerçeklik koruması
+
+- **Mağaza politikaları** (Ayarlar → "Mağaza politikaları"): keyartisan.net, cuteitabags.com ve üç Etsy mağazasının GERÇEK kargo / işlem süresi / iade bilgileri. Shopify sayfasına AI'nin yazmadığı, bu verilerden üretilen doğrulanmış bir **Shipping & Returns** bloğu, mağazanın kendi koleksiyonlarına **You may also like** bağlantıları ve (≥2 farklı görsel varsa) **Available options** küçük resimleri eklenir. Bloklar sayfa gösterilirken eklenir (önizleme, dışa aktarma ve Shopify push aynı kodu kullanır) — politikayı değiştirince tüm ürünlere yansır. Shopify siteleri için "Siteden yeniden çek" vardır; Etsy (sunucudan okunamaz) elle düzenlenir. cuteitabags.com'da sitenin kendi bannerı ($49+) ile kargo politikası ($100) çelişiyor — bu yüzden ücretsiz kargo eşiği sayfaya yazılmaz (Notlar'a bak).
+- **Ürün sayfasını ürüne göre güncelle** (Teslim adımı, Shopify): mevcut HTML sayfayı şablon alır; her öğeyi bu ürünün doğrulanmış verisine göre yeniden yazar, doğrulanamayanı siler. Başka üründen yapıştırılan sayfa da uyarlanabilir.
+- **Gerçeklik koruması:** üretim talimatı kaynakta/fotoğrafta olmayan iddiaları (askı, ölçü, malzeme, bakım…) yasaklar; üretimden sonra deterministik bir kontrol doğrulanamayan ifadeleri listeler; Shopify push'ta da AI tutarlılık kontrolü çalışır.
+- **Görsel kontrolü:** push öncesi (ve düğmeyle) görsellerde Çince yazı, satıcı filigranı veya iletişim bilgisi (telefon/WeChat/QR) aranır; sonuçlar görsel başına taslakta saklanır.

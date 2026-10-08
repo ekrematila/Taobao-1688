@@ -1,4 +1,8 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { env } from "./env.ts";
 import { getSetting } from "./db.ts";
@@ -312,6 +316,31 @@ export async function imageToBase64(url: string): Promise<{ data: string; mime: 
     if (inner) return fetchImageBase64(inner);
   }
   return fetchImageBase64(clean);
+}
+
+/**
+ * A picture for a VISION model (Claude / ChatGPT look at it, nothing is edited): the model APIs refuse a base64 image
+ * over ~10 MB, and a locally saved edit can easily be a 9 MB PNG. Anything big is re-encoded to a ≤1600 px JPEG in a
+ * temp file (ffmpeg); without ffmpeg an over-limit picture is refused so the caller can skip it instead of failing
+ * the whole request.
+ */
+export async function imageForVision(url: string): Promise<{ data: string; mime: string }> {
+  const img = await imageToBase64(url);
+  const rawBytes = Math.floor((img.data.length * 3) / 4);
+  if (rawBytes <= 4.5 * 1024 * 1024) return img;
+  const dir = mkdtempSync(join(tmpdir(), "vision-"));
+  try {
+    const inp = join(dir, "in." + (img.mime.includes("png") ? "png" : img.mime.includes("webp") ? "webp" : "jpg"));
+    const out = join(dir, "out.jpg");
+    writeFileSync(inp, Buffer.from(img.data, "base64"));
+    await promisify(execFile)("ffmpeg", ["-y", "-i", inp, "-vf", "scale='if(gt(iw,ih),min(1600,iw),-2)':'if(gt(iw,ih),-2,min(1600,ih))'", "-q:v", "4", out], { timeout: 40000 });
+    return { data: readFileSync(out).toString("base64"), mime: "image/jpeg" };
+  } catch {
+    if (rawBytes > 7 * 1024 * 1024) throw new ManusError("Görsel yapay zekâ için çok büyük (ffmpeg yok).");
+    return img;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /** Any binary (video included). Resolves our own /api/media, otherwise fetches. 100MB cap. */

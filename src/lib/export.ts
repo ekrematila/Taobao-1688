@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import type { GeneratedListing, NormalisedProduct, ProductImage } from "@shared/types.ts";
 import { flattenHtmlForImport, renderDescriptionHtml, renderImportBody } from "@shared/descLayouts.ts";
-import { descBodyImages, isEtsyTag, outputVariants, publicImageUrl, sortListingImages } from "@shared/listingFormat.ts";
+import { descBodyImages, isEtsyTag, outputVariants, pageBlocksFor, publicImageUrl, sortListingImages } from "@shared/listingFormat.ts";
+import { DEFAULT_STORE_PROFILES, type StoreProfile } from "@shared/storeProfiles.ts";
 import { categoryFor } from "@shared/shopifyCategories.ts";
 import { proxied } from "../api";
 import { downloadBlob, slugify } from "./image";
@@ -93,10 +94,17 @@ function bodyImgPairs(p: NormalisedProduct): import("@shared/descLayouts.ts").De
  *  standalone `.html` download. Kept human-readable (indented, one tag/rule per
  *  line) so it can be copied out and debugged. NOT for CSV/API import — that
  *  path (`importBodyHtml`) stays on one physical line for the CSV parser. */
+/** the operator's store policies (Settings) — set by the screens that load settings; the built-in ones until then */
+let STORE_PROFILES: StoreProfile[] = DEFAULT_STORE_PROFILES;
+export function setStoreProfiles(list: StoreProfile[] | undefined) {
+  if (list?.length) STORE_PROFILES = list;
+}
+
 export function shopifyBodyHtml(p: NormalisedProduct, l: GeneratedListing): string {
   return renderDescriptionHtml(l.layout, field(l, "description"), bodyImgPairs(p), {
     name: field(l, "title") || p.titleTranslated || p.title,
     props: p.props,
+    blocks: pageBlocksFor(p, l, STORE_PROFILES),
   });
 }
 
@@ -105,6 +113,7 @@ export function importBodyHtml(p: NormalisedProduct, l: GeneratedListing): strin
   return renderImportBody(l.layout, field(l, "description"), bodyImgPairs(p), {
     name: field(l, "title") || p.titleTranslated || p.title,
     props: p.props,
+    blocks: pageBlocksFor(p, l, STORE_PROFILES),
   });
 }
 

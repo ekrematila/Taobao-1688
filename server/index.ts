@@ -88,7 +88,7 @@ import { freeTranslate } from "./translate.ts";
 import { localAdvice, localCategoryResearch, localListing } from "./localContent.ts";
 import { allExamples } from "./examples.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
-import { stripCJK } from "@shared/listingFormat.ts";
+import { descBodyImages, stripCJK } from "@shared/listingFormat.ts";
 import {
   manusConfigured,
   manusCredits,
@@ -125,6 +125,8 @@ import { renderBlogHtml } from "@shared/blogPresets.ts";
 import type { BlogConfig, BlogRecord } from "@shared/types.ts";
 import { persistFromUrl, persistFileFromUrl, persistDataUrl, mediaPath, normaliseShortestEdge } from "./imagestore.ts";
 import { existsSync as fsExists } from "node:fs";
+import { readStoreProfiles, saveStoreProfiles } from "./storeProfiles.ts";
+import { htmlToText } from "@shared/pageBlocks.ts";
 import {
   getDraft,
   patchDraft,
@@ -284,6 +286,7 @@ async function currentSettings(): Promise<Settings> {
     brandUrl: getSetting("brand_url") ?? "",
     brandBrief: getSetting("brand_brief") ?? "",
     productTypes: readProductTypes(),
+    storeProfiles: readStoreProfiles(),
     productionUrl: productionUrl(),
     productionConnected: productionConnected(),
   };
@@ -358,6 +361,7 @@ router.post(
     }
     if (typeof p.anthropicKey === "string" && p.anthropicKey.trim()) setSetting("anthropic_key", p.anthropicKey.trim());
     if (typeof p.openaiKey === "string" && p.openaiKey.trim()) setSetting("openai_key", p.openaiKey.trim());
+    if (Array.isArray(p.storeProfiles)) saveStoreProfiles(p.storeProfiles);
     if (p.openaiDefaults && typeof p.openaiDefaults === "object") {
       const next = readOpenaiDefaults();
       for (const c of OPENAI_CATEGORIES) {
@@ -718,6 +722,47 @@ router.post(
   wrap(async (req, res) => res.json({ cancelled: cancelJob(req.params.id) })),
 );
 
+/**
+ * Re-read a Shopify store's own shipping + refund policy pages and turn them into the profile's
+ * customer-facing lines. Nothing is saved — the Settings card shows the result and the operator saves.
+ * (Etsy blocks server-side reads, so Etsy shops are edited by hand.)
+ */
+router.post(
+  "/api/store-profiles/refresh",
+  wrap(async (req, res) => {
+    const prof = readStoreProfiles().find((x) => x.id === String(req.body?.id || ""));
+    if (!prof) return res.status(404).json({ error: "Mağaza bulunamadı." });
+    if (prof.kind !== "shopify") return res.status(400).json({ error: "Etsy mağaza politikaları sunucudan okunamaz (Etsy engelliyor) — metni elle düzenle." });
+    const base = prof.url.replace(/\/+$/, "");
+    const page = async (path: string) => {
+      const r = await fetch(base + path, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ProductStudio)" }, signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error(`${base}${path} → HTTP ${r.status}`);
+      return htmlToText(await r.text()).slice(0, 14000);
+    };
+    const [shipping, refund] = await Promise.all([page("/policies/shipping-policy"), page("/policies/refund-policy")]);
+    const system = [
+      "You turn a store's shipping policy and refund policy pages into short CUSTOMER-FACING lines for a product page (English).",
+      "Use ONLY what the pages say — never invent a number, window, fee or promise. If the two pages (or a page and itself) disagree on a figure, leave that figure out.",
+      'Reply as strict JSON only: {"processing":"one sentence about processing time","shipping":["delivery times by main region","shipping cost only if stated clearly","tracking","origin/other"],"returns":["return window and conditions","damaged/defective handling","refund timing","cancellations"],"extra":["customs / payment / other"],"contact":"support email"} — each line ≤ 260 chars; omit a line you cannot support.',
+    ].join("\n");
+    const { text } = await ask(system, "SHIPPING POLICY PAGE:\n" + shipping + "\n\nREFUND POLICY PAGE:\n" + refund, "refreshStoreProfile", { maxTokens: 3500, effort: "low", thinking: "off" });
+    const j = extractJson(text) as any;
+    const strs = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : []);
+    res.json({
+      profile: {
+        ...prof,
+        processing: String(j.processing || prof.processing),
+        shipping: strs(j.shipping).length ? strs(j.shipping) : prof.shipping,
+        returns: strs(j.returns).length ? strs(j.returns) : prof.returns,
+        extra: strs(j.extra).length ? strs(j.extra) : prof.extra,
+        contact: String(j.contact || prof.contact),
+        fetchedAt: new Date().toISOString().slice(0, 10),
+        sources: [`${base}/policies/shipping-policy`, `${base}/policies/refund-policy`],
+      },
+    });
+  }),
+);
+
 /* ---------------------------------- ai --------------------------------- */
 
 // The channel's full field set — used only to tell a genuine partial request
@@ -741,6 +786,14 @@ router.post(
     const draft = getDraft(input.draftId);
     if (!draft?.product) return res.status(400).json({ error: "Önce bir ürün çağrısı yapın." });
     const local = input.mode === "local";
+    if (input.adaptPage) {
+      // "update the page for this product": the saved page IS the template — only the description is rewritten
+      const cur = draft.listing?.fields.find((f) => f.key === "description")?.value;
+      if (!cur?.trim()) return res.status(400).json({ error: "Güncellenecek bir sayfa yok — önce içerik üret ya da mevcut HTML'i açıklama alanına yapıştırıp kaydet." });
+      input.currentDescription = cur;
+      input.fields = (input.fields || []).filter((f: any) => f.key === "description");
+      if (!input.fields.length) input.fields = [{ key: "description" }];
+    }
     const jobId = startJob("generate-listing", async (ctx) => {
       ctx.plan(["Ürün ve niş tanınıyor", local ? "Şablonla içerik kuruluyor" : "Kod / içerik yazılıyor", "Kanal kurallarına göre biçimleniyor"]);
       ctx.step(local ? "Şablonla içerik kuruluyor" : "Kod / içerik yazılıyor");
@@ -1303,6 +1356,47 @@ router.post(
       return { results };
     });
     res.json({ jobId });
+  }),
+);
+
+/**
+ * Last look at the pictures that are about to leave the app: any that still carry Chinese text, a seller
+ * watermark or contact details (phone / WeChat / QR …). Results are remembered per image in the draft, so a
+ * repeat check only pays for pictures it has not seen.
+ */
+router.post(
+  "/api/ai/check-images",
+  wrap(async (req, res) => {
+    const { draftId, channel } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
+    const imgs = draft.product.images;
+    const picked =
+      channel === "etsy"
+        ? imgs.filter((i) => i.role === "gallery" || i.role === "variant")
+        : [...imgs.filter((i) => i.role === "gallery" || i.role === "variant"), ...descBodyImages(imgs, 20)];
+    const urls = [...new Set(picked.map((i) => i.url.split("#dup-")[0]))].slice(0, 40);
+    const state = (draft.imageState as any) ?? {};
+    const cache: Record<string, { needsCleanup: boolean; contact: boolean; chinese?: boolean; reason?: string }> = { ...(state.imageScan ?? {}) };
+    const todo = urls.filter((u) => !cache[u] || cache[u].chinese === undefined); // entries from before the Chinese-text question get re-read
+    if (todo.length) {
+      let cheap: string | undefined;
+      try {
+        cheap = claudeConfigured() ? "claude-haiku-5-5" : undefined;
+      } catch {
+        cheap = undefined;
+      }
+      const { results } = await classifyProductImages(todo, { draftId: draft.id, model: cheap });
+      for (const r of results) cache[r.url] = { needsCleanup: r.needsCleanup, contact: r.contact, chinese: r.chinese, reason: r.reason };
+      await withDraftLock(draft.id, async () => {
+        const fresh = getDraft(draft.id)!;
+        patchDraft(draft.id, { imageState: { ...((fresh.imageState as any) ?? {}), imageScan: cache } });
+      });
+    }
+    const flagged = urls
+      .filter((u) => cache[u] && (cache[u].needsCleanup || cache[u].contact || cache[u].chinese))
+      .map((u) => ({ url: u, needsCleanup: cache[u].needsCleanup || !!cache[u].chinese, contact: cache[u].contact, reason: cache[u].reason || "" }));
+    res.json({ flagged, scanned: urls.length, unchecked: urls.filter((u) => cache[u]?.chinese === undefined).length });
   }),
 );
 

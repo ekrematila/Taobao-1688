@@ -225,6 +225,14 @@ export interface GenerateListingInput {
   categoryResearch?: string;
   /** free-text product details the operator typed in themselves; honoured verbatim */
   productNote?: string;
+  /** which store policy profile (Settings) the page's Shipping & Returns block / facts come from; empty = auto */
+  storeProfileId?: string;
+  /** "Ürün sayfasını ürüne göre güncelle": rewrite the CURRENT page for this product instead of starting from the template */
+  adaptPage?: boolean;
+  /** optional operator instruction for that update */
+  adaptNote?: string;
+  /** the page being adapted — filled in by the server from the saved listing when adaptPage is set */
+  currentDescription?: string;
 }
 
 export interface AdviceResult {
@@ -254,6 +262,10 @@ export interface GeneratedListing {
     htmlLengthUnit?: "line" | "char";
     htmlBudget?: "full" | "lean" | "min";
     descStyle?: string;
+    /** which store policy profile (Settings → Mağaza politikaları) feeds the Shipping & Returns block */
+    storeProfileId?: string;
+    /** statements in the generated page that the source data does not back up (deterministic check at generation time) */
+    factWarnings?: { rule: string; snippet: string; why: string }[];
   };
   model: string;
   usage: LlmUsage;
@@ -343,6 +355,8 @@ export interface Settings {
   brandBrief: string;
   /** saved product-type presets for the Delivery "Ürün türü" field (built-ins + operator-added) */
   productTypes: string[];
+  /** the operator's real shop policies (shipping / returns / processing) per store — see shared/storeProfiles.ts */
+  storeProfiles: import("./storeProfiles.ts").StoreProfile[];
   /** address of the paired instance this one pushes its AI/API settings to (e.g. production) */
   productionUrl: string;
   /** true once paired (url + exchanged sync key both known) */
@@ -381,6 +395,7 @@ export interface SettingsPatch {
   brandBrief?: string;
   /** full replacement list of operator-added product-type presets */
   productTypes?: string[];
+  storeProfiles?: import("./storeProfiles.ts").StoreProfile[];
   clearProduction?: boolean;
 }
 

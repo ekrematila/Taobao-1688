@@ -4,6 +4,8 @@
 import { DESC_STYLES, TITLE_VOCAB } from "./models.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, detectProfiles, LAYOUT_COMPAT, profilePhrase } from "./keycaps.ts";
 import { cleanSpecs } from "./specs.ts";
+import { buildPageBlocks, productText, type PageBlocks } from "./pageBlocks.ts";
+import { pickStoreProfile, type StoreProfile } from "./storeProfiles.ts";
 import { ETSY_TAG_VOCAB, ETSY_SEARCH_ADJ } from "./exampleData.ts";
 import type {
   GeneratedField,
@@ -56,6 +58,37 @@ export function publicImageUrl(
     toPublicUrl(im.translatedFrom) ??
     null
   );
+}
+
+/**
+ * The verified blocks (Shipping & Returns from the real store policy, related links, option
+ * thumbnails) for a Shopify page — ONE function for the preview, the exports and the push, so
+ * they can never disagree.
+ */
+export function pageBlocksFor(
+  product: NormalisedProduct,
+  listing: Pick<GeneratedListing, "fields" | "meta"> | null | undefined,
+  profiles: StoreProfile[] | undefined,
+): PageBlocks | undefined {
+  if (!profiles?.length) return undefined;
+  const title = listing?.fields.find((f) => f.key === "title")?.value;
+  const text = productText(product, title);
+  const profile = pickStoreProfile(profiles, {
+    channel: "shopify",
+    productText: text,
+    isKeycapSet: detectKeyboardLayout(product).isKeycapSet,
+    preferId: listing?.meta?.storeProfileId,
+  });
+  return buildPageBlocks({
+    product,
+    profile,
+    listingTitle: title,
+    variantImageUrl: (v) => {
+      if (!v.imageUrl) return null;
+      const im = (product.images || []).find((i) => i.url === v.imageUrl);
+      return publicImageUrl(im ?? { url: v.imageUrl });
+    },
+  });
 }
 
 /**

@@ -42,6 +42,7 @@ const SYNC_FIELDS = [
   "brand_url",
   "brand_brief",
   "product_types",
+  "store_profiles",
 ] as const;
 
 /** The receiving side's durable sync key — issued the first time it's asked
