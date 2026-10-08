@@ -177,6 +177,14 @@ export function generateListingJob(
 ): RunningJob<import("@shared/types.ts").GeneratedListing> {
   return runJob(() => post("/ai/generate-listing", input), onProgress);
 }
+export type DescCompareResult = { model: string; description: string; secs: number; costUsd: number; error?: string };
+/** HTML description written by several models at once — nothing is saved. */
+export function compareDescriptionJob(
+  input: GenerateListingInput & { models: string[] },
+  onProgress: Progress,
+): RunningJob<{ results: DescCompareResult[] }> {
+  return runJob(() => post("/ai/compare-description", input), onProgress);
+}
 export function translateVariantsJob(
   draftId: string,
   targetLanguage: string,

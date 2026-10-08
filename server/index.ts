@@ -760,6 +760,44 @@ router.post(
   }),
 );
 
+/**
+ * Write the Shopify HTML description with SEVERAL models for the same product, side by side.
+ * Nothing is saved to the draft — the client previews each result and the operator picks one.
+ */
+router.post(
+  "/api/ai/compare-description",
+  wrap(async (req, res) => {
+    const input = req.body ?? {};
+    const draft = getDraft(input.draftId);
+    if (!draft?.product) return res.status(400).json({ error: "Önce bir ürün çağrısı yapın." });
+    const models: string[] = [...new Set<string>((Array.isArray(input.models) ? input.models : []).map(String).filter(Boolean))].slice(0, 4);
+    if (models.length < 1) return res.status(400).json({ error: "En az bir model seçin." });
+    const descFields = (Array.isArray(input.fields) ? input.fields : []).filter((f: any) => f?.key === "description");
+    if (!descFields.length) descFields.push({ key: "description" });
+    const jobId = startJob("compare-description", async (ctx) => {
+      ctx.plan(models.map((m) => `${m} yazıyor`));
+      const out = await Promise.all(
+        models.map(async (model) => {
+          const t0 = Date.now();
+          try {
+            const l = await generateListing(
+              draft.product!,
+              { ...input, channel: "shopify", fields: descFields, model, descModel: undefined, descProvider: undefined },
+              ctx.signal,
+            );
+            const description = l.fields.find((f) => f.key === "description")?.value ?? "";
+            return { model, description, secs: Math.round((Date.now() - t0) / 1000), costUsd: l.usage?.costUsd ?? 0, error: description ? undefined : "Boş açıklama döndü." };
+          } catch (e) {
+            return { model, description: "", secs: Math.round((Date.now() - t0) / 1000), costUsd: 0, error: (e as Error).message };
+          }
+        }),
+      );
+      return { results: out };
+    });
+    res.json({ jobId });
+  }),
+);
+
 /** Step 2 — quick AI review of the product, GUIDANCE ONLY. */
 router.post(
   "/api/ai/advice",

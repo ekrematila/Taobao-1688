@@ -1,5 +1,6 @@
 import ManusProfileOptions from "./ManusProfileOptions";
 import ModelOptions from "./ModelOptions";
+import DescCompare from "./DescCompare";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, categoryResearchJob, generateListingJob, nameVariantsJob, type Draft } from "../api";
@@ -24,6 +25,7 @@ import { proxied } from "../api";
 import type {
   ChannelId,
   DescriptionLayout,
+  GenerateListingInput,
   GeneratedField,
   GeneratedListing,
   JobView,
@@ -152,6 +154,7 @@ export default function DeliveryStudio({
   const [hoverLayout, setHoverLayout] = useState<string | null>(null);
   const hoverT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);
   const hydrated = useRef(false);
@@ -316,10 +319,9 @@ export default function DeliveryStudio({
     return (examplesQ.data as any)?.[channel]?.[k] ?? (DEFAULT_FIELD_EXAMPLES as any)[channel]?.[k] ?? "";
   };
 
-  async function generate(mode: "ai" | "local" = "ai") {
-    setBusy(mode === "local" ? "gen-local" : "gen");
-    const r = generateListingJob(
-      {
+  /** the current Delivery-studio settings as one generate request */
+  function genInput(mode: "ai" | "local" = "ai"): GenerateListingInput & { model?: string; mode?: "ai" | "local" } {
+    return {
         draftId: draft.id,
         channel,
         productType,
@@ -353,9 +355,12 @@ export default function DeliveryStudio({
           examples: (fieldCfg[k]?.examples ?? defaultExample(k)) || undefined,
           rules: fieldCfg[k]?.rules,
         })),
-      },
-      setJob,
-    );
+    };
+  }
+
+  async function generate(mode: "ai" | "local" = "ai") {
+    setBusy(mode === "local" ? "gen-local" : "gen");
+    const r = generateListingJob(genInput(mode), setJob);
     jobRef.current = r as RunningJob<unknown>;
     try {
       await r.promise;
@@ -1325,6 +1330,11 @@ export default function DeliveryStudio({
             <button className="btn" onClick={() => generate("local")} disabled={!!busy} title={t("delivery.generateLocalHint")}>
               {busy === "gen-local" ? <span className="spin" /> : t("delivery.generateLocal")}
             </button>
+            {channel === "shopify" && (
+              <button className="btn" onClick={() => setCompareOpen(true)} disabled={!!busy} title={t("descCmp.hint")}>
+                ⚖ {t("descCmp.open")}
+              </button>
+            )}
           </div>
           {job && <JobProgress job={job} onCancel={() => jobRef.current?.cancel()} />}
         </div>
@@ -1674,6 +1684,23 @@ export default function DeliveryStudio({
           onApply={(picks) => {
             setAttrPicks(picks);
             setAttrOpen(false);
+          }}
+        />
+      )}
+      {compareOpen && draft.product && (
+        <DescCompare
+          draft={draft}
+          buildInput={() => genInput("ai")}
+          defaultA="claude-sonnet-5-5"
+          defaultB="gpt-6.1-sol"
+          onClose={() => setCompareOpen(false)}
+          onUse={async (description, usedModel) => {
+            const base = draft.listing ?? { channel: "shopify" as const, fields: [], variants: [], model: usedModel, usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 } };
+            const fields = base.fields.some((f) => f.key === "description")
+              ? base.fields.map((f) => (f.key === "description" ? { ...f, value: description } : f))
+              : [...base.fields, { key: "description" as const, value: description }];
+            await api.patchDraft(draft.id, { listing: { ...base, layout: base.layout ?? layout, fields }, label: t("descCmp.label", { m: usedModel }) });
+            onSaved();
           }}
         />
       )}
