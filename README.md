@@ -77,6 +77,19 @@ ile canlı doğrular. Fiyatlar model başına girdi / önbellekli girdi / çıkt
 
 Maliyet paneli cache-read/cache-write token fiyatlandırmasını da hesaba katar.
 
+**ChatGPT'nin kullanıldığı yerler (Ayarlar → ChatGPT → "Amaca göre modeller"):**
+
+| Amaç | Nerede kullanılır |
+|---|---|
+| ✍ Yazı & akıl yürütme | tüm yazı işlemleri (liste, çeviri, kontroller, blog…) — her ekranın model seçicisi |
+| 💻 Kodlama | Shopify HTML açıklama yazıcısı (kod üretir): `HTML açıklama modeli` seçicisi, kodlama varsayılanı ★ ile işaretli, Codex modelleri ayrı grup |
+| 🖼 Görsel üretimi | görsel çevirme / düzenleme / yeni görsel (`/v1/images/edits`, `gpt-image-*`): görsel panellerinde **Manus ↔ OpenAI** motor seçici (model + kalite); varsayılan `gpt-image-2.5-sunburst` (hassas düzenleme), `flare` hızlı alternatif. Çince yazı kontrolü önce ucuz bir metin çağrısıyla yapılır (yazı yoksa görsel jetonu harcanmaz). |
+| 🎙 Ses · yazıya çevirme | video panelinde "Konuşmayı yazıya çevir" (`/v1/audio/transcriptions`, varsayılan `gpt-transcribe`, ≤25 MB); metin AI alt metnine girdi olur |
+| 🔊 Ses · konuşma, 🗣 canlı konuşma | henüz kullanan özellik yok — seçim saklanır |
+| 🎬 Video | OpenAI Sora / Videos API 24 Eylül 2026'da kapatıldı (yerine API yok); video düzenleme Manus'ta kalır |
+
+Maliyetler jeton kullanımından hesaplanır ve Kullanım sayfasında "ChatGPT" olarak ayrı görünür.
+
 **Manus:**
 - **Sürüm/kapasite:** `agent_profile` — `standard` / `lite` / `max` (+ `max-medium|high|extra|ultra`). Manus 2.0'da model sürümü ayrıca seçilmez (sürüm eki yok sayılır), her görev güncel modelle çalışır. Bu, Manus v2
   OpenAPI şemasındaki **tek** resmî model/sürüm parametresidir (`task.create` gövdesi). Ayarlardan seçilir.

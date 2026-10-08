@@ -1,3 +1,5 @@
+import ImageEnginePicker from "./ImageEnginePicker";
+import { useImageAi } from "../lib/useImageAi";
 import ManusProfileOptions from "./ManusProfileOptions";
 import { useEffect, useRef, useState } from "react";
 import { altTextsManusJob, api, proxied, translateImagesJob, type Draft } from "../api";
@@ -63,6 +65,7 @@ export default function OcrTranslatePanel({
   const [drawMode, setDrawMode] = useState(false);
   const [drag, setDrag] = useState<null | { x: number; y: number; x2: number; y2: number }>(null);
   const [manusProfile, setManusProfile] = useState<string>("standard");
+  const imageAi = useImageAi();
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);
   const beforeRef = useRef<HTMLCanvasElement | null>(null);
@@ -200,7 +203,7 @@ export default function OcrTranslatePanel({
 
   /* --------------------------- AI actions --------------------------- */
   async function runJobAction(kind: "ai-tr" | "ai-alt") {
-    if (!hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (kind === "ai-tr" ? !imageAi.ready : !hasManusKey) return toast(t(kind === "ai-tr" ? "ws.imageAiMissing" : "ws.manusMissing"), "err");
     setBusy("ai");
     // pull the draft back into the workspace every time the job advances a step —
     // translate-images writes each image into its slot the moment it's ready, so
@@ -331,7 +334,7 @@ export default function OcrTranslatePanel({
               {busy === "run" ? <span className="spin" /> : t("ocr.apply", { n: urls.length })}
             </button>
             <span className="tiny muted">{t("ocr.orAi")}</span>
-            <button className="btn sm" onClick={() => runJobAction("ai-tr")} disabled={!!busy || !hasManusKey}>
+            <button className="btn sm" onClick={() => runJobAction("ai-tr")} disabled={!!busy || !imageAi.ready}>
               {t("ocr.aiTranslate")}
             </button>
             <button className="btn sm" onClick={() => runJobAction("ai-alt")} disabled={!!busy || !hasManusKey}>
@@ -340,12 +343,7 @@ export default function OcrTranslatePanel({
             <button className="btn sm" onClick={runLocalAlt} disabled={!!busy}>
               {t("ocr.localAlt")}
             </button>
-            <label className="row tiny muted" style={{ gap: 4, margin: 0 }}>
-              {t("ws.manusProfile")}
-              <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)} disabled={!hasManusKey}>
-                <ManusProfileOptions />
-              </select>
-            </label>
+            <ImageEnginePicker inline profile={manusProfile} onProfile={setManusProfile} />
           </div>
           {job && <JobProgress job={job} onCancel={() => jobRef.current?.cancel()} />}
         </div>

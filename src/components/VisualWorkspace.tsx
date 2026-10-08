@@ -1,3 +1,6 @@
+import OpenAIPurposeSelect from "./OpenAIPurposeSelect";
+import ImageEnginePicker from "./ImageEnginePicker";
+import { useImageAi } from "../lib/useImageAi";
 import ManusProfileOptions from "./ManusProfileOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
@@ -14,6 +17,7 @@ import {
   proxied,
   translateImagesJob,
   videoAltJob,
+  videoTranscribeJob,
   videoPlanJob,
   type Draft,
 } from "../api";
@@ -221,6 +225,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   const [customH, setCustomH] = useState(1500);
   const [customQ, setCustomQ] = useState<"standard" | "high" | "maximum">("high");
   const [manusProfile, setManusProfile] = useState<string>("standard");
+  const imageAi = useImageAi();
   const [aiCmd, setAiCmd] = useState("");
   const [bulkTrPrompt, setBulkTrPrompt] = useState("");
   const [bulkAltPrompt, setBulkAltPrompt] = useState("");
@@ -610,7 +615,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   }
 
   async function runTranslateImages(all: boolean) {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (!imageAi.ready) return toast(t("ws.imageAiMissing"), "err");
     const urls = all ? images.map((i) => i.url) : [...sel];
     if (!urls.length) return toast(t("ws.selectFirst"), "err");
     reportTranslateSettled(await translateFanout(urls));
@@ -646,7 +651,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   }
 
   async function runEditImages() {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (!imageAi.ready) return toast(t("ws.imageAiMissing"), "err");
     const urls = [...sel];
     if (!urls.length || !aiCmd.trim()) return toast(t("ws.selectFirst"), "err");
     reportEditSettled(await editFanout(urls, aiCmd.trim()));
@@ -660,7 +665,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
 
   /* ---- explicit-URL variants for the right-click shortcut menu ---- */
   async function runTranslateUrls(urls: string[]) {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (!imageAi.ready) return toast(t("ws.imageAiMissing"), "err");
     if (!urls.length) return;
     reportTranslateSettled(await translateFanout(urls));
     onSaved();
@@ -672,7 +677,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
    *  over ALL images regardless of the current selection. Finishes by asking
    *  whether to also (re)generate content and add a logo. */
   async function runAutoPrepare() {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (!imageAi.ready) return toast(t("ws.imageAiMissing"), "err");
     const urls = images.map((i) => i.url);
     if (!urls.length) return toast(t("ws.selectFirst"), "err");
     setAutoBusy(true);
@@ -816,7 +821,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   }
 
   async function runEditUrls(urls: string[], instruction: string) {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (!imageAi.ready) return toast(t("ws.imageAiMissing"), "err");
     if (!urls.length || !instruction.trim()) return;
     reportEditSettled(await editFanout(urls, instruction));
     onSaved();
@@ -828,7 +833,8 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     [sel, orderedUrls, images],
   );
   async function runBulkAi(kind: "ai-tr" | "ai-alt") {
-    if (!settings.data?.hasManusKey) return toast(t("ws.manusMissing"), "err");
+    if (kind === "ai-tr" ? !imageAi.ready : !settings.data?.hasManusKey)
+      return toast(t(kind === "ai-tr" ? "ws.imageAiMissing" : "ws.manusMissing"), "err");
     if (!bulkTargets.length) return toast(t("ws.selectFirst"), "err");
     if (kind === "ai-tr") {
       // fan out → one row per image in the operations area
@@ -1449,13 +1455,13 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 <span className="hinttip-badge" tabIndex={0} aria-label={t("ws.autoHint")}>?</span>
                 <span className="hinttip-pop" role="tooltip">{t("ws.autoHint")}</span>
               </span>
-              {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
+              {!imageAi.ready && <span className="badge warn">{t("ws.imageAiMissing")}</span>}
             </div>
             <div className="card-b col">
               <button
                 className="btn primary"
                 onClick={runAutoPrepare}
-                disabled={autoBusy || running || !settings.data?.hasManusKey || !images.length}
+                disabled={autoBusy || running || !imageAi.ready || !images.length}
               >
                 {autoBusy ? <span className="spin" /> : t("ws.autoRun")}
               </button>
@@ -1471,7 +1477,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 <span className="hinttip-badge" tabIndex={0} aria-label={t("ws.trTip")}>?</span>
                 <span className="hinttip-pop" role="tooltip">{t("ws.trTip")}</span>
               </span>
-              {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
+              {!imageAi.ready && <span className="badge warn">{t("ws.imageAiMissing")}</span>}
             </div>
             <div className="card-b col">
               <label className="field">
@@ -1494,12 +1500,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 />
               </label>
               <p className="tiny muted" style={{ margin: "2px 0 0" }}>{t("ws.trSizeNote")}</p>
-              <label className="field">
-                {t("ws.manusProfile")}
-                <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)}>
-                  <ManusProfileOptions />
-                </select>
-              </label>
+              <ImageEnginePicker profile={manusProfile} onProfile={setManusProfile} />
               <p className="tiny muted" style={{ margin: 0 }}>{t("ws.manusProfileHint")}</p>
               <div className="row">
                 <button className="btn primary sm" onClick={() => runTranslateImages(false)} disabled={running || !sel.size}>
@@ -1558,7 +1559,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           <div className="card" style={{ boxShadow: "none" }}>
             <div className="card-h">
               <h3 style={{ fontSize: 13 }}>{t("ws.aiCmdTitle")}</h3>
-              {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
+              {!imageAi.ready && <span className="badge warn">{t("ws.imageAiMissing")}</span>}
             </div>
             <div className="card-b col" style={{ padding: 0 }}>
             <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="ws-ai-cmd">
@@ -1573,7 +1574,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 <button
                   className="btn primary sm"
                   onClick={runEditImages}
-                  disabled={running || !sel.size || !aiCmd.trim() || !settings.data?.hasManusKey}
+                  disabled={running || !sel.size || !aiCmd.trim() || !imageAi.ready}
                 >
                   {t("ws.aiCmdRun")} ({sel.size})
                 </button>
@@ -1588,7 +1589,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           <div className="card" style={{ boxShadow: "none" }}>
             <div className="card-h">
               <h3 style={{ fontSize: 13 }}>🎨 {t("ws.studioTitle")}</h3>
-              {!settings.data?.hasManusKey && <span className="badge warn">{t("ws.manusMissing")}</span>}
+              {!imageAi.ready && <span className="badge warn">{t("ws.imageAiMissing")}</span>}
             </div>
             <div className="card-b col" style={{ padding: 0 }}>
             <Collapsible title={t("common.showOptions")} defaultOpen={false} storageKey="ws-ai-studio">
@@ -1809,12 +1810,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           {/* bulk AI — runs on the selected images (or all if none selected) */}
           <div className="qc-grp">
             <h5>{t("ws.bulkAi")} {`· ${bulkTargets.length}`}</h5>
-            <label className="field">
-              {t("ws.manusProfile")}
-              <select value={manusProfile} onChange={(e) => setManusProfile(e.target.value as any)}>
-                <ManusProfileOptions />
-              </select>
-            </label>
+            <ImageEnginePicker profile={manusProfile} onProfile={setManusProfile} />
             <div className="row" style={{ gap: 6, alignItems: "flex-start" }}>
               <input
                 type="text"
@@ -1826,7 +1822,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
               <button
                 className="btn primary sm"
                 onClick={runBulkTranslate}
-                disabled={running || !bulkTargets.length || !settings.data?.hasManusKey}
+                disabled={running || !bulkTargets.length || !imageAi.ready}
               >
                 {t("ws.pvAiTr")}
               </button>
@@ -1847,7 +1843,8 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 {t("ws.pvAiAlt")}
               </button>
             </div>
-            {!settings.data?.hasManusKey && <p className="tiny muted" style={{ margin: 0 }}>{t("ws.manusMissing")}</p>}
+            {!imageAi.ready && <p className="tiny muted" style={{ margin: 0 }}>{t("ws.imageAiMissing")}</p>}
+            {!settings.data?.hasManusKey && <p className="tiny muted" style={{ margin: 0 }}>{t("ws.manusMissing")} ({t("ws.pvAiAlt")})</p>}
           </div>
 
           {/* every selected image — real aspect, no crop/stretch, live filigran+logo+adjust
@@ -1945,7 +1942,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
             else fn();
           };
           const cnt = bulk ? <span className="cnt"> · {targets.length}</span> : null;
-          const hasManusKey = !!settings.data?.hasManusKey;
+          const imageReady = imageAi.ready;
           const revertTargets = targets.filter((u) => imgByUrl.get(u)?.translatedFrom);
           return (
             <>
@@ -1987,7 +1984,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 <div className="vfx-menu-sec">{t("ws.imgMenuTranslate")}</div>
                 <button
                   className="vfx-menu-item primary"
-                  disabled={running || !hasManusKey}
+                  disabled={running || !imageReady}
                   onClick={() => go(t("ws.imgMenuTranslateAi"), () => runTranslateUrls(targets))}
                 >
                   {t("ws.imgMenuTranslateAi")}
@@ -2027,7 +2024,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                   />
                   <button
                     className="btn primary sm"
-                    disabled={running || !imgMenuPrompt.trim() || !hasManusKey}
+                    disabled={running || !imgMenuPrompt.trim() || !imageReady}
                     onClick={() => {
                       const p = imgMenuPrompt;
                       go(t("ws.imgMenuPromptRun"), () => runEditUrls(targets, p));
@@ -2188,6 +2185,9 @@ function VideoStudio({
   const [prof, setProf] = useState(manusProfile);
   const [logo, setLogo] = useState<LogoSpec | null>(null);
   const [alt, setAlt] = useState<string>(((draft.product as any)?.videoAlt as string) || "");
+  const transcript = draft.product?.videoTranscript;
+  const [trModel, setTrModel] = useState("");
+  const hasOpenai = !!useQuery({ queryKey: ["settings"], queryFn: api.settings }).data?.hasOpenaiKey;
   const ops: ImageOp[] = ((draft.product as any)?.videoOps as ImageOp[]) || [];
   const dv = ((draft.product as any)?.videoDelivery as { trimStart?: number; trimEnd?: number; mute?: boolean }) || {};
   const [mute, setMute] = useState(!!dv.mute);
@@ -2568,6 +2568,23 @@ function VideoStudio({
       await r.promise;
       toast(t("video.editDone"), "ok");
       setCmd("");
+      onSaved();
+    } catch (e) {
+      if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
+    } finally {
+      setBusy("");
+      setJob(null);
+    }
+  }
+
+  async function runTranscribe() {
+    if (!hasOpenai) return toast(t("ws.imageAiMissing"), "err");
+    setBusy("transcribe");
+    const r = videoTranscribeJob({ draftId: draft.id, model: trModel || undefined }, setJob);
+    jobRef.current = r as RunningJob<unknown>;
+    try {
+      const res = (await r.promise) as { text: string; model: string; seconds: number | null; costUsd: number };
+      toast(res.text ? t("video.transcribeDone", { model: res.model, cost: res.costUsd.toFixed(4) }) : t("video.transcribeNone"), res.text ? "ok" : "err");
       onSaved();
     } catch (e) {
       if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
@@ -3457,6 +3474,28 @@ function VideoStudio({
               {busy === "alt" ? <span className="spin" /> : t("video.altAi")}
             </button>
           </div>
+          <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+            <button className="btn ghost sm" onClick={runTranscribe} disabled={!!busy || !hasOpenai}>
+              {busy === "transcribe" ? <span className="spin" /> : t("video.transcribe")}
+            </button>
+            <OpenAIPurposeSelect category="transcription" value={trModel} onChange={setTrModel} exclude={/live|realtime|diarize/} title={t("video.transcribeModel")} disabled={!!busy} />
+          </div>
+          {transcript && (
+            <details style={{ marginTop: 6 }} open={!!transcript.text}>
+              <summary className="tiny muted" style={{ cursor: "pointer" }}>
+                {t("video.transcriptTitle")} · {transcript.model}
+                {transcript.seconds != null ? ` · ${Math.round(transcript.seconds)} s` : ""}
+              </summary>
+              {transcript.text ? (
+                <>
+                  <textarea readOnly rows={4} value={transcript.text} style={{ width: "100%", fontSize: 12 }} onFocus={(e) => e.currentTarget.select()} />
+                  <p className="tiny muted" style={{ margin: "2px 0 0" }}>{t("video.transcriptHint")}</p>
+                </>
+              ) : (
+                <p className="tiny muted" style={{ margin: 0 }}>{t("video.transcribeNone")}</p>
+              )}
+            </details>
+          )}
         </div>
 
         {/* no-AI tools — full in-browser video editor, zero AI (tabbed like a real editor) */}

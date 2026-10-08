@@ -4,7 +4,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
-import { activeOpenAIKey, openaiModelIdsCached, OpenAIHttpError } from "./openai.ts";
+import { activeOpenAIKey, openaiConfigured, openaiModelIdsCached, OpenAIHttpError } from "./openai.ts";
+import { DEFAULT_IMAGE_MODEL, openaiComposeImages, openaiEditImage, openaiTranslateImage } from "./openaiImageEngine.ts";
+import { openaiTranscribe } from "./openaiMedia.ts";
 import { OPENAI_CATEGORIES } from "@shared/openaiModels.ts";
 import { normalizeManusProfile } from "@shared/models.ts";
 import { initModelCatalog, modelCatalog } from "./modelCatalog.ts";
@@ -40,6 +42,7 @@ import {
   FAST_MODELS,
   LlmError,
   suggestAttributes,
+  logClaudeUsage,
 } from "./llm.ts";
 import {
   pushToShopify,
@@ -104,6 +107,7 @@ import {
   altTextManus,
   researchCategoryManus,
   verifyManus,
+  fetchFileBase64,
   ManusError,
 } from "./manus.ts";
 import { startJob, getJob, listJobs, cancelJob, Cancelled } from "./jobs.ts";
@@ -295,6 +299,14 @@ function readOpenaiDefaults(): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+/** Image model for an OpenAI image job: the request's pick, else the operator's saved default, else sunburst. */
+function imageModelFor(requested: unknown): string {
+  const ok = (m: unknown): m is string => typeof m === "string" && /^(gpt-image-|chatgpt-image)/.test(m.trim());
+  if (ok(requested)) return requested.trim();
+  const saved = readOpenaiDefaults().image;
+  return ok(saved) ? saved : DEFAULT_IMAGE_MODEL;
 }
 
 /** Built-in product-type presets + operator-added ones, de-duped, order preserved. */
@@ -1081,10 +1093,12 @@ router.post(
 router.post(
   "/api/ai/translate-images",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile } = req.body ?? {};
+    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile, engine, imageModel, imageQuality } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
-    if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
+    const useOpenAI = engine === "openai";
+    if (useOpenAI ? !openaiConfigured() : !manusConfigured())
+      return res.status(400).json({ error: useOpenAI ? "OPENAI_API_KEY ayarlı değil." : "MANUS_API_KEY ayarlı değil." });
     const urls: string[] = Array.isArray(imageUrls) && imageUrls.length
       ? imageUrls
       : // a photo can legitimately carry BOTH the gallery and variant role now
@@ -1103,7 +1117,9 @@ router.post(
     // task exists, its polling runs independently — so raising this past ~10
     // mainly shortens the tail (more tasks waiting/polling concurrently once
     // they're all created), not the creation rate itself.
-    const CONCURRENCY = Math.max(1, Math.min(16, Number(process.env.MANUS_IMAGE_CONCURRENCY) || 6));
+    // OpenAI's image endpoint is limited per minute (e.g. 20 images/min on the Build tier) and each
+    // edit takes a while — a few in flight is plenty, more only trips 429s.
+    const CONCURRENCY = useOpenAI ? 3 : Math.max(1, Math.min(16, Number(process.env.MANUS_IMAGE_CONCURRENCY) || 6));
     const jobId = startJob("translate-images", async (ctx) => {
       const labels = urls.map((_, i) => `Görsel ${i + 1}/${urls.length} çevriliyor`);
       ctx.plan(labels);
@@ -1120,7 +1136,8 @@ router.post(
         if (!it?.resultUrl) return;
         let persisted = it.resultUrl as string;
         try {
-          persisted = await persistFromUrl(it.resultUrl, manusFileAuthHeaders());
+          // OpenAI results are already stored under /api/media; Manus ones are 48h-expiring URLs
+          if (!it.local) persisted = await persistFromUrl(it.resultUrl, manusFileAuthHeaders());
           // operator rule: a translated image's SHORTEST side is always 800–1000 px,
           // high quality — no other size constraint.
           persisted = await normaliseShortestEdge(persisted);
@@ -1141,7 +1158,7 @@ router.post(
               translatedFrom: im.url,
               ops: [...(im.ops || []).filter((o) => o !== "translate"), "translate" as const],
               taskUrl: it.taskUrl,
-              remoteUrl: it.resultUrl || undefined,
+              remoteUrl: it.local ? undefined : it.resultUrl || undefined,
             };
           });
           if (!hit) {
@@ -1151,7 +1168,7 @@ router.post(
               ops: ["translate"],
               translatedFrom: it.sourceUrl,
               taskUrl: it.taskUrl,
-              remoteUrl: it.resultUrl || undefined,
+              remoteUrl: it.local ? undefined : it.resultUrl || undefined,
             });
           }
           replaced++;
@@ -1163,12 +1180,44 @@ router.post(
         });
       };
 
+      // the OpenAI engine edits the image directly and hands back stored bytes — same
+      // bookkeeping as the Manus path below, minus tasks / credits
+      const oneOpenAI = async (i: number) => {
+        const r = await openaiTranslateImage({
+          imageUrl: urls[i],
+          targetLanguage: target,
+          productContext: context,
+          instruction,
+          model: imageModelFor(imageModel),
+          quality: typeof imageQuality === "string" ? imageQuality : undefined,
+          draftId: draft.id,
+          ctx,
+        });
+        const item = { sourceUrl: r.sourceUrl, resultUrl: r.resultUrl, changed: r.changed, taskId: "", taskUrl: "", creditsUsed: 0, creditsEstimated: false, model: r.model, local: true, costUsd: r.costUsd };
+        items[i] = item;
+        if (r.changed) {
+          await applyOne(item);
+          done++;
+          console.log(`[translate-images] #${i + 1}/${urls.length} OK openai model=${r.model} cost=$${r.costUsd.toFixed(4)}`);
+          ctx.step(labels[done - 1]);
+        } else {
+          done++;
+          console.warn(`[translate-images] #${i + 1}/${urls.length} no Chinese overlay text (openai, skipped)`);
+          ctx.skip(labels[done - 1]);
+        }
+      };
+
       const worker = async () => {
         for (;;) {
           const i = cursor++;
           if (i >= urls.length) return;
           ctx.throwIfCancelled();
           try {
+            if (useOpenAI) {
+              await oneOpenAI(i);
+              ctx.setStatus(`${done}/${urls.length} görsel çevrildi`);
+              continue;
+            }
             // one account bound for this image's whole lifecycle — create,
             // poll, AND the result-file download in applyOne() below, which
             // all have to agree on the same Manus account.
@@ -1261,10 +1310,12 @@ router.post(
 router.post(
   "/api/ai/edit-images",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, instruction, imageSpec, speed, agentProfile } = req.body ?? {};
+    const { draftId, imageUrls, instruction, imageSpec, speed, agentProfile, engine, imageModel, imageQuality } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
-    if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
+    const useOpenAI = engine === "openai";
+    if (useOpenAI ? !openaiConfigured() : !manusConfigured())
+      return res.status(400).json({ error: useOpenAI ? "OPENAI_API_KEY ayarlı değil." : "MANUS_API_KEY ayarlı değil." });
     if (!String(instruction || "").trim()) return res.status(400).json({ error: "Komut boş." });
     const urls: string[] = Array.isArray(imageUrls) && imageUrls.length ? imageUrls : [];
     if (!urls.length) return res.status(400).json({ error: "Görsel seçin." });
@@ -1274,10 +1325,25 @@ router.post(
       ctx.plan(urls.map((_, i) => `Görsel ${i + 1}/${urls.length} düzenleniyor`));
       const map: { from: string; to: string; remote?: string }[] = [];
       let totalCredits = 0;
+      let firstError: string | undefined;
       for (let i = 0; i < urls.length; i++) {
         ctx.throwIfCancelled();
         ctx.step(`Görsel ${i + 1}/${urls.length} düzenleniyor`);
         try {
+          if (useOpenAI) {
+            const r = await openaiEditImage({
+              imageUrl: urls[i],
+              instruction: String(instruction),
+              productContext: context,
+              imageSpec,
+              model: imageModelFor(imageModel),
+              quality: typeof imageQuality === "string" ? imageQuality : undefined,
+              draftId: draft.id,
+              ctx,
+            });
+            if (r.resultUrl) map.push({ from: urls[i], to: r.resultUrl });
+            continue;
+          }
           await withManusAccount(async () => {
             const r = await editImageManus({
               imageUrl: urls[i],
@@ -1307,9 +1373,11 @@ router.post(
           });
         } catch (e) {
           if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
-          /* skip one */
+          firstError ??= (e as Error)?.message || String(e); // skip this one, keep going
         }
       }
+      // every image failed: say WHY instead of reporting a silent "0 changed"
+      if (!map.length && firstError) throw new Error(`Hiçbir görsel düzenlenemedi. İlk hata: ${firstError}`);
       // replace the sources in place
       if (map.length) {
         await withDraftLock(draft.id, async () => {
@@ -1364,14 +1432,38 @@ router.post(
 router.post(
   "/api/ai/compose-image",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, instruction, brandBrief, imageSpec, speed, agentProfile } = req.body ?? {};
+    const { draftId, imageUrls, instruction, brandBrief, imageSpec, speed, agentProfile, engine, imageModel, imageQuality } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
-    if (!manusConfigured()) return res.status(400).json({ error: "MANUS_API_KEY ayarlı değil." });
+    const useOpenAI = engine === "openai";
+    if (useOpenAI ? !openaiConfigured() : !manusConfigured())
+      return res.status(400).json({ error: useOpenAI ? "OPENAI_API_KEY ayarlı değil." : "MANUS_API_KEY ayarlı değil." });
     if (!String(instruction || "").trim()) return res.status(400).json({ error: "Ne oluşturulacağını yazın." });
     const urls: string[] = (Array.isArray(imageUrls) ? imageUrls : []).map(String).filter(Boolean).slice(0, 20);
     if (!urls.length) return res.status(400).json({ error: "En az bir kaynak görsel seçin." });
     const context = `${draft.product.titleTranslated || draft.product.title}. ${layoutNote(detectKeyboardLayout(draft.product), "en")}`;
+
+    if (useOpenAI) {
+      const jobId = startJob("compose-image", async (ctx) => {
+        ctx.plan(["Kaynak görseller hazırlanıyor", "Yeni görsel oluşturuluyor"]);
+        ctx.step("Yeni görsel oluşturuluyor");
+        const r = await openaiComposeImages({
+          imageUrls: urls,
+          instruction: String(instruction),
+          productContext: context,
+          brandBrief: brandBrief ? String(brandBrief) : undefined,
+          imageSpec: imageSpec || undefined,
+          model: imageModelFor(imageModel),
+          quality: typeof imageQuality === "string" ? imageQuality : undefined,
+          draftId: draft.id,
+          ctx,
+        });
+        if (!r.resultUrl) throw new Error("OpenAI yeni görsel döndürmedi.");
+        ctx.step("Kaydediliyor");
+        return { url: r.resultUrl, remoteUrl: undefined, taskUrl: "", credits: 0, costUsd: r.costUsd };
+      });
+      return res.json({ jobId });
+    }
 
     const jobId = startJob("compose-image", (ctx) => withManusAccount(async () => {
       ctx.plan(["Kaynak görseller hazırlanıyor", "Yeni görsel oluşturuluyor", "Kaydediliyor"]);
@@ -1462,6 +1554,51 @@ router.post(
   }),
 );
 
+/** Speech-to-text for the product video (OpenAI) — the transcript is stored on the draft and
+ *  feeds the AI alt text. mp4/webm straight to the API (no ffmpeg needed); OpenAI caps files at 25 MB. */
+router.post(
+  "/api/ai/video-transcribe",
+  wrap(async (req, res) => {
+    const { draftId, model } = req.body ?? {};
+    const draft = getDraft(draftId);
+    if (!draft?.product?.videoUrl) return res.status(400).json({ error: "Üründe video yok." });
+    if (!openaiConfigured()) return res.status(400).json({ error: "OPENAI_API_KEY ayarlı değil." });
+    const videoUrl = draft.product.videoUrl;
+    const wanted =
+      typeof model === "string" && /transcribe|whisper/.test(model) ? model.trim() : readOpenaiDefaults().transcription || "gpt-transcribe";
+    const jobId = startJob("video-transcribe", async (ctx) => {
+      ctx.plan(["Video indiriliyor", "Konuşma yazıya çevriliyor"]);
+      ctx.step("Video indiriliyor");
+      const f = await fetchFileBase64(videoUrl);
+      const buf = Buffer.from(f.data, "base64");
+      const ext = f.mime.includes("webm") ? "webm" : f.mime.includes("mpeg") ? "mp3" : "mp4";
+      ctx.step("Konuşma yazıya çevriliyor");
+      const run = (m: string) => openaiTranscribe({ model: m, file: buf, filename: `video.${ext}`, mime: f.mime, signal: ctx.signal });
+      let used = wanted;
+      let r;
+      try {
+        r = await run(wanted);
+      } catch (e) {
+        // the key may not have the newest model yet — fall back once to the long-standing cheap one
+        if (e instanceof OpenAIHttpError && e.status === 404 && wanted !== "gpt-4o-mini-transcribe") {
+          used = "gpt-4o-mini-transcribe";
+          r = await run(used);
+        } else if (e instanceof OpenAIHttpError) {
+          throw new LlmError(e.message, e.status === 401 ? 401 : 400);
+        } else throw e;
+      }
+      logClaudeUsage("video-transcribe", used, { inputTokens: 0, outputTokens: 0, costUsd: r.costUsd }, draft.id, r.text, "openai");
+      const transcript = { text: r.text, model: used, seconds: r.seconds, at: new Date().toISOString() };
+      await withDraftLock(draft.id, async () => {
+        const fresh = getDraft(draft.id)!;
+        patchDraft(draft.id, { product: { ...fresh.product!, videoTranscript: transcript } }, "Video konuşması yazıya çevrildi");
+      });
+      return { ...transcript, costUsd: r.costUsd, estimated: r.estimated };
+    });
+    res.json({ jobId });
+  }),
+);
+
 router.post(
   "/api/ai/video-alt",
   wrap(async (req, res) => {
@@ -1486,6 +1623,9 @@ router.post(
           `ÜRÜN: ${stripCJK(context)}`,
           `ÖZELLİKLER: ${stripCJK(Object.values(p.props).slice(0, 8).join(", "))}`,
           p.videoOps?.length ? `VİDEO İŞLEMLERİ: ${p.videoOps.join(", ")}` : "",
+          // spoken content (OpenAI transcription), when the operator ran it — the one thing
+          // about the video this text-only model can actually learn
+          p.videoTranscript?.text ? `VİDEODA DUYULAN KONUŞMA (Çince olabilir, çıktıya Çince yazma): ${p.videoTranscript.text.slice(0, 1200)}` : "",
         ]
           .filter(Boolean)
           .join("\n");

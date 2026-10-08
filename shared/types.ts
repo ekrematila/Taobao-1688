@@ -148,6 +148,8 @@ export interface NormalisedProduct {
   videoUrlOriginal?: string;
   /** alt text for the listing video */
   videoAlt?: string;
+  /** what is SAID in the video (OpenAI transcription) — feeds the AI alt text */
+  videoTranscript?: { text: string; model: string; seconds: number | null; at: string };
   /** ops applied to the video, for the badge / delivery notes */
   videoOps?: ImageOp[];
   /** operator's non-AI video delivery instructions (trim / mute) */

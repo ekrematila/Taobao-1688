@@ -8,7 +8,7 @@ import { MANUS_PROFILES, normalizeManusProfile } from "@shared/models.ts";
 import { dropCJK, stripCJK } from "@shared/listingFormat.ts";
 import { pickImageAttachment, saidNoChange } from "@shared/manusResult.ts";
 
-const NO_CJK_DIRECTIVE = "The output must contain ZERO Chinese / CJK characters — none at all.";
+export const NO_CJK_DIRECTIVE = "The output must contain ZERO Chinese / CJK characters — none at all.";
 import type { JobCtx } from "./jobs.ts";
 
 export class ManusError extends Error {
@@ -784,7 +784,7 @@ function speedConfig(speed?: ManusSpeed, explicitProfile?: string): { profile?: 
   return { profile: p ?? "standard", hint: "Balance speed and quality." };
 }
 
-const KEYCAP_GLOSSARY =
+export const KEYCAP_GLOSSARY =
   '"原厂高度"/"原厂"/"original height"/"original factory"/"factory profile"/"factory height" = "Cherry Profile" (EXACTLY, capital P). ' +
   'BUT "OEM"/"OEM Profile"/"OEM高度" is a DIFFERENT, taller profile — render it "OEM Profile", NEVER "Cherry". ' +
   'Keep whatever profile the source actually states; do not substitute one profile for another. ' +
@@ -823,6 +823,29 @@ async function pickImageModel(sourceBytes: number): Promise<"Nano Banana Pro" | 
 }
 
 /**
+ * The engine-neutral part of the image-translation brief — shared by Manus (which
+ * adds "return it as an attachment / NO_CHANGE_NEEDED") and the OpenAI image
+ * engine (which edits the image directly). Kept deliberately short and
+ * single-purpose: find Chinese overlay text and translate it, in the same style,
+ * touching nothing else.
+ */
+export function translatePromptCore(targetLanguage: string, productContext?: string, instruction?: string): string[] {
+  return [
+    `Look at this product photo. Find any Chinese text that was ADDED ON TOP of the photo (headlines, captions, labels, banner text, badges) and translate it into ${targetLanguage}.`,
+    `This is a RESTYLE, not a plain text swap — do NOT drop it in as default/plain text in a generic font. Reproduce the ORIGINAL lettering's own design as closely as possible: same font category (bold sans / script / serif / decorative / handwritten / 3D-embossed, whichever it actually is), same weight and letter-spacing, same fill (solid colour, gradient — match the exact direction and stops), same outline/stroke, same drop shadow or glow, same rotation/skew/perspective/curve if the original text isn't flat and horizontal, same size and same position. If the original uses multiple colours or a decorative treatment (e.g. one word in a different colour, an emphasis effect on one character), preserve that same treatment on the corresponding translated word. Fully erase the original glyphs first (no ghosting) before placing the ${targetLanguage} text.`,
+    `REMOVE (do not translate) shop/seller names, watermarks, and off-topic marketplace text (Taobao/Tmall/1688/Pinduoduo, WeChat/QQ/phone numbers, QR codes, "scan to buy") — cleanly reconstruct whatever was behind them.`,
+    `REMOVE any watermark overlaid on the photo (a semi-transparent repeating mark, a corner/center stamp, a photographer or studio credit) — cleanly reconstruct whatever was behind it.`,
+    `REMOVE any logo overlaid on the photo as a graphic badge/sticker (a shop's or brand's logo stamped on top of the image) — cleanly reconstruct whatever was behind it. A logo that is part of the PRODUCT ITSELF (printed/molded/embroidered onto the product) is not overlay — leave that alone, per the rule below.`,
+    `If what looks like Chinese is actually part of the product's OWN physical design (printed or molded onto the product itself, not text overlaid on the photo — e.g. a keycap's own legend), leave the product exactly as it is. Do not translate or touch it.`,
+    `Everything that is not overlay text — the product, the background, every other pixel — must come back visually identical.`,
+    productContext ? `Product context (for correct terminology): ${productContext.slice(0, 400)}` : "",
+    `Glossary — apply exactly: ${KEYCAP_GLOSSARY}`,
+    NO_CJK_DIRECTIVE,
+    instruction ? `Operator instruction: ${instruction}` : "",
+  ];
+}
+
+/**
  * Translate ONLY the Chinese overlay/annotation text baked into a product image
  * into `targetLanguage`, leaving the product, its own printed markings, and the
  * background completely untouched. Domain-aware.
@@ -842,22 +865,8 @@ export async function translateImage(opts: {
   const sourceBytes = Math.round((data.length * 3) / 4);
   const model = await pickImageModel(sourceBytes);
 
-  // Kept deliberately short and single-purpose — one job only: find Chinese
-  // overlay text and translate it, in the same style, touching nothing else.
-  // No output-size/quality demands here (that was pure overhead for Manus and
-  // is handled anyway by `normaliseShortestEdge` after the image comes back).
   const prompt = [
-    `Look at this product photo. Find any Chinese text that was ADDED ON TOP of the photo (headlines, captions, labels, banner text, badges) and translate it into ${targetLanguage}.`,
-    `This is a RESTYLE, not a plain text swap — do NOT drop it in as default/plain text in a generic font. Reproduce the ORIGINAL lettering's own design as closely as possible: same font category (bold sans / script / serif / decorative / handwritten / 3D-embossed, whichever it actually is), same weight and letter-spacing, same fill (solid colour, gradient — match the exact direction and stops), same outline/stroke, same drop shadow or glow, same rotation/skew/perspective/curve if the original text isn't flat and horizontal, same size and same position. If the original uses multiple colours or a decorative treatment (e.g. one word in a different colour, an emphasis effect on one character), preserve that same treatment on the corresponding translated word. Fully erase the original glyphs first (no ghosting) before placing the ${targetLanguage} text.`,
-    `REMOVE (do not translate) shop/seller names, watermarks, and off-topic marketplace text (Taobao/Tmall/1688/Pinduoduo, WeChat/QQ/phone numbers, QR codes, "scan to buy") — cleanly reconstruct whatever was behind them.`,
-    `REMOVE any watermark overlaid on the photo (a semi-transparent repeating mark, a corner/center stamp, a photographer or studio credit) — cleanly reconstruct whatever was behind it.`,
-    `REMOVE any logo overlaid on the photo as a graphic badge/sticker (a shop's or brand's logo stamped on top of the image) — cleanly reconstruct whatever was behind it. A logo that is part of the PRODUCT ITSELF (printed/molded/embroidered onto the product) is not overlay — leave that alone, per the rule below.`,
-    `If what looks like Chinese is actually part of the product's OWN physical design (printed or molded onto the product itself, not text overlaid on the photo — e.g. a keycap's own legend), leave the product exactly as it is. Do not translate or touch it.`,
-    `Everything that is not overlay text — the product, the background, every other pixel — must come back visually identical.`,
-    productContext ? `Product context (for correct terminology): ${productContext.slice(0, 400)}` : "",
-    `Glossary — apply exactly: ${KEYCAP_GLOSSARY}`,
-    NO_CJK_DIRECTIVE,
-    instruction ? `Operator instruction: ${instruction}` : "",
+    ...translatePromptCore(targetLanguage, productContext, instruction),
     "Return the edited image as a file attachment. If the photo has NO Chinese overlay text at all, reply with just the single token NO_CHANGE_NEEDED instead of an image.",
     spd.hint,
   ]

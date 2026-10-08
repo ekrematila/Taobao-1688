@@ -4,7 +4,7 @@ import { api } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { useModels } from "../lib/useModels";
-import { groupOpenAIModels, OPENAI_CATEGORIES, type OpenAICategory } from "@shared/openaiModels.ts";
+import { groupOpenAIModels, OPENAI_CATEGORIES, OPENAI_UNAVAILABLE, type OpenAICategory } from "@shared/openaiModels.ts";
 
 /**
  * What this OpenAI key can use, sorted by purpose (writing, coding, images, the
@@ -73,6 +73,13 @@ export default function OpenAIModelsPanel({
         const saved = defaults[cat];
         const value = saved && all.includes(saved) ? saved : rec?.id ?? cur[0] ?? "";
         const isText = cat === "text";
+        if (OPENAI_UNAVAILABLE[cat])
+          return (
+            <div key={cat} style={{ border: "1px dashed var(--line, #e2e2e8)", borderRadius: 8, padding: "8px 10px" }}>
+              <b className="tiny">{t(`settings.openaiCat.${cat}` as any)}</b>
+              <div className="tiny muted" style={{ marginTop: 4 }}>{t("settings.openaiVideoGone")}</div>
+            </div>
+          );
         return (
           <div key={cat} style={{ border: "1px solid var(--line, #e2e2e8)", borderRadius: 8, padding: "8px 10px" }}>
             <div className="row" style={{ alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -105,8 +112,11 @@ export default function OpenAIModelsPanel({
                 </button>
               )}
             </div>
+            <div className="tiny muted" style={{ marginTop: 4 }}>
+              {t(`settings.openaiUse.${cat}` as any)}
+            </div>
             {rec && (
-              <div className="tiny muted" style={{ marginTop: 4 }}>
+              <div className="tiny muted" style={{ marginTop: 2 }}>
                 ★ {t(`settings.openaiWhy.${rec.why}` as any)}: <span className="mono">{rec.id}</span>
                 {priceOf(rec.id) && <> · {priceOf(rec.id)}</>}
               </div>

@@ -1142,7 +1142,7 @@ export default function DeliveryStudio({
                 <div className="ai-picker">
                   <select value={descModel} onChange={(e) => setDescModel(e.target.value)}>
                     <option value="">{t("delivery.descModelSame")}</option>
-                    <ModelOptions />
+                    <ModelOptions purpose="code" />
                   </select>
                   <select value={descEffort} onChange={(e) => setDescEffort(e.target.value)} title={t("ai.effort")}>
                     <option value="">{t("ai.effortDefault")}</option>

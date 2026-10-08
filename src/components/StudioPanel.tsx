@@ -1,4 +1,4 @@
-import ManusProfileOptions from "./ManusProfileOptions";
+import ImageEnginePicker from "./ImageEnginePicker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, composeImageJob, proxied, researchBrandJob, type Draft } from "../api";
@@ -594,12 +594,7 @@ export default function StudioPanel({
                     <input type="number" min={256} max={6000} value={customH} onChange={(e) => setCustomH(Math.max(1, Number(e.target.value) || 0))} style={{ width: 84 }} />
                   </div>
                 )}
-                <label className="field">
-                  {t("ws.manusProfile")}
-                  <select value={profile} onChange={(e) => setProfile(e.target.value as any)}>
-                    <ManusProfileOptions />
-                  </select>
-                </label>
+                <ImageEnginePicker profile={profile} onProfile={setProfile} />
               </div>
 
               <button className="btn primary" onClick={generate} disabled={busy || !picked.size || !instruction.trim()}>

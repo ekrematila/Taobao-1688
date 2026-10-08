@@ -17,6 +17,7 @@ import type {
   UsageDashboard,
 } from "@shared/types.ts";
 import { runJob, type RunningJob } from "./lib/jobs";
+import { imageEngineBody } from "./lib/imageEngineStore";
 
 export interface Draft {
   id: string;
@@ -243,7 +244,7 @@ export function translateImagesJob(
   },
   onProgress: Progress,
 ): RunningJob<ImageTranslateJobResult> {
-  return runJob(() => post("/ai/translate-images", body), onProgress);
+  return runJob(() => post("/ai/translate-images", { ...body, ...imageEngineBody() }), onProgress);
 }
 export function classifyImagesJob(
   body: { draftId: string; imageUrls?: string[] },
@@ -262,7 +263,7 @@ export function editImagesJob(
   },
   onProgress: Progress,
 ): RunningJob<{ changed: number; totalCredits: number }> {
-  return runJob(() => post("/ai/edit-images", body), onProgress);
+  return runJob(() => post("/ai/edit-images", { ...body, ...imageEngineBody() }), onProgress);
 }
 export function composeImageJob(
   body: {
@@ -276,7 +277,7 @@ export function composeImageJob(
   },
   onProgress: Progress,
 ): RunningJob<{ url: string; remoteUrl?: string; taskUrl?: string; credits: number }> {
-  return runJob(() => post("/ai/compose-image", body), onProgress);
+  return runJob(() => post("/ai/compose-image", { ...body, ...imageEngineBody() }), onProgress);
 }
 export function researchBrandJob(
   body: { draftId: string; brandUrl: string },
@@ -295,6 +296,12 @@ export function videoAltJob(
   onProgress: Progress,
 ): RunningJob<{ alt: string; taskUrl?: string; credits: number }> {
   return runJob(() => post("/ai/video-alt", body), onProgress);
+}
+export function videoTranscribeJob(
+  body: { draftId: string; model?: string },
+  onProgress: Progress,
+): RunningJob<{ text: string; model: string; seconds: number | null; costUsd: number; estimated: boolean }> {
+  return runJob(() => post("/ai/video-transcribe", body), onProgress);
 }
 export function videoPlanJob(
   body: {
