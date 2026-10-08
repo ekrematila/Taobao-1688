@@ -140,6 +140,32 @@ export function outputVariants(
   });
 }
 
+/**
+ * A variant's picture is a COPY of an image's url. When that image is later cropped,
+ * translated, split or reverted, `image.url` changes but the variant kept the old one —
+ * so the store got the un-edited photo. Re-point every variant at the image's CURRENT url
+ * (found by its current url, its immutable source, or any earlier version of it).
+ * Pure: returns a new product only when something changed.
+ */
+export function syncVariantImages<T extends Pick<NormalisedProduct, "images" | "variants">>(product: T): T {
+  const images = product.images ?? [];
+  if (!images.length || !product.variants?.length) return product;
+  let changed = false;
+  const variants = product.variants.map((v) => {
+    if (!v.imageUrl && !v.imageSrc) return v;
+    const hit =
+      images.find((i) => i.url === v.imageUrl) ||
+      (v.imageSrc ? images.find((i) => i.srcUrl === v.imageSrc) : undefined) ||
+      images.find((i) => v.imageUrl && [i.originalUrl, i.translatedFrom, i.srcUrl, i.remoteUrl].includes(v.imageUrl));
+    if (!hit) return v;
+    const imageSrc = hit.srcUrl || v.imageSrc;
+    if (v.imageUrl === hit.url && v.imageSrc === imageSrc) return v;
+    changed = true;
+    return { ...v, imageUrl: hit.url, ...(imageSrc ? { imageSrc } : {}) };
+  });
+  return changed ? { ...product, variants } : product;
+}
+
 /* ------------------------------ small utils ------------------------------ */
 
 /** Lower-case, allowed chars only, ≤ 20 chars — but NEVER chop a word in half. */

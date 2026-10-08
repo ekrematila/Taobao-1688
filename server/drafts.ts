@@ -6,6 +6,7 @@ import type {
   GeneratedListing,
   NormalisedProduct,
 } from "@shared/types.ts";
+import { syncVariantImages } from "@shared/listingFormat.ts";
 
 export interface DraftRow {
   id: string;
@@ -89,7 +90,8 @@ function toDraft(r: DraftRow): Draft {
     title: r.title,
     channel: r.channel as Draft["channel"],
     step: r.step,
-    product,
+    // variants always follow their image's current (edited) url — UI, exports and pushes all read this
+    product: product ? syncVariantImages(product) : product,
     listing: r.listing ? JSON.parse(r.listing) : null,
     imageState: r.image_state ? JSON.parse(r.image_state) : null,
     apiResponse: r.api_response ? JSON.parse(r.api_response) : null,

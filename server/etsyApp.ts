@@ -13,6 +13,7 @@
 // it instead of the operator's actual, capped `tags` selection.
 
 import { env } from "./env.ts";
+import { syncVariantImages } from "@shared/listingFormat.ts";
 import { getSetting, setSetting } from "./db.ts";
 import { cleanTag } from "@shared/listingFormat.ts";
 import type { GeneratedListing, NormalisedProduct } from "@shared/types.ts";
@@ -72,11 +73,12 @@ function absolutizeMedia(u: string | undefined): string | undefined {
   return u;
 }
 
-export function withAbsoluteMedia(product: NormalisedProduct): NormalisedProduct {
+export function withAbsoluteMedia(input: NormalisedProduct): NormalisedProduct {
+  const product = syncVariantImages(input); // edited variant pictures, even for a draft saved before the sync existed
   return {
     ...product,
     images: product.images.map((im) => ({ ...im, url: absolutizeMedia(im.url) ?? im.url })),
-    variants: product.variants.map((v) => (v.imageUrl ? { ...v, imageUrl: absolutizeMedia(v.imageUrl) } : v)),
+    variants: product.variants.map(({ imageSrc: _src, ...v }) => (v.imageUrl ? { ...v, imageUrl: absolutizeMedia(v.imageUrl) } : v)),
     videoUrl: absolutizeMedia(product.videoUrl),
   };
 }

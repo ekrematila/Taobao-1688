@@ -85,3 +85,24 @@ test("withCleanEtsyFields strips seo_description (Shopify-only field)", () => {
   assert.equal(out.fields.find((f) => f.key === "seo_description"), undefined);
   assert.equal(out.fields.length, 1);
 });
+
+// Regression: a variant keeps a COPY of its image's url, so after the image was cropped /
+// translated the store still received the un-edited photo for that variant.
+test("a variant follows its image through an edit (and through a revert)", async () => {
+  const { syncVariantImages } = await import("../shared/listingFormat.ts");
+  const src = "https://img.alicdn.com/a.jpg";
+  const edited = product({
+    images: [{ url: "/api/media/new.png", role: "variant", originalUrl: src, srcUrl: src }],
+    variants: [{ name: "Black", price: 10, imageUrl: src }],
+  });
+  const a = syncVariantImages(edited);
+  assert.equal(a.variants[0].imageUrl, "/api/media/new.png");
+  assert.equal(a.variants[0].imageSrc, src);
+  // reverting the image points the variant back at the original
+  const reverted = syncVariantImages({ ...a, images: [{ url: src, role: "variant", srcUrl: src }] });
+  assert.equal(reverted.variants[0].imageUrl, src);
+  // and the Etsy payload carries the edited, absolute url without the bookkeeping field
+  const out = withAbsoluteMedia(edited);
+  assert.equal(out.variants[0].imageUrl, `${env.appPublicUrl}/api/media/new.png`);
+  assert.equal("imageSrc" in out.variants[0], false);
+});

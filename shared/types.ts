@@ -96,6 +96,8 @@ export interface ProductVariant {
   sku?: string;
   /** the product image bound to this variant (auto-picked, operator can change). */
   imageUrl?: string;
+  /** immutable source (pre-edit) URL of that image — lets the variant keep following the image through crops / translations / reverts */
+  imageSrc?: string;
   stock?: number | null;
   /** true when the operator added this variant by hand (not from the source listing). */
   manual?: boolean;
