@@ -192,6 +192,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   const [cropUrls, setCropUrls] = useState<string[] | null>(null);
   const [ocrUrls, setOcrUrls] = useState<string[] | null>(null);
   const [stitchUrls, setStitchUrls] = useState<string[] | null>(null);
+  const [stitchMode, setStitchMode] = useState<"merge" | "split">("merge");
   const [studioSeed, setStudioSeed] = useState<string[] | "open" | null>(null);
   const [studioType, setStudioType] = useState<string>("ad");
   const [studioBand, setStudioBand] = useState<string>("");
@@ -1068,6 +1069,28 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     onSaved();
   }
 
+  /** N source images → their separate pictures (cut out of the merged image), dropped in at the first source's slot. */
+  async function applySplit(sourceUrls: string[], pieceUrls: string[], removeSources: boolean) {
+    const fresh = await api.draft(draft.id);
+    const list: ProductImage[] = fresh.product?.images ?? [];
+    const srcSet = new Set(sourceUrls);
+    const idxs = list.map((im, i) => (srcSet.has(im.url) ? i : -1)).filter((i) => i >= 0);
+    if (!idxs.length || !pieceUrls.length) return;
+    const anchor = Math.min(...idxs);
+    const roleCount = new Map<string, number>();
+    for (const i of idxs) roleCount.set(list[i].role, (roleCount.get(list[i].role) ?? 0) + 1);
+    const role = ([...roleCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "gallery") as ProductImage["role"];
+    const pieces: ProductImage[] = pieceUrls.map((url) => ({ url, role, ops: ["edit" as ImageOp] }));
+    const next: ProductImage[] = [];
+    list.forEach((im, i) => {
+      if (i === anchor) next.push(...pieces);
+      if (!srcSet.has(im.url) || !removeSources) next.push(im);
+    });
+    await api.patchDraft(draft.id, { product: { ...fresh.product, images: next }, label: t("stitch.splitLabel", { n: pieceUrls.length }) });
+    setSel(new Set(pieceUrls));
+    onSaved();
+  }
+
   /** Replace images by a {from,to} map, in place, merging op(s). */
   async function applyImageMap(map: { from: string; to: string }[], op: ImageOp | ImageOp[], label: string) {
     if (!map.length) return;
@@ -1182,11 +1205,13 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           onApply={(map) => applyImageMap(map, "translate", t("ocr.label", { n: map.length }))}
         />
       )}
-      {stitchUrls && stitchUrls.length >= 2 && (
+      {stitchUrls && stitchUrls.length >= 1 && (
         <StitchPanel
           urls={stitchUrls}
+          initialMode={stitchMode}
           onClose={() => setStitchUrls(null)}
           onApply={applyStitch}
+          onApplySplit={applySplit}
         />
       )}
       {studioSeed && (
@@ -1972,10 +1997,23 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                       onClick={() => {
                         const list = targets;
                         close();
+                        setStitchMode("merge");
                         setStitchUrls(list);
                       }}
                     >
                       {t("ws.imgMenuMergeRun")}
+                      <span className="cnt"> · {targets.length}</span>
+                    </button>
+                    <button
+                      className="vfx-menu-item"
+                      onClick={() => {
+                        const list = targets;
+                        close();
+                        setStitchMode("split");
+                        setStitchUrls(list);
+                      }}
+                    >
+                      ✂ {t("ws.imgMenuSplitRun")}
                       <span className="cnt"> · {targets.length}</span>
                     </button>
                   </>

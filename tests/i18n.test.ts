@@ -53,3 +53,8 @@ test("dynamically-built key families are complete in both languages", async () =
   for (const f of ["title", "title_alt", "description", "tags"]) need.push(`delivery.field.${f}`);
   assert.deepEqual(need.filter((k) => !trKeys.has(k) || !enKeys.has(k)), []);
 });
+
+test("merge & split: every piece kind the AI can return has a label in both languages", () => {
+  const kinds = ["product_photo", "model_photo", "detail_closeup", "text_banner", "size_chart", "logo_or_icon", "blank", "other"];
+  assert.deepEqual(kinds.map((k) => `stitch.kind.${k}`).filter((k) => !trKeys.has(k) || !enKeys.has(k)), []);
+});

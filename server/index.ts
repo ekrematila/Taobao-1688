@@ -1306,6 +1306,49 @@ router.post(
   }),
 );
 
+/**
+ * "Merge & split": the client cut a long image into numbered boxes and drew them on a small
+ * copy — the vision model says which boxes are real product photos (keep) and which are text
+ * banners, size charts, logos, blank slides… One cheap call, no job.
+ */
+router.post(
+  "/api/ai/classify-regions",
+  wrap(async (req, res) => {
+    const { draftId, imageDataUrl, count, model } = req.body ?? {};
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(imageDataUrl || ""));
+    if (!m) return res.status(400).json({ error: "Görsel gerekli." });
+    if (!llmConfigured(model)) return res.status(400).json({ error: `${llmKeyName(model)} API anahtarı ayarlı değil.` });
+    const n = Math.max(1, Math.min(60, Number(count) | 0));
+    const system = [
+      "You look at ONE long e-commerce image (a product detail strip) that has been cut into numbered rectangles — red outlines, each with a red number badge in its top-left corner.",
+      "For EVERY number decide what that rectangle contains and whether it is worth keeping as a standalone product image.",
+      'kind is one of: "product_photo" (a real photograph of the product), "model_photo" (a person / hand / scene using the product), "detail_closeup" (a close-up of a product detail), "text_banner" (headline / selling-point / shipping text), "size_chart" (specification, size or parameter table), "logo_or_icon" (shop logo, badge, QR code, contact info), "blank" (empty / decorative / white slide), "other".',
+      "keep = true for product_photo, model_photo and detail_closeup; false for everything else.",
+      'Reply with strict JSON only: {"regions":[{"n":1,"kind":"product_photo","keep":true}, ...]} — exactly one entry per number, nothing else.',
+    ].join("\n");
+    const { text, model: used } = await ask(system, `There are ${n} numbered rectangles. Classify each one.`, "classify-regions", {
+      images: [{ data: m[2], mime: m[1] }],
+      maxTokens: 1200,
+      effort: "low",
+      thinking: "off",
+      model: typeof model === "string" && model ? model : undefined,
+      draftId: typeof draftId === "string" ? draftId : undefined,
+    });
+    let parsed: any = {};
+    try {
+      parsed = extractJson(text);
+    } catch {
+      /* fall through to the error below */
+    }
+    const KINDS = new Set(["product_photo", "model_photo", "detail_closeup", "text_banner", "size_chart", "logo_or_icon", "blank", "other"]);
+    const regions = (Array.isArray(parsed?.regions) ? parsed.regions : [])
+      .map((r: any) => ({ n: Number(r?.n), kind: KINDS.has(r?.kind) ? String(r.kind) : "other", keep: Boolean(r?.keep) }))
+      .filter((r: { n: number }) => Number.isInteger(r.n) && r.n >= 1 && r.n <= n);
+    if (!regions.length) return res.status(400).json({ error: "Model bölgeleri sınıflandıramadı — tekrar deneyin." });
+    res.json({ regions, model: used });
+  }),
+);
+
 /** Free-form (non-translate) AI image edit on the selected images via Manus. */
 router.post(
   "/api/ai/edit-images",

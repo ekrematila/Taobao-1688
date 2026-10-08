@@ -150,6 +150,8 @@ export const api = {
     req<import("@shared/types.ts").ManusAccountUsage>("/manus/usage" + qs(range)),
   archive: () => req<ArchiveEntry[]>("/archive"),
   saveArchive: (entry: Omit<ArchiveEntry, "createdAt"> & { payload: unknown }) => post("/archive", entry),
+  classifyRegions: (imageDataUrl: string, count: number, draftId?: string) =>
+    post<{ regions: { n: number; kind: string; keep: boolean }[]; model: string }>("/ai/classify-regions", { imageDataUrl, count, draftId }),
   saveMedia: (dataUrl: string) => post<{ url: string }>("/media", { dataUrl }),
   freeTranslate: (texts: string[], to = "en", from = "zh") =>
     post<{ results: string[]; engine: string }>("/translate/free", { texts, to, from }),
