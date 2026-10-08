@@ -155,3 +155,15 @@ export async function openaiListModelsDetailed(overrideKey?: string): Promise<{ 
   const j: any = await res.json();
   return (j?.data ?? []).map((m: any) => ({ id: String(m.id), created: Number(m.created) || 0 }));
 }
+
+let idsMemo: { at: number; key: string; ids: string[] } | null = null;
+
+/** Model ids for the Settings panel — one OpenAI call per half hour, not per page view. */
+export async function openaiModelIdsCached(force = false): Promise<string[]> {
+  const key = activeOpenAIKey();
+  if (!key) return [];
+  if (!force && idsMemo && idsMemo.key === key && Date.now() - idsMemo.at < 30 * 60 * 1000) return idsMemo.ids;
+  const ids = await openaiListModels();
+  idsMemo = { at: Date.now(), key, ids };
+  return ids;
+}

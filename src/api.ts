@@ -70,6 +70,7 @@ export const api = {
     req<{ models: import("@shared/models.ts").ClaudeModel[]; discovered: string[]; checkedAt: number; errors: string[] }>(
       "/models" + (refresh ? "?refresh=1" : ""),
     ),
+  openaiModels: (refresh = false) => req<{ ids: string[] }>("/openai/models" + (refresh ? "?refresh=1" : "")),
   verifyOpenAI: (key?: string) => post<import("@shared/types.ts").VerifyClaudeResult>("/verify/openai", { key }),
   verifyManus: (key?: string) => post<import("@shared/types.ts").VerifyManusResult>("/verify/manus", { key }),
   addManusAccount: (label: string, key: string) => post<Settings>("/settings/manus-accounts", { label, key }),

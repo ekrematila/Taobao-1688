@@ -29,6 +29,7 @@ const SYNC_FIELDS = [
   "onebound_secret",
   "anthropic_key",
   "openai_key",
+  "openai_defaults",
   "manus_key",
   "llm_model",
   "llm_effort",

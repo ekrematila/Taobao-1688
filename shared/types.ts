@@ -299,6 +299,8 @@ export interface Settings {
   hasOpenaiKey: boolean;
   openaiKeyHint: string;
   openaiKeySource: KeySource;
+  /** price/performance pick (or the operator's own) per purpose: text, code, image, speech… */
+  openaiDefaults: Record<string, string>;
   llmEffort: "low" | "medium" | "high" | "xhigh" | "max";
   llmThinking: "adaptive" | "off";
   llmFast: boolean;
@@ -348,6 +350,8 @@ export interface SettingsPatch {
   oneboundSecret?: string;
   anthropicKey?: string;
   openaiKey?: string;
+  /** per-purpose model picks; an empty string resets that purpose to the recommended default */
+  openaiDefaults?: Record<string, string>;
   manusKey?: string;
   clearAnthropicKey?: boolean;
   clearOpenaiKey?: boolean;

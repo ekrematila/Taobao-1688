@@ -4,7 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { env, ROOT, mask } from "./env.ts";
 import { db, getSetting, setSetting, now } from "./db.ts";
-import { activeOpenAIKey } from "./openai.ts";
+import { activeOpenAIKey, openaiModelIdsCached, OpenAIHttpError } from "./openai.ts";
+import { OPENAI_CATEGORIES } from "@shared/openaiModels.ts";
 import { normalizeManusProfile } from "@shared/models.ts";
 import { initModelCatalog, modelCatalog } from "./modelCatalog.ts";
 import { callOnebound, OneboundError, oneboundCreds } from "./onebound.ts";
@@ -248,6 +249,7 @@ async function currentSettings(): Promise<Settings> {
     hasOpenaiKey: Boolean(activeOpenAIKey()),
     openaiKeyHint: mask(activeOpenAIKey()),
     openaiKeySource: getSetting("openai_key") ? "ui" : env.openaiKey ? "env" : "none",
+    openaiDefaults: readOpenaiDefaults(),
     hasManusKey: manusConfigured(),
     manusKeyHint: mask(activeManusKey()),
     manusKeySource: manusFromDb ? "ui" : env.manusKey ? "env" : "none",
@@ -281,6 +283,18 @@ async function currentSettings(): Promise<Settings> {
     productionUrl: productionUrl(),
     productionConnected: productionConnected(),
   };
+}
+
+/** Per-purpose OpenAI model picks ({ text, code, image, speech, … } → model id). */
+function readOpenaiDefaults(): Record<string, string> {
+  try {
+    const raw = JSON.parse(getSetting("openai_defaults") ?? "{}");
+    const out: Record<string, string> = {};
+    for (const c of OPENAI_CATEGORIES) if (typeof raw?.[c] === "string" && raw[c]) out[c] = raw[c];
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 /** Built-in product-type presets + operator-added ones, de-duped, order preserved. */
@@ -332,6 +346,16 @@ router.post(
     }
     if (typeof p.anthropicKey === "string" && p.anthropicKey.trim()) setSetting("anthropic_key", p.anthropicKey.trim());
     if (typeof p.openaiKey === "string" && p.openaiKey.trim()) setSetting("openai_key", p.openaiKey.trim());
+    if (p.openaiDefaults && typeof p.openaiDefaults === "object") {
+      const next = readOpenaiDefaults();
+      for (const c of OPENAI_CATEGORIES) {
+        const v = (p.openaiDefaults as Record<string, unknown>)[c];
+        if (typeof v !== "string") continue;
+        if (v.trim()) next[c] = v.trim().slice(0, 80);
+        else delete next[c]; // empty = back to the recommended default
+      }
+      setSetting("openai_defaults", JSON.stringify(next));
+    }
     if (typeof p.manusKey === "string" && p.manusKey.trim()) setSetting("manus_key", p.manusKey.trim());
     if (typeof p.llmEffort === "string" && (EFFORT_LEVELS as readonly string[]).includes(p.llmEffort))
       setSetting("llm_effort", p.llmEffort);
@@ -433,6 +457,17 @@ router.post(
 router.get(
   "/api/models",
   wrap(async (req, res) => res.json(await modelCatalog(req.query.refresh === "1"))),
+);
+/** Every model id the OpenAI key can use (cached 30 min) — the Settings panel sorts them by purpose. */
+router.get(
+  "/api/openai/models",
+  wrap(async (req, res) => {
+    try {
+      res.json({ ids: await openaiModelIdsCached(req.query.refresh === "1") });
+    } catch (e) {
+      throw e instanceof OpenAIHttpError ? new LlmError(e.message, e.status === 401 ? 401 : 400) : e;
+    }
+  }),
 );
 router.post(
   "/api/verify/openai",

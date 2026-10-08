@@ -1,5 +1,6 @@
 import ModelOptions from "../components/ModelOptions";
 import ManusProfileOptions from "../components/ManusProfileOptions";
+import OpenAIModelsPanel from "../components/OpenAIModelsPanel";
 import { useModels } from "../lib/useModels";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -208,6 +209,7 @@ export default function SettingsPage() {
       await flushPrefs();
       const r = await api.verifyOpenAI(openaiKey || undefined);
       setVOpenai(r);
+      if (r.ok) qc.invalidateQueries({ queryKey: ["openai-models"] });
       if (r.ok && openaiKey) {
         await api.saveSettings({ openaiKey });
         setOpenaiKey("");
@@ -493,6 +495,14 @@ export default function SettingsPage() {
                 </button>
               )}
             </div>
+            {s.data?.hasOpenaiKey && (
+              <OpenAIModelsPanel
+                defaults={s.data.openaiDefaults ?? {}}
+                activeModel={model}
+                onUseAsActive={pickModel}
+                onSaved={() => s.refetch()}
+              />
+            )}
             {vOpenai && vOpenai !== "loading" && (
               <div className="verifybox">
                 <b className={vOpenai.ok ? "ok-t" : "err-t"}>
@@ -503,16 +513,6 @@ export default function SettingsPage() {
                   <>
                     <div className="tiny muted" style={{ margin: "6px 0 4px" }}>
                       {t("settings.claudeModelsProof")} — {vOpenai.models.length}
-                    </div>
-                    <div className="chips">
-                      {vOpenai.models
-                        .filter((m) => providerOf(m) === "openai")
-                        .slice(0, 60)
-                        .map((m) => (
-                          <span key={m} className={"chip" + (m === vOpenai.activeModel ? " active" : "")} style={{ cursor: "default" }}>
-                            {m}
-                          </span>
-                        ))}
                     </div>
                   </>
                 )}
