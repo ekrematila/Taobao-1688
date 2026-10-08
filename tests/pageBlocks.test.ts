@@ -53,12 +53,20 @@ test("normalizeStoreProfiles repairs junk and falls back to the defaults when no
   assert.deepEqual(out[0].links, [{ label: "ok", url: "https://x.com/c", keywords: ["kw"] }]);
 });
 
-test("the shipping block says what the policy says, escapes it, and always names the contact", () => {
-  const html = shipBlockHtml({ ...shopify("keyartisan-net"), returns: ["Returns <b>60</b> days"] });
+test("the shipping block is just tidy, centred links to the store's own policy pages (no policy text on the page)", () => {
+  const html = shipBlockHtml(shopify("keyartisan-net"));
   assert.match(html, /data-ps="ship"/);
-  assert.match(html, /Returns &lt;b&gt;60&lt;\/b&gt; days/);
+  assert.match(html, /text-align:center/);
+  assert.match(html, /href="https:\/\/keyartisan\.net\/policies\/shipping-policy"/);
+  assert.match(html, /href="https:\/\/keyartisan\.net\/policies\/refund-policy"/);
   assert.match(html, /mailto:hello@keyartisan\.net/);
-  assert.match(html, /Processing &amp; delivery/);
+  assert.doesNotMatch(html, /business days|\$8|60 days|restocking/, "no policy wording is pasted into the page");
+  // a custom policy address wins; a shop without one derives it from its own address
+  const custom = shipBlockHtml({ ...shopify("cuteitabags"), shippingUrl: "https://cuteitabags.com/pages/shipping" });
+  assert.match(custom, /cuteitabags\.com\/pages\/shipping/);
+  assert.match(custom, /cuteitabags\.com\/policies\/refund-policy/);
+  // Etsy shops have no policy pages to link to
+  assert.equal(shipBlockHtml({ ...shopify("etsy-keyartisanus"), contact: "Etsy Messages" }), "");
 });
 
 test("related links: only the store's own collections whose keywords appear in the product text, best first", () => {
@@ -121,6 +129,7 @@ test("pageBlocksFor builds the verified blocks from the saved profile; option th
   });
   const blocks = pageBlocksFor(p, { fields: [{ key: "title", value: "Clear Window Ita Bag" }] }, DEFAULT_STORE_PROFILES)!;
   assert.match(blocks.ship, /Shipping &amp; Returns/);
+  assert.match(blocks.related, /text-align:center/);
   assert.match(blocks.swatches, /data-ps="swatches"/);
   assert.match(blocks.swatches, /https:\/\/img\.alicdn\.com\/a\.jpg/, "a locally edited picture falls back to its public source for the placeholder");
   assert.match(blocks.related, /Clear window ita bags/);
@@ -131,7 +140,7 @@ test("pageBlocksFor builds the verified blocks from the saved profile; option th
   assert.equal(noProfile.ship, "");
 });
 
-test("description pictures: nothing opens, no 'Tap to zoom', no zoom on hover â€” only a small brightness lift", () => {
+test("description pictures: nothing opens, no 'Tap to zoom', no zoom or brightness change on hover", () => {
   // a page stored before this rule: zoom cursor + zoom tag + lightbox node + zoom hooks, as the old template produced
   const old =
     "<style>.bm{--ink:#222}.bm-media img{cursor:zoom-in}.bm-media img:hover{transform:scale(1.2)}.bm-lightbox{display:none}.bm-reveal{opacity:1}</style>" +
@@ -146,7 +155,7 @@ test("description pictures: nothing opens, no 'Tap to zoom', no zoom on hover â€
   assert.doesNotMatch(out, /data-bm-lightbox-img/);
   assert.match(out, /<img src="https:\/\/img\.example\.com\/a\.jpg"/, "the pictures are still there");
   const flat = out.replace(/\s+/g, "");
-  assert.match(flat, /\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/);
+  assert.match(flat, /\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:none!important/);
   assert.match(flat, /\.bm-mediaimg,\.bm-media\.bm-stage,\.pd-mediaimg\{cursor:default!important\}/);
   assert.match(flat, /\.bm-zoomtag,\.bm-lightbox,\[data-bm-lightbox\]\{display:none!important\}/);
   // the runtime no longer opens anything

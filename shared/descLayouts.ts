@@ -539,7 +539,7 @@ const fmtStyle = (block: string): string =>
 const BM_STYLE_EXTRA = fmtStyle(
   `<style>@media (prefers-reduced-motion:reduce){.bm *{animation-duration:.01ms!important;transition-duration:.01ms!important}}` +
   `.bm-reveal{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}.bm-reveal.bm-show{opacity:1;transform:none}` +
-  `.bm-media .bm-stage{position:relative}.bm-media img{transition:filter .3s cubic-bezier(.25,.8,.3,1);background:var(--sky,#eaeefc)}.bm-media img:hover{filter:brightness(1.06)}` +
+  `.bm-media .bm-stage{position:relative}.bm-media img{background:var(--sky,#eaeefc)}` +
   `.bm-faq{margin-top:6px;border:1px solid var(--line,rgba(79,87,196,.16));border-radius:12px;overflow:hidden}.bm-faq-item{border-bottom:1px solid var(--line,rgba(79,87,196,.16))}.bm-faq-item:last-child{border-bottom:0}` +
   `.bm-faq-q{list-style:none;cursor:pointer;width:100%;display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff;border:0;text-align:left;font-size:13.4px;font-weight:700;color:var(--acc,#4f57c4)}.bm-faq-q::-webkit-details-marker{display:none}.bm-faq-q::marker{content:""}` +
   `.bm-faq-q .bm-plus{flex:0 0 auto;width:18px;height:18px;position:relative;transition:transform .3s}.bm-faq-q .bm-plus::before,.bm-faq-q .bm-plus::after{content:"";position:absolute;background:var(--acc,#4f57c4);border-radius:2px;transition:opacity .3s}.bm-faq-q .bm-plus::before{left:0;top:50%;width:100%;height:2px;transform:translateY(-50%)}.bm-faq-q .bm-plus::after{top:0;left:50%;width:2px;height:100%;transform:translateX(-50%)}.bm-faq-item[open] .bm-plus,.bm-faq-item.is-open .bm-plus{transform:rotate(90deg)}.bm-faq-item[open] .bm-plus::after,.bm-faq-item.is-open .bm-plus::after{opacity:0}` +
@@ -725,18 +725,27 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //     regenerated CSS for `.bm-compat-eg .bm-eg` drops it (observed in
   //     production: "60%Anne Pro 2 · Ducky One 3 Mini · RK61" glued together
   //     with zero space, even though the stored reference example has the gap).
-  `.bm-compat-eg .bm-eg{display:flex!important;flex-wrap:wrap!important;align-items:baseline!important;gap:8px!important}` +
+  `.bm-compat-eg{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))!important;gap:6px 10px!important;margin:10px 0 0!important}` +
+  `.bm-compat-eg .bm-eg{display:flex!important;flex-wrap:nowrap!important;align-items:baseline!important;gap:10px!important;padding:7px 10px!important;font-size:12.5px!important;line-height:1.4!important}` +
+  `.bm-compat-eg .bm-eg b{flex:0 0 46px!important;min-width:46px!important;font-size:12.5px!important}` +
+  `.bm-compat-eg .bm-eg span{flex:1 1 auto!important;min-width:0!important;font-size:12.5px!important;font-weight:400!important}` +
+  `.bm-layouts-note{margin:10px 0 0!important;font-size:12.5px!important;line-height:1.5!important}` +
+  // 4d) feature rows: the emoji gets a fixed square so every icon sits on the same line as its title, whatever the model wrote
+  `.bm-feat li{display:flex!important;align-items:flex-start!important;gap:10px!important}` +
+  `.bm-feat li .ico{flex:0 0 30px!important;width:30px!important;height:30px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:18px!important;line-height:1!important;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}` +
+  `.bm-feat li .tx{flex:1 1 auto!important;min-width:0!important}` +
+  `.bm-feat li .tx b{display:block!important;margin:0 0 2px!important;line-height:1.3!important}` +
+  `.bm-feat li .tx .t{display:block!important;font-size:13px!important;line-height:1.45!important}` +
   // 4c) trust badges (Ships worldwide / Secure checkout / Support…) need a
   //     real hover affordance even when the model's own CSS forgot one.
   `.bm-trust span{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s cubic-bezier(.4,0,.2,1)!important}` +
   `.bm-trust span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,63,140,217),.28)!important;background:#fff!important}` +
-  // 4i) product photos: nothing opens, nothing zooms. No "Tap to zoom" tag, no lightbox, no zoom cursor, no scale
-  //     on hover — only a small brightness lift. Pages stored earlier (and the model's own CSS) may still carry the old
-  //     zoom bits, so they are switched off here for good.
+  // 4i) product photos: nothing opens, nothing zooms, nothing changes on hover — no "Tap to zoom" tag, no lightbox, no zoom
+  //     cursor, no scale, no brightness change. Pages stored earlier (and the model's own CSS) may still carry the old bits,
+  //     so they are switched off here for good.
   `.bm-zoomtag,.bm-lightbox,[data-bm-lightbox]{display:none!important}` +
   `.bm-media img,.bm-media .bm-stage,.pd-media img{cursor:default!important}` +
-  `.bm-media img,.pd-media img{transform:none!important;transition:filter .3s cubic-bezier(.25,.8,.3,1)!important}` +
-  `.bm-media img:hover,.pd-media img:hover{transform:none!important;filter:brightness(1.06)!important}` +
+  `.bm-media img,.pd-media img,.bm-media img:hover,.pd-media img:hover{transform:none!important;filter:none!important;transition:none!important}` +
   // 4j) the root card is capped for a narrow desktop theme column — widen it
   //     on devices that actually have the room (desktop/tablet) regardless of
   //     what the model's own `.bm{}` max-width says.
@@ -870,6 +879,57 @@ function forceBmAccDisclosure(html: string): string {
   return `${before}<details class="bm-acc" open><summary class="bm-bar">${label}</summary>${middle}</details>${after}`;
 }
 
+/** Google fonts the model may pick for a product (name → css2 family spec). Anything else is ignored. */
+const PRODUCT_FONTS: Record<string, string> = {
+  Fredoka: "Fredoka:wght@400;500;600;700",
+  Nunito: "Nunito:wght@400;600;700",
+  "Baloo 2": "Baloo+2:wght@400;600;700",
+  Poppins: "Poppins:wght@400;500;600;700",
+  "DM Sans": "DM+Sans:wght@400;500;700",
+  Inter: "Inter:wght@400;500;600;700",
+  "Playfair Display": "Playfair+Display:wght@400;600;700",
+  Lato: "Lato:wght@400;700",
+  Rajdhani: "Rajdhani:wght@400;500;600;700",
+  "DM Serif Display": "DM+Serif+Display",
+  Oswald: "Oswald:wght@400;500;600;700",
+  Barlow: "Barlow:wght@400;500;600;700",
+  Lora: "Lora:wght@400;500;600;700",
+  "Nunito Sans": "Nunito+Sans:wght@400;600;700",
+  Quicksand: "Quicksand:wght@400;500;600;700",
+  Montserrat: "Montserrat:wght@400;500;600;700",
+  "Space Grotesk": "Space+Grotesk:wght@400;500;600;700",
+};
+const SERIF = new Set(["Playfair Display", "DM Serif Display", "Lora"]);
+
+/** The model picks `--fh` / `--fb` (heading / body font) from a fixed list; load them and apply them page-wide. */
+export function applyProductFonts(html: string): string {
+  const pick = (v: string) => {
+    const m = html.match(new RegExp("--" + v + "\\s*:\\s*['\"]?([A-Za-z0-9 ]+?)['\"]?\\s*[;}]"));
+    const name = m?.[1]?.trim();
+    return name && PRODUCT_FONTS[name] ? name : "";
+  };
+  const fh = pick("fh");
+  const fb = pick("fb");
+  if (!fh && !fb) return html;
+  const fam = [...new Set([fh, fb].filter(Boolean))].map((n) => "family=" + PRODUCT_FONTS[n]).join("&");
+  const stack = (n: string) => `'${n}',${SERIF.has(n) ? "Georgia,serif" : "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif"}`;
+  const body = stack(fb || fh);
+  const head = stack(fh || fb);
+  const css =
+    `<style>@import url('https://fonts.googleapis.com/css2?${fam}&display=swap');` +
+    `.bm,.bm button,.bm summary{font-family:${body}!important}` +
+    `.bm h1,.bm h2,.bm h3,.bm .bm-eyebrow,.bm .bm-glance-t,.bm .bm-feat b,.bm .bm-sub,.bm summary.bm-bar{font-family:${head}!important}</style>`;
+  return css + html;
+}
+
+/** Drop the parts the operator does not want on a page: the "fun fact" line and the generic comparison table. */
+export function trimBmPage(html: string): string {
+  return html
+    .replace(/<p\b[^>]*class=["'][^"']*\bbm-trivia\b[^"']*["'][^>]*>[\s\S]*?<\/p>/gi, "")
+    .replace(/<h3\b[^>]*>[^<]*<\/h3>\s*<table\b[^>]*class=["'][^"']*\bbm-compare\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi, "")
+    .replace(/<table\b[^>]*class=["'][^"']*\bbm-compare\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi, "");
+}
+
 /** Guarantee a `.bm` styled block carries the no-JS guard and
  *  the runtime `<script>`. We NEVER trust a model-authored `<script>` here either
  *  (same reason as `ensurePdScaffold`): strip whatever the model wrote and inject
@@ -877,7 +937,7 @@ function forceBmAccDisclosure(html: string): string {
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
   let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
-  out = forceBmAccDisclosure(out);
+  out = trimBmPage(applyProductFonts(forceBmAccDisclosure(out)));
   out = forceCtaOnclick(out, "data-bm-goto-atc", BM_CTA_ONCLICK);
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   out = out

@@ -26,7 +26,7 @@ import {
 import { detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { readExample } from "./examples.ts";
 import { runManusTask, manusConfigured, imageForVision } from "./manus.ts";
-import { FACT_GUARD_ETSY, FACT_GUARD_RULE, GLANCE_RULE, adaptRule, evidenceText, findUnsupportedClaims, htmlToText, productText, storeFactsLine } from "@shared/pageBlocks.ts";
+import { BREVITY_RULE, FACT_GUARD_ETSY, FACT_GUARD_RULE, FONT_RULE, GLANCE_RULE, adaptRule, evidenceText, findUnsupportedClaims, htmlToText, productText, storeFactsLine } from "@shared/pageBlocks.ts";
 import { pickStoreProfile, profileText } from "@shared/storeProfiles.ts";
 import { readStoreProfiles } from "./storeProfiles.ts";
 import type {
@@ -78,7 +78,7 @@ function shopifyDescRuleOther(descImgN: number, isKeycapSet: boolean): string {
     "Görsel SEÇİMİYLE (hangi fotoğraf, tekrar/benzer kopya elemek) UĞRAŞMA — sistemimiz aynı fotoğrafın farklı boyuttaki kopyalarını zaten otomatik eler ve her slota gerçek, birbirinden farklı bir ürün fotoğrafı yerleştirir. Senin işin SADECE doğru sayıda/düzende `pd-media` slotu açmak.",
     "MUTLAK YASAK: kendi `<script>` YAZMA — FAQ native `<details>` ile, CTA `data-pd-goto-atc` + yukarıdaki inline `onclick` ile çalışır (JS silinse bile). Kendi script'in eklenirse SİLİNİR.",
     "BÖLÜM BAŞLIKLARI HEDEF DİLDE olacak — ASLA Çince başlık yazma ('套餐说明', '产品参数', '官方标配' vb. YASAK). Kaynaktaki Çince başlıkları hedef dile çevir.",
-    "UZUNLUK — KESİN: operatör bir karakter/satır bandı verdiyse görünen metin gövdesi O BANDIN İÇİNDE olMAK ZORUNDA. Bandın ALTINDA çıktı KABUL EDİLMEZ — kısa kaldıysan FAQ, spec satırı, feature kartı, spotlight/intro paragrafı ve uyumluluk notlarını GERÇEK bilgiyle genişleterek banda çık; üstündeysen dolguyu kes. `<style>` serbest ve ZORUNLU; `<iframe>` yok. Örnek metinleri KOPYALAMA.",
+    "UZUNLUK: operatörün bandı yalnızca ÜST sınırdır — bandın altında kalmak serbest ve tercih edilir; bandı doldurmak için asla metin/FAQ/rozet ekleme. Dolgu, tekrar, genel bilgi YOK (KISA VE ÖZ bloğu bunun için önceliklidir).",
     "EMOJİ ANİMASYONU: emoji/ikon taşıyan hover'larda (`.pd-<önek>__feature-ic` vb.) `transform:rotate(15deg)` + yumuşak `transition` — emoji hover'da 15° döner. Tüm geçişler smooth (cubic-bezier), ani/sert değil.",
     "EMOJİ SEÇİMİ: her emoji yanındaki METİNLE anlamca alakalı olsun (ör. malzeme satırında 🧵/🧱, kargo/teslimat satırında 🚚, güvenlik/ödeme satırında 🔒, temizlik/bakımda 🧼 gibi) — rastgele/dekoratif/alakasız emoji KULLANMA. Aynı emoji bölüm içinde gereksiz tekrar etmesin.",
     "Herhangi bir `*-reveal` sınıfı kullanırsan başlangıç durumu GÖRÜNÜR olsun (`opacity:1;transform:none`) — JS'e bağımlı görünmezlik YASAK, Shopify `<script>`'i siler.",
@@ -120,7 +120,7 @@ function shopifyDescRuleStacked(isKeycapSet: boolean): string {
     : '4) KEYCAP/KLAVYE DEĞİL — `.bm-grid>details.bm-acc-desc>.bm-c2>.bm-inner> <div class="bm-info bm-reveal">` şu bölümleri SIRAYLA içerir: `<p class="bm-lede">` güçlü 3-4 cümle (anahtarlar `<strong>`, İLK CÜMLE KISA); `<p class="bm-trivia">` ürünle ilgili 1 kısa ilginç bilgi; `<h3>Highlights</h3>`+`<ul class="bm-feat">` 5-6 `<li>`; `<h3>` (ürüne uygun bir başlık — ör. "Details & Fit" / "Size &amp; Colors" / "What\'s Included") + `<div class="bm-layouts">` içinde ürüne GERÇEKTEN uyan çipler (ör. gerçek boyut/renk/ölçü seçenekleri — 60%/TKL gibi klavye çipi YAZMA, UYDURMA seçenek de YAZMA, sadece gerçek veri varsa bu bölümü kullan, yoksa bu H3\'ü ATLA) + `<p class="bm-layouts-note">` kısa not; `<h3>Specifications</h3>`+`<div class="bm-spec">` (aşağıdaki SPECIFICATIONS kuralı, GERÇEK veriler); `<h3>` ürüne uygun bir "neden bu ürün / X vs Y" başlığı (ör. "Why Genuine Leather Over Faux", "Why This Fabric Lasts Longer" — ürünün GERÇEK malzeme/kalite farkına göre, PBT/ABS UYDURMA) + `<table class="bm-compare">` 4 satırlık karşılaştırma (`<td class="bm-yes">` üstün tarafta); `<h3>` ürüne uygun bir FAQ başlığı (ör. "Sizing &amp; Care", klavye/keycap kelimesi GEÇMESİN) + `<div class="bm-faq">` 5-7 tane NATIVE `<details class="bm-faq-item" name="bm-faq">` (HEPSİNDE `name="bm-faq"`, ilkinde ayrıca `open`) → `<summary class="bm-faq-q"><span>SORU</span><span class="bm-plus"></span></summary><div class="bm-faq-a"><p>CEVAP</p></div></details>` (JS YOK); `<div class="bm-note"><b>📦 In the box:</b> ürünün GERÇEK içeriği (uydurma keycap/puller YAZMA).<br><b>💬 Questions?</b> please contact us.</div>` (KISA — "message the store" YAZMA, "please contact us" kullan); `<div class="bm-cta"><p>kısa çağrı ✨</p><button type="button" data-bm-goto-atc onclick="…">🛒 Add to Cart</button></div>` — `onclick` içine ÖRNEK açıklamadaki CTA butonunun `onclick`\'ini AYNEN kopyala; `<div class="bm-trust">` 3 `<span>` güven rozeti.',
   '5) `<div class="bm-media"></div>` — BOŞ bırak (yorumla doldurabilirsin). Kendin `<img>` YAZMA; sistemimiz ürün görsellerini buraya düz resimler olarak dizer (tıklanınca açılmaz, Tap-to-zoom etiketi YOK, üzerine gelince yakınlaşma YOK — sadece hafif parlaklık artışı). Sen `.bm-lightbox`, `.bm-zoomtag`, `data-bm-zoom` YAZMA; `<script>`\'i sistem ekler. KENDİN `<script>` YAZMA — yazsan bile SİLİNİR. FAQ = native `<details>` (JS gerektirmez), CTA = `data-bm-goto-atc` + yukarıdaki inline `onclick` (JS silinse bile çalışır).',
   "TÜM emojiler/renkler/rozetler/highlight ikonları/layout çipleri/compare satırları/FAQ soruları/CTA metni ürünün tarzı-rengi-temasına göre DEĞİŞSİN. `.bm*` sınıf adlarını, `data-bm-*` kancalarını ve bölüm setini/yapısını DEĞİŞTİRME. Örnekteki 'Chiikawa' metnini KOPYALAMA — iskeleti taklit et, içeriği bu ürüne yaz.",
-  "UZUNLUK — KESİN: operatör bir karakter/satır bandı verdiyse çıktı O BANDIN İÇİNDE olMAK ZORUNDA (bu hedef `<style>` + CSS + şablon + tüm görünür metin dahil TÜM HTML'i sayar). Bandın ALTINDA bir çıktı KABUL EDİLMEZ — kısa kaldıysan FAQ (6-8'e çıkar), spec satırı, highlight, `bm-compare` satırı, `bm-trivia`, rozet ve `bm-lede`/`bm-note` paragraflarını GERÇEK bilgiyle genişleterek banda çık; bandın üstündeysen dolguyu kes. Dolgu/tekrar cümle YOK ama band alt sınırına MUTLAKA ulaş.",
+  "UZUNLUK: operatörün bandı yalnızca ÜST sınırdır — bandın altında kalmak serbest ve tercih edilir; bandı doldurmak için asla metin/FAQ/rozet ekleme. Dolgu, tekrar, genel bilgi YOK (KISA VE ÖZ bloğu bunun için önceliklidir).",
   "`.bm-reveal` kuralı `opacity:1;transform:none` olacak (hem `.bm-reveal` hem `.bm-reveal.bm-show`). Başta görünmez (`opacity:0`) yapıp JS ile açan efekt YASAK — Shopify `<script>`'i siler, açıklama BOŞ görünür.",
   "EMOJİ ANİMASYONU: emoji taşıyan hover'larda (özellikle `.bm-feat li:hover .ico`) `transform:rotate(15deg)` olacak; tüm hover/animasyon geçişleri `transition` ile YUMUŞAK (cubic-bezier) olsun, ani/sert geçiş yok.",
   "EMOJİ SEÇİMİ: her emoji yanındaki METİNLE anlamca alakalı olsun (ör. malzeme satırında 🧵/🧱, kargo/teslimatta 🚚, güvenlik/ödemede 🔒, temizlik/bakımda 🧼 gibi) — rastgele/dekoratif/alakasız emoji KULLANMA.",
@@ -881,7 +881,7 @@ export async function generateListing(
     let autoChars =
       8500 + descImgN * 1450 + specN * 340 + Math.min(variantN, 20) * 180 + Math.min(srcLen, 10000) * 0.55;
     autoChars = Math.max(7000, Math.min(44000, autoChars));
-    if (bandIsTotal) autoChars = 29000; // sensible default for the fixed .bm block
+    if (bandIsTotal) autoChars = 17000; // the .bm block is short on purpose: ~12k of it is the stylesheet, the copy is ~3k
 
     // explicit operator line/char band overrides the auto size — for BOTH layouts
     if (input.htmlLengthBand && /^\d+-\d+$/.test(input.htmlLengthBand)) {
@@ -913,6 +913,13 @@ export async function generateListing(
         budgetNote +
         ` Stil/şablon/CSS bu sayıya dahil değildir.`;
 
+    if (bandIsTotal) {
+      // short & tidy: the operator's band is only a CEILING for the .bm page (copy must stay ~3,000 chars)
+      const ceiling = Math.min(24000, Math.max(14000, targetChars));
+      htmlLenLine =
+        `HTML AÇIKLAMA — KISA VE ÖZ: TÜM HTML (\`<style>\` + CSS dahil) EN FAZLA ~${ceiling.toLocaleString("tr-TR")} karakter; GÖRÜNEN METİN ~3.000 karakteri GEÇMESİN. ` +
+        `Bu bir ÜST sınırdır — daha kısa olması iyidir; dolgu/tekrar/genel bilgi YOK.` + budgetNote;
+    }
     // token budget scales with the target so cheap modes really are cheaper
     // floor raised to 12k: even the leanest budget still needs room for the full
     // required HTML+CSS scaffold (hero/features/specs/FAQ/CTA or the .bm card) on
@@ -920,7 +927,7 @@ export async function generateListing(
     // bandIsTotal → targetChars is the whole HTML the model must emit, so give it
     // more headroom (output tokens + thinking) than the "visible body only" case.
     descMaxTokens = bandIsTotal
-      ? Math.round(Math.max(16000, Math.min(64000, targetChars / 2.6 + 8000)))
+      ? Math.round(Math.max(14000, Math.min(26000, targetChars / 2.6 + 7000)))
       : Math.round(Math.max(12000, Math.min(64000, targetChars / 3.1 + 6000)));
   }
   // a partial request that doesn't include the HTML description (e.g. "just
@@ -1122,7 +1129,7 @@ export async function generateListing(
     preferId: input.storeProfileId,
   });
   const guardBlock = isShopify
-    ? [FACT_GUARD_RULE, GLANCE_RULE, storeFactsLine(storeProfile)].filter(Boolean).join("\n")
+    ? [BREVITY_RULE, FACT_GUARD_RULE, GLANCE_RULE, isSelfContainedLayout(input.descriptionLayout) ? FONT_RULE : "", storeFactsLine(storeProfile)].filter(Boolean).join("\n")
     : [
         FACT_GUARD_ETSY,
         storeProfile ? `MAĞAZA GERÇEKLERİ (kargo/iade/işlem süresinden SÖZ EDECEKSEN yalnızca bunları kullan; başka rakam/vaat uydurma): ${profileText(storeProfile)}` : "",
@@ -1506,6 +1513,8 @@ export async function generateListing(
   const notTr = !/^tr/i.test(input.targetLanguage || "");
   for (const f of fields) {
     let g = applyKeycapGlossary(f.value);
+    // keycap sets never say "oriented" / "orientation" — it is a layout, so say layout
+    if (kb.isKeycapSet) g = g.replace(/\b(ANSI|ISO)[- ]oriented(?: (?:kit|set|layout))?/gi, "$1 layout").replace(/\blayout[- ]oriented\b/gi, "layout").replace(/\bfor orientation (?:only|purposes)\b/gi, "for reference only").replace(/\b(\w+)-oriented\b/gi, "$1");
     if (notTr) g = deTurkish(g);
     f.value = f.key === "description" ? dropCJK(g) : stripCJK(g);
   }

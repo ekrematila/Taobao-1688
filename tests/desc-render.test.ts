@@ -204,12 +204,13 @@ test("a model-authored onclick with broken syntax is replaced, not trusted", () 
   }
 });
 
-test("product photos never scale/zoom on hover (only brighten) and never show a zoom hint or open a lightbox", () => {
+test("product photos never scale, brighten or zoom on hover and never show a zoom hint or open a lightbox", () => {
   // The operator does not want pictures in the HTML description to open, to say "Tap to zoom", or to zoom on hover —
   // only a small brightness lift. Forced regardless of what the model's own CSS (or an older stored page) says.
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   const flat = out.replace(/\s+/g, "");
-  assert.ok(/\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:brightness\(1\.06\)!important\}/.test(flat), "hover brightens, never scales");
+  assert.ok(/\.bm-mediaimg:hover,\.pd-mediaimg:hover\{transform:none!important;filter:none!important/.test(flat), "hover changes nothing: no scale, no brightness");
+  assert.ok(!/brightness\(1\.06\)/.test(flat), "the old brightness lift is gone");
   assert.ok(/\.bm-zoomtag,\.bm-lightbox,\[data-bm-lightbox\]\{display:none!important\}/.test(flat), "zoom tag / lightbox are switched off");
   assert.ok(/cursor:default!important/.test(flat), "no zoom-in cursor");
   assert.ok(!/Tapto zoom/i.test(flat) && !/ data-bm-zoom/.test(out) && !/<div[^>]*data-bm-lightbox/.test(out) && !/<span[^>]*bm-zoomtag/.test(out), "no tag, hook or lightbox node is rendered");
@@ -319,7 +320,8 @@ test("Compatible Layouts example rows always get a real gap, even if the model's
   );
   const out = renderDescriptionHtml("stacked-plain", strippedGap, imgs);
   const flat = out.replace(/\s+/g, "");
-  assert.ok(/\.bm-compat-eg\.bm-eg\{display:flex!important[^}]*gap:8px!important/.test(flat), "gap forced even with model's gap-less rule");
+  assert.ok(/\.bm-compat-eg\.bm-eg\{display:flex!important[^}]*gap:10px!important/.test(flat), "gap forced even with model's gap-less rule");
+  assert.ok(/\.bm-compat-eg\{display:grid!important/.test(flat), "rows sit in one tidy grid");
 });
 
 test("trust badges always get a hover affordance, even if the model's CSS forgot one", () => {
@@ -412,4 +414,26 @@ test("no country-flag emoji and no literal 'ISO Enter' phrase in the examples", 
     assert.ok(!/[\uD83C][\uDDE6-\uDDFF]/.test(out), "no regional-indicator flag emoji");
     assert.ok(!/ISO Enter\b/.test(out), "phrase 'ISO Enter' avoided");
   }
+});
+
+test("the model's two font variables load a matching web font page-wide (only fonts from the allowed list)", () => {
+  const page = "<style>.bm{--fh:'Fredoka';--fb:'Nunito';--ink:#222}.bm-reveal{opacity:1}</style><div class=\"bm\"><div class=\"bm-cta\"><button data-bm-goto-atc>x</button></div></div>";
+  const out = renderDescriptionHtml("stacked-plain", page, imgs);
+  assert.match(out, /@import url\('https:\/\/fonts\.googleapis\.com\/css2\?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap'\)/);
+  assert.match(out, /\.bm h1,\.bm h2,\.bm h3[^{]*\{font-family:'Fredoka'/);
+  assert.match(out, /\.bm,\.bm button,\.bm summary\{font-family:'Nunito'/);
+  // an unknown / injected name is ignored, nothing is loaded
+  const bad = renderDescriptionHtml("stacked-plain", page.replace("'Fredoka'", "'Evil;}body{x'").replace("'Nunito'", "'Comic Sans'"), imgs);
+  assert.doesNotMatch(bad, /fonts\.googleapis\.com/);
+});
+
+test("the 'fun fact' line and the generic comparison table are dropped from a page", () => {
+  const page =
+    "<style>.bm{--a:1}.bm-reveal{opacity:1}</style><div class=\"bm\"><p class=\"bm-lede\">keep</p><p class=\"bm-trivia\">💡 Fun fact: polycarbonate is used in lenses</p>" +
+    "<h3>Why PC over matte</h3><table class=\"bm-compare\"><tr><td>x</td></tr></table><h3>FAQ</h3></div>";
+  const out = renderDescriptionHtml("stacked-plain", page, imgs);
+  assert.match(out, /keep/);
+  const markup = out.replace(/<style[\s\S]*?<\/style>/g, "");
+  assert.doesNotMatch(markup, /Fun fact|bm-compare|Why PC over matte/);
+  assert.match(out, /<h3>FAQ<\/h3>/);
 });

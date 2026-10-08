@@ -16,28 +16,28 @@ const escH = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g,
 /* ------------------------------ block HTML ------------------------------ */
 
 const BOX =
-  "margin:18px 0;padding:16px 18px;border:1px solid var(--line2,#e4e4e7);border-radius:var(--r,14px);background:var(--milk,#fafafa);color:var(--body,#3f3f46);font-size:14px;line-height:1.6;text-align:left";
-const H = "margin:0 0 8px;font-size:15px;line-height:1.3;color:var(--head,var(--ink,#18181b))";
+  "margin:18px 0;padding:16px 18px;border:1px solid var(--line2,#e4e4e7);border-radius:var(--r,14px);background:var(--milk,#fafafa);color:var(--body,#3f3f46);font-size:14px;line-height:1.6;text-align:center";
+const PILL =
+  "display:inline-block;margin:4px 5px 0;padding:8px 16px;border:1px solid var(--line2,#d4d4d8);border-radius:999px;color:var(--head,var(--ink,#18181b));font-size:13px;font-weight:600;line-height:1.2;text-decoration:none;background:#fff";
+const H = "margin:0 0 10px;font-size:15px;line-height:1.3;text-align:center;color:var(--head,var(--ink,#18181b))";
 const SUB = "margin:10px 0 4px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--head,var(--ink,#18181b))";
 const UL = "margin:0;padding-left:18px";
 
 const li = (s: string) => `<li style="margin:2px 0">${escH(s)}</li>`;
 
 export function shipBlockHtml(p: StoreProfile): string {
-  const ship = [p.processing, ...p.shipping].filter(Boolean);
-  const ret = p.returns.filter(Boolean);
-  const more = p.extra.filter(Boolean);
-  if (!ship.length && !ret.length) return "";
-  const contact = p.contact ? `<p style="margin:10px 0 0;font-size:13px">Questions? ${/@/.test(p.contact) ? `Email <a href="mailto:${escH(p.contact)}" style="color:inherit;text-decoration:underline">${escH(p.contact)}</a>` : `Message us via ${escH(p.contact)}`} — we are happy to help.</p>` : "";
-  return (
-    `<div data-ps="ship" style="${BOX}">` +
-    `<h3 style="${H}">🚚 Shipping &amp; Returns</h3>` +
-    (ship.length ? `<p style="${SUB}">Processing &amp; delivery</p><ul style="${UL}">${ship.map(li).join("")}</ul>` : "") +
-    (ret.length ? `<p style="${SUB}">Returns &amp; cancellations</p><ul style="${UL}">${ret.map(li).join("")}</ul>` : "") +
-    (more.length ? `<p style="${SUB}">Good to know</p><ul style="${UL}">${more.map(li).join("")}</ul>` : "") +
-    contact +
-    `</div>`
-  );
+  const base = p.url.replace(/\/+$/, "");
+  const shipUrl = p.shippingUrl || (p.kind === "shopify" && base ? `${base}/policies/shipping-policy` : "");
+  const retUrl = p.returnsUrl || (p.kind === "shopify" && base ? `${base}/policies/refund-policy` : "");
+  const pill = (href: string, label: string, ext = true) =>
+    `<a href="${escH(href)}"${ext ? ' target="_blank" rel="noopener"' : ""} style="${PILL}">${escH(label)}</a>`;
+  const links = [
+    shipUrl && pill(shipUrl, "Shipping policy →"),
+    retUrl && pill(retUrl, "Returns & refunds →"),
+    p.contact && /@/.test(p.contact) && pill(`mailto:${p.contact}`, "Contact us →", false),
+  ].filter(Boolean);
+  if (!links.length) return "";
+  return `<div data-ps="ship" style="${BOX}"><h3 style="${H}">🚚 Shipping &amp; Returns</h3><div>${links.join("")}</div></div>`;
 }
 
 /** up to `max` of the store's own collection links whose keywords appear in the product text */
@@ -53,10 +53,7 @@ export function pickRelatedLinks(p: StoreProfile, productText: string, max = 3):
 export function relatedBlockHtml(links: { label: string; url: string }[]): string {
   if (!links.length) return "";
   const a = links
-    .map(
-      (l) =>
-        `<a href="${escH(l.url)}" target="_blank" rel="noopener" style="display:inline-block;margin:4px 6px 0 0;padding:7px 13px;border:1px solid var(--line2,#d4d4d8);border-radius:999px;color:var(--head,var(--ink,#18181b));font-size:13px;text-decoration:none;background:var(--milk,#fff)">${escH(l.label)} →</a>`,
-    )
+    .map((l) => `<a href="${escH(l.url)}" target="_blank" rel="noopener" style="${PILL}">${escH(l.label)} →</a>`)
     .join("");
   return `<div data-ps="related" style="${BOX}"><h3 style="${H}">💫 You may also like</h3><div>${a}</div></div>`;
 }
@@ -75,7 +72,7 @@ export function swatchBlockHtml(items: Swatch[]): string {
         `<figure style="margin:0;text-align:center;width:76px"><img src="${escH(s.url)}" alt="${escH(s.name)}" loading="lazy" style="width:68px;height:68px;object-fit:cover;border-radius:12px;border:1px solid var(--line2,#e4e4e7);display:block;margin:0 auto"><figcaption style="margin-top:4px;font-size:12px;line-height:1.25">${escH(s.name)}</figcaption></figure>`,
     )
     .join("");
-  return `<div data-ps="swatches" style="${BOX}"><h3 style="${H}">🎨 Available options</h3><div style="display:flex;flex-wrap:wrap;gap:10px">${cells}</div></div>`;
+  return `<div data-ps="swatches" style="${BOX}"><h3 style="${H}">🎨 Available options</h3><div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">${cells}</div></div>`;
 }
 
 export interface PageBlocks {
@@ -157,6 +154,28 @@ export const FACT_GUARD_RULE = [
   "- MÜŞTERİYE KONUŞ: 'source', 'supplied details', 'listing data', 'the information provided', 'not established', 'not specified' gibi iç/veri dili ASLA kullanma. Fotoğraflardan söz edersen 'pictured/shown' de, 'the photos show' değil.",
   "- Kargo, teslimat süresi, ücret, iade, işlem süresi, iptal, gümrük, ödeme yöntemi HAKKINDA HİÇBİR ŞEY YAZMA (SSS'de bile) — sayfaya sistem GERÇEK mağaza politikasından doğrulanmış bir 'Shipping & Returns' bloğu ekliyor. SSS'de bu konuda soru çıkarsa cevap: 'Please see the Shipping & Returns section below.' (kısa).",
   "- 'Ships worldwide', 'free shipping', 'N-day returns', 'money-back' gibi ifadeler YAZMA (bm-trust rozetlerinde bile: rozetler 'Secure checkout', 'Support before & after purchase', 'Carefully packed' gibi doğrulanabilir şeyler olsun).",
+  "- KEYCAP/KLAVYE: 'oriented' / 'orientation' kelimeleri ASLA kullanılmaz ('ANSI-oriented', 'for orientation only' YASAK). Düzenden söz edeceksen 'layout' de ('ANSI & ISO layout compatible').",
+  "- ALAKASIZ BİLGİ YOK: ürünle doğrudan ilgisi olmayan genel bilgi, 'fun fact', malzeme tarihçesi, benzetme/süs cümlesi YAZMA.",
+].join("\n");
+
+/** The page must be short and tidy — takes priority over every section/length rule in the template prompt. */
+export const BREVITY_RULE = [
+  "KISA VE ÖZ — BU BLOK, ŞABLONDAKİ TÜM BÖLÜM/UZUNLUK KURALLARINDAN ÖNCELİKLİDİR (operatör: 'çok fazla yazı olmasın, alakasız şey yazma'):",
+  "- Görünen metnin TOPLAMI ~3.000 karakteri GEÇMESİN. Dolgu, tekrar, süs cümlesi YOK. Her satır müşterinin karar vermesine yarasın.",
+  "- `bm-lede`: EN FAZLA 2 kısa cümle. `bm-trivia` (fun fact) HİÇ YAZMA. `bm-compare` karşılaştırma tablosunu (ve başlığını) HİÇ YAZMA.",
+  "- Highlights: 4–5 madde; her madde = kalın başlık (≤4 kelime) + TEK kısa satır (≤12 kelime).",
+  "- Specifications: 8–12 satır, her değer kısa; açıklama cümlesi yok.",
+  "- Compatible Layouts (sadece keycap/klavye): boyut çipleri + tuş sayısı çipleri + `bm-compat-eg` içinde HER satır yalnız `<b>60%</b><span>Model A · Model B · Model C</span>` (SADECE model adları, CÜMLE YOK); `bm-layouts-note` EN FAZLA 2 kısa cümle (spacebar/shift detay paragrafı YOK).",
+  "- SSS: 4–5 soru; her cevap EN FAZLA 2 kısa cümle (~25 kelime). Kargo/iade sorusu YOK.",
+  "- `bm-note` tek kısa satır; CTA tek cümle.",
+  "- Bölüm sayısı ve uzunluk için operatörün bandı yalnızca ÜST sınırdır: bandın altında kalmak SERBEST ve TERCİH EDİLİR; bandı doldurmak için asla metin ekleme.",
+].join("\n");
+
+/** Typography that fits the product (the system loads the web font from the two variables the model sets). */
+export const FONT_RULE = [
+  "TİPOGRAFİ — ürüne uygun: `.bm{}` bloğuna iki değişken ekle: `--fh:'Başlık Fontu';` ve `--fb:'Gövde Fontu';` (yalnızca aşağıdaki listeden, tırnaklı tek isim). Font da ürünün havasına uysun:",
+  "sevimli/kawaii/pastel → Fredoka + Nunito · anime/eğlenceli → Baloo 2 + Poppins · minimal/temiz/modern → DM Sans + Inter · zarif/premium/lüks → Playfair Display + Lato · gaming/fütüristik/teknik → Rajdhani + Inter · retro/vintage → DM Serif Display + DM Sans · koyu/dramatik → Oswald + Barlow · doğal/toprak/matcha → Lora + Nunito Sans · canlı/renkli/cesur → Poppins + Montserrat · tatlı/yumuşak (alternatif) → Quicksand + Nunito Sans · geek/tech minimal → Space Grotesk + Inter.",
+  "Sistem bu iki fontu otomatik yükler ve tüm sayfaya uygular — sen `font-family`'yi ayrıca yazma; renk, rozet, emoji ve metin tonu da aynı havaya uysun.",
 ].join("\n");
 
 /** Etsy (plain-text) listings: the same honesty rule, shorter. */
@@ -167,8 +186,8 @@ export const FACT_GUARD_ETSY = [
 
 /** At-a-glance summary — mobile first, facts only. */
 export const GLANCE_RULE = [
-  "ÖZET KUTUSU (At a glance) — sayfanın EN ÜSTÜNDE kısa özet: `.bm-info` içinde `<p class=\"bm-lede\">` paragrafının HEMEN ÖNCESİNE şu bloğu koy (CSS'i sistem ekler, sen yazma): `<div class=\"bm-glance\"><p class=\"bm-glance-t\">At a glance</p><ul><li><b>Etiket:</b> değer</li>…</ul></div>`.",
-  "3–6 madde; yalnızca DOĞRULANMIŞ olgular: ürün türü, boyut/ölçü (yalnızca kaynakta/operatör notunda varsa — sayıyla), ağırlık (varsa), malzeme (varsa), kapanış (varsa), renk/seçenek sayısı ve adları, stil/tema, ürüne has 1 öne çıkan özellik. Bilinmeyen bir etiketi ATLA — 'N/A', 'see photos', 'not specified' YAZMA. Maddeler tek satır, kısa.",
+  "ÖZET KUTUSU (At a glance) — sayfanın EN ÜSTÜNDE kısa özet (ÇOK KISA): `.bm-info` içinde `<p class=\"bm-lede\">` paragrafının HEMEN ÖNCESİNE şu bloğu koy (CSS'i sistem ekler, sen yazma): `<div class=\"bm-glance\"><p class=\"bm-glance-t\">At a glance</p><ul><li><b>Etiket:</b> değer</li>…</ul></div>`.",
+  "3–5 madde, her biri 1–5 kelime değer; yalnızca DOĞRULANMIŞ olgular: ürün türü, boyut/ölçü (yalnızca kaynakta/operatör notunda varsa — sayıyla), ağırlık (varsa), malzeme (varsa), kapanış (varsa), renk/seçenek sayısı ve adları, stil/tema, ürüne has 1 öne çıkan özellik. Bilinmeyen bir etiketi ATLA — 'N/A', 'see photos', 'not specified' YAZMA. Maddeler tek satır, kısa.",
 ].join("\n");
 
 /** "Adapt the current page to this product" mode. */
@@ -249,7 +268,7 @@ const RULES: Rule[] = [
   { id: "canvas", re: /\bcanvas\b/i, ok: /帆布|canvas/i, why: "Malzeme (kanvas) kaynakta yok" },
   { id: "silicone", re: /\b(silicone|stainless steel|zinc alloy|brass)\b/i, ok: /硅胶|不锈钢|锌合金|黄铜|silicone|stainless|zinc|brass/i, why: "Malzeme kaynakta yok" },
   { id: "capacity", re: /\b(fits|holds|big enough for|room for) (a |an |your )?(phone|smartphone|ipad|tablet|laptop|water bottle|umbrella|wallet)\b/i, ok: /容量|可放|能装|可装|手机|phone|ipad|capacity|装/i, why: "Kapasite ('şunu alır') kaynakta yok" },
-  { id: "claims", re: /\b(hypoallergenic|BPA[- ]free|non-toxic|food[- ]safe|eco-friendly|hand-?made|officially licensed|official merch|limited edition)\b/i, ok: /无毒|环保|手工|手作|正版|授权|限量|官方|hand-?made|licensed|official|limited|non-toxic|eco/i, why: "Bu iddia (hipoalerjenik/handmade/lisanslı vb.) kaynakta yok" },
+  { id: "claims", re: /\b(hypoallergenic|BPA[- ]free|non-toxic|food[- ]safe|eco-friendly|hand-?made|hand-?drawn|hand-?painted|officially licensed|official merch|limited edition)\b/i, ok: /无毒|环保|手工|手作|手绘|正版|授权|限量|官方|hand-?made|hand-?drawn|licensed|official|limited|non-toxic|eco/i, why: "Bu iddia (hipoalerjenik/handmade/lisanslı vb.) kaynakta yok" },
   { id: "policy", re: /\b(free shipping|free returns?|hassle[- ]free returns?|money[- ]back|\d+[- ]day returns?|ships? within \d+|delivered in \d+)\b/i, ok: /(?!)/, why: "Kargo/iade iddiası AI tarafından yazılmış — sayfaya doğrulanmış mağaza bloğu otomatik ekleniyor" },
   { id: "datalang", re: /\b(supplied product details|the source (says|identifies|lists)|source listing|listing data|not established by|is not specified|not provided in)\b/i, ok: /(?!)/, why: "Müşteriye gösterilmemesi gereken iç/veri dili" },
 ];

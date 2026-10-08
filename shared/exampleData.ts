@@ -245,7 +245,6 @@ export const STACKED_DESC_EXAMPLE = `<style>
   backface-visibility:hidden; -webkit-backface-visibility:hidden;
   transition:filter .3s cubic-bezier(.25,.8,.3,1); background:var(--sky);
 }
-.bm-media img:hover{filter:brightness(1.06)}
 @keyframes bmFade{from{opacity:0} to{opacity:1}}
 .bm-info{padding:20px 18px; border:1px solid var(--line); border-radius:var(--r); background:var(--milk)}
 .bm-info h3{margin:0 0 10px; font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gold)}

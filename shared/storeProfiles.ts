@@ -28,6 +28,9 @@ export interface StoreProfile {
   /** customs / payment / other customer-facing lines */
   extra: string[];
   contact: string;
+  /** the store's own full policy pages — the product page links to these (no policy text on the page itself) */
+  shippingUrl?: string;
+  returnsUrl?: string;
   links: StoreLink[];
   /** operator-only remarks (conflicts found on the live store, things to double check) — never shown to customers */
   notes: string;
@@ -90,6 +93,8 @@ export const DEFAULT_STORE_PROFILES: StoreProfile[] = [
     ],
     extra: ["Customs delays can affect delivery time for international orders."],
     contact: "hello@keyartisan.net",
+    shippingUrl: "https://keyartisan.net/policies/shipping-policy",
+    returnsUrl: "https://keyartisan.net/policies/refund-policy",
     links: KEY_LINKS,
     notes:
       "Read from keyartisan.net/policies/shipping-policy and refund-policy. Express shipping is listed on the policy page as 'will be added in the future', so it is NOT promised. The policy does not say whether the 15% fee also applies inside the 60-day window — check with the policy owner.",
@@ -119,6 +124,8 @@ export const DEFAULT_STORE_PROFILES: StoreProfile[] = [
       "We accept Visa, Mastercard, American Express, PayPal, Apple Pay, Google Pay and Shop Pay.",
     ],
     contact: "hello@cuteitabags.com",
+    shippingUrl: "https://cuteitabags.com/policies/shipping-policy",
+    returnsUrl: "https://cuteitabags.com/policies/refund-policy",
     links: BAG_LINKS,
     notes:
       "Read from cuteitabags.com/policies/shipping-policy and refund-policy. CONFLICT on the live store: the homepage banners say 'free shipping on orders $49+' / 'over $50' while the shipping policy page says $8 under $50 · $10 for $50–$99 · free from $100. Customer-facing text therefore does not state a free-shipping threshold or shipping prices — fix the banner or the policy, then add the right line here. The homepage also says 'Full Tracking With Every Order' while the policy says tracking when available; the policy wording is used.",
@@ -225,6 +232,8 @@ export function normalizeStoreProfiles(raw: unknown): StoreProfile[] {
       returns: strs(r.returns),
       extra: strs(r.extra),
       contact: String(r.contact || "").trim(),
+      shippingUrl: /^https?:\/\//i.test(String(r.shippingUrl || "").trim()) ? String(r.shippingUrl).trim() : undefined,
+      returnsUrl: /^https?:\/\//i.test(String(r.returnsUrl || "").trim()) ? String(r.returnsUrl).trim() : undefined,
       links: (Array.isArray(r.links) ? r.links : [])
         .map((l: any) => ({ label: String(l?.label || "").trim(), url: String(l?.url || "").trim(), keywords: strs(l?.keywords).map((k) => k.toLowerCase()) }))
         .filter((l: StoreLink) => l.label && /^https?:\/\//i.test(l.url)),

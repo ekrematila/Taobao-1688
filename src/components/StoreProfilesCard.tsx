@@ -139,6 +139,18 @@ export default function StoreProfilesCard({ profiles }: { profiles: StoreProfile
                     {t("settings.stores.fExtra")}
                     <ListArea rows={2} value={p.extra} ser={lines} parse={unlines} onChange={(v) => patch(p.id, { extra: v })} />
                   </label>
+                  {p.kind === "shopify" && (
+                    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                      <label className="field" style={{ flex: 1, minWidth: 220 }}>
+                        {t("settings.stores.fShipUrl")}
+                        <input value={p.shippingUrl ?? ""} placeholder={`${p.url.replace(/\/+$/, "")}/policies/shipping-policy`} onChange={(e) => patch(p.id, { shippingUrl: e.target.value.trim() || undefined })} />
+                      </label>
+                      <label className="field" style={{ flex: 1, minWidth: 220 }}>
+                        {t("settings.stores.fRetUrl")}
+                        <input value={p.returnsUrl ?? ""} placeholder={`${p.url.replace(/\/+$/, "")}/policies/refund-policy`} onChange={(e) => patch(p.id, { returnsUrl: e.target.value.trim() || undefined })} />
+                      </label>
+                    </div>
+                  )}
                   <label className="field">
                     {t("settings.stores.fContact")}
                     <input value={p.contact} onChange={(e) => patch(p.id, { contact: e.target.value })} />

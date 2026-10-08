@@ -101,8 +101,8 @@ export default function DeliveryStudio({
   const [htmlBudget, setHtmlBudget] = useState<"full" | "lean" | "min">("full");
   // explicit length override for "Diğer HTML düzenler" — leave unset to use the
   // auto-sized target; set a band to pin it (still styled HTML either way).
-  const [htmlBand, setHtmlBand] = useState("400-500");
-  const [htmlUnit, setHtmlUnit] = useState<"line" | "char">("line");
+  const [htmlBand, setHtmlBand] = useState("16000-22000");
+  const [htmlUnit, setHtmlUnit] = useState<"line" | "char">("char");
   const [descModel, setDescModel] = useState(""); // "" = same as the main model
   const [genEffort, setGenEffort] = useState<string>(""); // "" = app default
   const [genThinking, setGenThinking] = useState<string>("");
@@ -224,8 +224,8 @@ export default function DeliveryStudio({
       setFieldCfg(dc.fieldCfg ?? {});
       setBrand(dc.brand ?? "");
       setHtmlBudget(dc.htmlBudget === "lean" || dc.htmlBudget === "min" ? dc.htmlBudget : "full");
-      setHtmlBand(dc.htmlBand ?? "400-500");
-      setHtmlUnit(dc.htmlUnit === "char" ? "char" : "line");
+      setHtmlBand(dc.htmlBand ?? "16000-22000");
+      setHtmlUnit(dc.htmlUnit === "line" ? "line" : "char");
       setDescModel(typeof dc.descModel === "string" ? dc.descModel : "");
       setGenEffort(typeof dc.genEffort === "string" ? dc.genEffort : "");
       setGenThinking(typeof dc.genThinking === "string" ? dc.genThinking : "");
