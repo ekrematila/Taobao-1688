@@ -30,8 +30,11 @@ export interface Piece extends Rect {
   suspect: boolean;
 }
 export interface SplitOptions {
-  /** 0..100 (default 50): higher = cuts more eagerly; from 65 up it also cuts hard seams with no gutter */
+  /** 0..100 (default 50): higher = cuts more eagerly */
   sensitivity?: number;
+  /** also cut hard seams where two pictures touch with NO gutter (a horizon inside one photo can look the same,
+   *  so it is opt-in). Default: on from sensitivity 65 up. */
+  seams?: boolean;
   /** smallest piece side as a fraction of the image's shorter side (default 0.1) */
   minPiece?: number;
 }
@@ -160,7 +163,7 @@ function sideCoverage(img: Pixels, r: Rect, axis: Axis, from: number, to: number
  *     12 %, thin light lines up to 3 %;
  *   - a hard seam (only at high sensitivity) needs edge-to-edge content on BOTH sides.
  */
-function cutAxis(img: Pixels, r: Rect, axis: Axis, sens: number, minLen: number): Rect[] {
+function cutAxis(img: Pixels, r: Rect, axis: Axis, sens: number, minLen: number, seams: boolean): Rect[] {
   const lines = axis === "rows" ? r.h : r.w;
   const cross = axis === "rows" ? r.w : r.h;
   if (lines < minLen * 2) return [r]; // can't hold two real pieces — cutting further would only shred it
@@ -226,9 +229,9 @@ function cutAxis(img: Pixels, r: Rect, axis: Axis, sens: number, minLen: number)
     }
     i = j;
   }
-  // Hard seams (two pictures butted with no gutter) are opt-in via a high sensitivity: a strong
-  // edge across a single photo (horizon, table edge) looks the same, so by default only gutters cut.
-  for (let i = 1; sens >= 65 && i < lines; i++) {
+  // Hard seams (two pictures butted with no gutter) are opt-in: a strong edge across a single
+  // photo (horizon, table edge) looks the same, so by default only gutters cut.
+  for (let i = 1; seams && i < lines; i++) {
     if (flat[i] || flat[i - 1]) continue;
     const around: number[] = [];
     for (let k = Math.max(1, i - 6); k <= Math.min(lines - 1, i + 6); k++) if (k !== i) around.push(p.diff[k]);
@@ -283,13 +286,13 @@ function sameRect(a: Rect, b: Rect) {
   return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
 
-function xyCut(img: Pixels, r: Rect, sens: number, minLen: number, depth: number, out: Rect[]) {
+function xyCut(img: Pixels, r: Rect, sens: number, minLen: number, seams: boolean, depth: number, out: Rect[]) {
   if (out.length > MAX_PIECES * 3) return;
   if (depth < 10) {
     for (const axis of ["cols", "rows"] as Axis[]) {
-      const segs = cutAxis(img, r, axis, sens, minLen);
+      const segs = cutAxis(img, r, axis, sens, minLen, seams);
       if (segs.length !== 1 || !sameRect(segs[0], r)) {
-        for (const s of segs) xyCut(img, s, sens, minLen, depth + 1, out);
+        for (const s of segs) xyCut(img, s, sens, minLen, seams, depth + 1, out);
         return;
       }
     }
@@ -334,7 +337,7 @@ export function splitRegions(img: Pixels, opts: SplitOptions = {}): Piece[] {
   const minFrac = Math.max(0.02, Math.min(0.5, opts.minPiece ?? 0.1));
   const minSide = Math.max(24, Math.round(minFrac * Math.min(img.width, img.height)));
   const leaves: Rect[] = [];
-  xyCut(img, { x: 0, y: 0, w: img.width, h: img.height }, sens, minSide, 0, leaves);
+  xyCut(img, { x: 0, y: 0, w: img.width, h: img.height }, sens, minSide, opts.seams ?? sens >= 65, 0, leaves);
   const pieces: Piece[] = [];
   for (const r of leaves) {
     if (r.w < minSide || r.h < minSide) continue;

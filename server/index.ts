@@ -262,7 +262,7 @@ async function currentSettings(): Promise<Settings> {
     llmFast: activeFast(),
     llmEffortLevels: [...EFFORT_LEVELS],
     llmFastModels: [...FAST_MODELS],
-    manusAgentProfile: normalizeManusProfile(getSetting("manus_agent_profile") ?? env.manusAgentProfile) ?? "standard",
+    manusAgentProfile: normalizeManusProfile(getSetting("manus_agent_profile") ?? env.manusAgentProfile) ?? "lite",
     manusBase: env.manusBase,
     manusUsdPerCredit: manusUsdPerCredit(),
     manusCredits: await manusCredits(),
@@ -835,7 +835,7 @@ router.post(
           logManusUsage("category-research", mr.creditsUsed, mr.creditsEstimated, draft.id, mr.taskId, {
             text: mr.research,
           });
-        r = { research: mr.research, model: normalizeManusProfile(agentProfile) ?? "standard" };
+        r = { research: mr.research, model: normalizeManusProfile(agentProfile) ?? "lite" };
       }
       await withDraftLock(draft.id, async () => {
         const fresh = getDraft(draft.id)!;

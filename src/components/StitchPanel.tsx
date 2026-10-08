@@ -79,6 +79,7 @@ export default function StitchPanel({
 
   // split settings
   const [sens, setSens] = useState(50);
+  const [seams, setSeams] = useState(false); // also cut hard seams between pictures with no gutter
   const [minPiece, setMinPiece] = useState(10); // % of the shorter side
   const [padPct, setPadPct] = useState(0);
   const [ratioKey, setRatioKey] = useState("orig");
@@ -112,8 +113,8 @@ export default function StitchPanel({
   }, [sig, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- split: render the analysis canvas, then detect ----------
-  const detect = (a: Analysis, s = sens, m = minPiece) => {
-    const found = splitRegions(a.pixels, { sensitivity: s, minPiece: m / 100 });
+  const detect = (a: Analysis, s = sens, m = minPiece, sm = seams) => {
+    const found = splitRegions(a.pixels, { sensitivity: s, minPiece: m / 100, seams: sm });
     setPieces(found.map((p) => ({ id: nextId.current++, x: p.x, y: p.y, w: p.w, h: p.h, keep: !p.suspect, suspect: p.suspect })));
   };
 
@@ -147,7 +148,7 @@ export default function StitchPanel({
     if (mode !== "split" || !analysis) return;
     const h = setTimeout(() => detect(analysis), 200);
     return () => clearTimeout(h);
-  }, [sens, minPiece]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sens, minPiece, seams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- ordering ----------
   const move = (i: number, d: -1 | 1) => {
@@ -420,6 +421,10 @@ export default function StitchPanel({
                   <label className="field">
                     {t("stitch.sens")}: {sens}
                     <input type="range" min={0} max={100} value={sens} onChange={(e) => setSens(Number(e.target.value))} />
+                  </label>
+                  <label className="row tiny" style={{ gap: 6, margin: 0 }} title={t("stitch.seamsHint")}>
+                    <input type="checkbox" checked={seams} onChange={(e) => setSeams(e.target.checked)} />
+                    {t("stitch.seams")}
                   </label>
                   <label className="field">
                     {t("stitch.minPiece")}: {minPiece}%

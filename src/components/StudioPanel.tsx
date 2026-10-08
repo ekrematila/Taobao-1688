@@ -84,7 +84,7 @@ export default function StudioPanel({
   const [customW, setCustomW] = useState(1500);
   const [customH, setCustomH] = useState(1500);
   const [quality, setQuality] = useState<"standard" | "high" | "maximum">("high");
-  const [profile, setProfile] = useState<string>("standard");
+  const [profile, setProfile] = useState<string>("lite");
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);

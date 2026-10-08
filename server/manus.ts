@@ -632,7 +632,7 @@ export async function runManusTask(
   } = {},
 ): Promise<ManusResult> {
   const { ctx, structuredSchema, locale, pollMs = 3000, timeoutMs = 6 * 60 * 1000 } = opts;
-  const profile = normalizeManusProfile(opts.agentProfile) ?? normalizeManusProfile(env.manusAgentProfile) ?? "standard";
+  const profile = normalizeManusProfile(opts.agentProfile) ?? normalizeManusProfile(env.manusAgentProfile) ?? "lite";
 
   // a sliced emoji in the source data can leave a lone UTF-16 surrogate, which
   // makes strict JSON body parsers 400 — scrub text parts before sending.
@@ -781,7 +781,7 @@ function speedConfig(speed?: ManusSpeed, explicitProfile?: string): { profile?: 
     return { profile: p ?? "lite", hint: "Prioritize SPEED over everything: a fast, acceptable result is fine; do not over-refine." };
   if (speed === "slow")
     return { profile: p ?? "max", hint: "Prioritize MAXIMUM fidelity and quality: take the time needed, match fonts/colours/edges precisely." };
-  return { profile: p ?? "standard", hint: "Balance speed and quality." };
+  return { profile: p ?? "lite", hint: "Balance speed and quality." };
 }
 
 export const KEYCAP_GLOSSARY =

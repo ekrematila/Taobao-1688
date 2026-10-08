@@ -43,14 +43,15 @@ test("three photos with thin white gutters and black side bars come apart as thr
   photos.forEach((r, i) => assert.ok(near(out[i], r, 3), `piece ${i}: ${JSON.stringify(out[i])} vs ${JSON.stringify(r)}`));
 });
 
-test("two different photos butted together with NO gutter are separated at the seam when the sensitivity is raised", () => {
+test("two different photos butted together with NO gutter are separated at the seam only when seams are switched on", () => {
   const p = canvas(240, 600);
   photo(p, { x: 0, y: 0, w: 240, h: 280 }, 1);
   photo(p, { x: 0, y: 280, w: 240, h: 320 }, 7);
   assert.equal(splitRegions(p).length, 1, "by default only gutters cut — a seam alone could be an edge inside one photo");
-  const out = splitRegions(p, { sensitivity: 80 });
+  const out = splitRegions(p, { seams: true });
   assert.equal(out.length, 2, JSON.stringify(out));
   assert.ok(Math.abs(out[0].h - 280) <= 2 && Math.abs(out[1].y - 280) <= 2);
+  assert.equal(splitRegions(p, { sensitivity: 80, seams: false }).length, 1, "an explicit off wins over high sensitivity");
 });
 
 test("slices of ONE continuous photo stay one piece (no false seam)", () => {

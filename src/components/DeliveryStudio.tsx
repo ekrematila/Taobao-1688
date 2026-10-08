@@ -104,7 +104,7 @@ export default function DeliveryStudio({
   const [genEffort, setGenEffort] = useState<string>(""); // "" = app default
   const [genThinking, setGenThinking] = useState<string>("");
   const [descProvider, setDescProvider] = useState<"claude" | "manus">("claude");
-  const [descManusProfile, setDescManusProfile] = useState("standard");
+  const [descManusProfile, setDescManusProfile] = useState("lite");
   const [descEffort, setDescEffort] = useState<string>("");
   const [descThinking, setDescThinking] = useState<string>("");
   const [descStyle, setDescStyle] = useState("product");
@@ -140,7 +140,7 @@ export default function DeliveryStudio({
   const [applyResearch, setApplyResearch] = useState(false);
   const [research, setResearch] = useState("");
   const [researchQ, setResearchQ] = useState("");
-  const [researchManusProfile, setResearchManusProfile] = useState<string>("standard");
+  const [researchManusProfile, setResearchManusProfile] = useState<string>("lite");
   const [confirmGate, setConfirmGate] = useState<null | boolean>(null);
   const [etsyShopId, setEtsyShopId] = useState("");
   const [etsyPushConfirm, setEtsyPushConfirm] = useState<{ shopId: string; shopName: string } | null>(null);
@@ -220,7 +220,7 @@ export default function DeliveryStudio({
       setGenEffort(typeof dc.genEffort === "string" ? dc.genEffort : "");
       setGenThinking(typeof dc.genThinking === "string" ? dc.genThinking : "");
       setDescProvider(dc.descProvider === "manus" ? "manus" : "claude");
-      setDescManusProfile(normalizeManusProfile(dc.descManusProfile) ?? "standard");
+      setDescManusProfile(normalizeManusProfile(dc.descManusProfile) ?? "lite");
       setDescEffort(typeof dc.descEffort === "string" ? dc.descEffort : "");
       setDescThinking(typeof dc.descThinking === "string" ? dc.descThinking : "");
       setDescStyle(dc.descStyle ?? "product");

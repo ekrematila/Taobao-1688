@@ -44,7 +44,7 @@ npm run build && npm start   # http://localhost:8787 tek portta servis eder
 | `OPENAI_API_KEY` | opsiyonel | ChatGPT (OpenAI) — herhangi bir `gpt-*` modeli seçildiğinde TÜM yapay zeka işlemleri bu anahtarla çalışır. Ayarlar sayfasından da girilebilir. |
 | `LLM_MODEL` | hayır | Varsayılan model id (`claude-sonnet-5-5`). Claude: fable-5-1 / opus-5-5 / sonnet-5-5 / opus-5 / opus-4-8 / opus-4-7 / opus-4-6 / sonnet-4-6 / haiku-4-5 / fable-5. ChatGPT: gpt-6.1-sol / gpt-6-astra / gpt-6-sol / gpt-6-luna / gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna / gpt-5.5 |
 | `MANUS_API_KEY` | görsel çevirisi için | Manus API v2 (`api.manus.ai`, `x-manus-api-key`). Görsellerdeki Çince yazıların çevirisi ajan görevi olarak çalışır. |
-| `MANUS_AGENT_PROFILE` | hayır | `standard` (varsayılan) / `lite` / `max` / `max-medium` / `max-high` / `max-extra` / `max-ultra` (eski `manus-1.6*` değerleri otomatik çevrilir) |
+| `MANUS_AGENT_PROFILE` | hayır | `lite` (varsayılan) / `standard` / `max` / `max-medium` / `max-high` / `max-extra` / `max-ultra` (eski `manus-1.6*` değerleri otomatik çevrilir) |
 | `MANUS_USD_PER_CREDIT` | hayır | Maliyet paneli için 1 Manus kredisinin USD değeri (varsayılan 0.01) |
 | `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_ADMIN_TOKEN` | opsiyonel | "Shopify'a taslak gönder" düğmesi |
 | `PREVIEW_REFERENCE_URL` | hayır | Final önizleme düzeni için referans mağaza ürün URL'i |

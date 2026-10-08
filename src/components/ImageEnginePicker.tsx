@@ -39,7 +39,7 @@ export default function ImageEnginePicker({
           Manus
         </button>
         <button type="button" className={"seg-b" + (ai.engine === "openai" ? " on" : "")} onClick={() => ai.set({ engine: "openai" })}>
-          OpenAI
+          ChatGPT
         </button>
       </span>
       {ai.engine === "manus" ? (

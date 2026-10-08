@@ -44,7 +44,7 @@ export const env = {
 
   manusKey: process.env.MANUS_API_KEY || "",
   manusBase: (process.env.MANUS_BASE || "https://api.manus.ai").replace(/\/$/, ""),
-  manusAgentProfile: process.env.MANUS_AGENT_PROFILE || "standard",
+  manusAgentProfile: process.env.MANUS_AGENT_PROFILE || "lite",
   // ~$0.005/credit is the effective rate on Manus paid plans (Standard $20 → 4,000
   // credits, Extended $200 → 40,000). Override via env or Settings.
   manusUsdPerCredit: Number(process.env.MANUS_USD_PER_CREDIT || 0.005),

@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const [effort, setEffort] = useState<Effort>("high");
   const [thinking, setThinking] = useState<"adaptive" | "off">("adaptive");
   const [fast, setFast] = useState(false);
-  const [profile, setProfile] = useState("standard");
+  const [profile, setProfile] = useState("lite");
   const [usdPerCredit, setUsdPerCredit] = useState(0.01);
   const [claudeBalance, setClaudeBalance] = useState(0);
   const [autoPush, setAutoPush] = useState(false);

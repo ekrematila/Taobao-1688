@@ -225,7 +225,7 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
   const [customW, setCustomW] = useState(1500);
   const [customH, setCustomH] = useState(1500);
   const [customQ, setCustomQ] = useState<"standard" | "high" | "maximum">("high");
-  const [manusProfile, setManusProfile] = useState<string>("standard");
+  const [manusProfile, setManusProfile] = useState<string>("lite");
   const imageAi = useImageAi();
   const [aiCmd, setAiCmd] = useState("");
   const [bulkTrPrompt, setBulkTrPrompt] = useState("");
@@ -2020,6 +2020,9 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
                 )}
 
                 <div className="vfx-menu-sec">{t("ws.imgMenuTranslate")}</div>
+                <div style={{ padding: "2px 10px 6px" }}>
+                  <ImageEnginePicker profile={manusProfile} onProfile={setManusProfile} inline />
+                </div>
                 <button
                   className="vfx-menu-item primary"
                   disabled={running || !imageReady}

@@ -64,7 +64,7 @@ export default function OcrTranslatePanel({
   const [focus, setFocus] = useState(0);
   const [drawMode, setDrawMode] = useState(false);
   const [drag, setDrag] = useState<null | { x: number; y: number; x2: number; y2: number }>(null);
-  const [manusProfile, setManusProfile] = useState<string>("standard");
+  const [manusProfile, setManusProfile] = useState<string>("lite");
   const imageAi = useImageAi();
   const [job, setJob] = useState<JobView | null>(null);
   const jobRef = useRef<RunningJob<unknown> | null>(null);

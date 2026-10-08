@@ -80,7 +80,7 @@ export default function AiPicker({
           </select>
         </>
       ) : (
-        <select value={normalizeManusProfile(v.manusProfile) ?? "standard"} onChange={(e) => set({ manusProfile: e.target.value })} title="Manus sürümü">
+        <select value={normalizeManusProfile(v.manusProfile) ?? "lite"} onChange={(e) => set({ manusProfile: e.target.value })} title="Manus sürümü">
           <ManusProfileOptions />
         </select>
       )}

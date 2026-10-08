@@ -46,30 +46,32 @@ export default function Usage() {
 
   const maxDay = Math.max(1, ...(mu?.byDay ?? []).map((x) => x.credits));
 
+  // Manus is a prepaid CREDIT plan: while the account still holds credits, the
+  // credits this app burned cost no extra money — never count them as spend, anywhere.
+  const manusHasCredits = (mu?.available ?? 0) > 0;
+  const billable = (c: { provider?: string; costUsd?: number }) => (c.provider === "manus" && manusHasCredits ? 0 : c.costUsd || 0);
+
   // combined $ spend per day (Claude tokens + billable Manus), bucketed from the call log
   const dailySpend = useMemo(() => {
     const by = new Map<string, number>();
     for (const c of d?.calls ?? []) {
       const day = String(c.at).slice(0, 10);
-      by.set(day, (by.get(day) ?? 0) + (c.costUsd || 0));
+      by.set(day, (by.get(day) ?? 0) + billable(c));
     }
     return [...by.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([x, y]) => ({ x: x.slice(5), y }));
-  }, [d?.calls]);
+  }, [d?.calls, manusHasCredits]);
   const kindSpend = useMemo(() => {
     const by = new Map<string, number>();
-    for (const c of d?.calls ?? []) by.set(c.kind, (by.get(c.kind) ?? 0) + (c.costUsd || 0));
+    for (const c of d?.calls ?? []) by.set(c.kind, (by.get(c.kind) ?? 0) + billable(c));
     return [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [d?.calls]);
+  }, [d?.calls, manusHasCredits]);
   // Prefer the app-scoped, Manus-reconciled figure; fall back to our local estimate.
   const manusUsd = mu?.configured ? mu.costUsd : d?.manusCostUsd ?? 0;
   const manusCredits = mu?.configured ? mu.costCredits : d?.totalManusCredits ?? 0;
   const claudeBalance = d?.claudeBalanceUsd ?? 0;
 
-  // Manus is a prepaid CREDIT plan: while the account still holds credits, the
-  // credits this app burned cost no extra money — don't add them to the total.
-  const manusHasCredits = (mu?.available ?? 0) > 0;
   const manusBillableUsd = manusHasCredits ? 0 : manusUsd;
   const totalCostUsd = (d?.claudeCostUsd ?? 0) + (d?.openaiCostUsd ?? 0) + manusBillableUsd;
 
@@ -204,7 +206,7 @@ export default function Usage() {
                 <div className="row">
                   <Stat
                     label={t("usage.manusSpentRange")}
-                    value={usd(mu.costUsd)}
+                    value={usd(manusBillableUsd)}
                     sub={`${mu.costCredits.toLocaleString()} ${t("settings.credits")}`}
                     big
                   />
@@ -237,7 +239,7 @@ export default function Usage() {
                           <td>{r.title}</td>
                           <td>{r.credits.toLocaleString()}</td>
                           <td>
-                            <b>{usd(r.costUsd)}</b>
+                            <b>{usd(manusHasCredits ? 0 : r.costUsd)}</b>
                           </td>
                         </tr>
                       ))}
@@ -285,7 +287,7 @@ export default function Usage() {
                             {Math.abs(e.credits).toLocaleString()}
                             {e.estimated ? "*" : ""}
                           </td>
-                          <td>{e.type === "refund" ? "—" : usd(Math.abs(e.credits) * mu.usdPerCredit)}</td>
+                          <td>{e.type === "refund" ? "—" : usd(manusHasCredits ? 0 : Math.abs(e.credits) * mu.usdPerCredit)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -321,10 +323,10 @@ export default function Usage() {
                     <tr key={r.draftId ?? "none"}>
                       <td>{r.title}</td>
                       <td>{usd(r.claudeUsd)}</td>
-                      <td>{usd(r.manusUsd)}</td>
+                      <td>{usd(manusHasCredits ? 0 : r.manusUsd)}</td>
                       <td>{r.manusCredits}</td>
                       <td>
-                        <b>{usd(r.claudeUsd + r.manusUsd)}</b>
+                        <b>{usd(r.claudeUsd + (manusHasCredits ? 0 : r.manusUsd))}</b>
                       </td>
                     </tr>
                   ))}
@@ -376,7 +378,7 @@ export default function Usage() {
                           {c.credits || "—"}
                           {c.estimated && c.credits ? "*" : ""}
                         </td>
-                        <td>{usd(c.costUsd)}</td>
+                        <td>{usd(billable(c))}</td>
                         <td>
                           {c.result != null && c.result !== "" ? (
                             <button className="btn ghost sm" onClick={() => setOpenRow(openRow === i ? null : i)}>
