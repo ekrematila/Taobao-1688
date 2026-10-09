@@ -40,6 +40,9 @@ test("pickStoreProfile: keyboard things → keyartisan.net, bags and everything 
   assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "PBT keycap set cherry", isKeycapSet: true })?.id, "keyartisan-net");
   assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "Clear Window Ita Bag Handbag" })?.id, "cuteitabags");
   assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "plush keychain" })?.id, "cuteitabags");
+  // regression: a keycap set whose Chinese brand is "糖包" (sugar bun) is not a bag
+  assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "Winter Cozy Keycap Set 品牌 SugarBun糖包 包装 FOA", isKeycapSet: true })?.id, "keyartisan-net");
+  assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "PBT keycap 糖包" })?.id, "keyartisan-net");
   assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "etsy", productText: "anything" })?.kind, "etsy");
   assert.equal(pickStoreProfile(DEFAULT_STORE_PROFILES, { channel: "shopify", productText: "bag", preferId: "keyartisan-net" })?.id, "keyartisan-net");
 });

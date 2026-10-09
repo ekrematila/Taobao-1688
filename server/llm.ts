@@ -1541,7 +1541,7 @@ export async function generateListing(
       htmlLengthUnit: input.htmlLengthUnit,
       htmlBudget: input.htmlBudget,
       descStyle: input.descStyle,
-      storeProfileId: storeProfile?.id,
+      storeProfileId: input.storeProfileId?.trim() || undefined, // only an EXPLICIT choice sticks; "auto" is re-picked at render time
       factWarnings: factWarnings.length ? factWarnings : undefined,
     },
     model,

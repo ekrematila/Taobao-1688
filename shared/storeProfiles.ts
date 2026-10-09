@@ -191,7 +191,7 @@ export const DEFAULT_STORE_PROFILES: StoreProfile[] = [
   },
 ];
 
-const BAGGY = /\b(bag|bags|backpack|rucksack|tote|wallet|pouch|purse|handbag|crossbody|ita)\b|包|背包|痛包/i;
+const BAGGY = /\b(bag|bags|backpack|rucksack|tote|wallet|pouch|purse|handbag|crossbody|ita)\b|背包|手提包|挎包|痛包|书包|钱包/i;
 const KEYBOARDY = /keycap|keyboard|switch|key\s*set|键帽|键盘|轴/i;
 
 /** Which profile fits this product + channel: keyboard stuff → keyartisan.net, everything else → cuteitabags.com (Shopify); first Etsy shop for Etsy. */
@@ -208,7 +208,8 @@ export function pickStoreProfile(
   const keyboardish = opts.isKeycapSet || KEYBOARDY.test(text);
   const bag = BAGGY.test(text);
   const byUrl = (frag: string) => pool.find((p) => p.url.includes(frag));
-  if (keyboardish && !bag) return byUrl("keyartisan.net") ?? pool[0];
+  // a keycap set is never a bag — even when its brand says "糖包" (sugar bun); only text-only keyboard hints yield to bag words
+  if (opts.isKeycapSet || (keyboardish && !bag)) return byUrl("keyartisan.net") ?? pool[0];
   return byUrl("cuteitabags") ?? pool[0];
 }
 
