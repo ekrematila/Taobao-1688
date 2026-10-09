@@ -110,6 +110,38 @@ const SCOPE = "body:has(.bm)";
 const rule = (selectors: string[], body: string) => selectors.map((s) => `${SCOPE} ${s}`).join(",") + `{${body}}`;
 const repeat = (tokens: string[], n: number) => Array.from({ length: n }, (_, i) => tokens[i % tokens.length]).join("  ");
 
+
+/* ---------------------- scattered characters (SVG tiles) ---------------------- */
+
+/** small seeded PRNG so a given product always gets the same scatter */
+function rng(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** one tile = `count` characters placed at random spots, sizes (px), tilts and (low) opacities — as a CSS url(data:svg) */
+export function scatterTile(tokens: string[], w: number, h: number, count: number, seed: number, minSize: number, maxSize: number): string {
+  const rand = rng(seed);
+  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const marks: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const tok = tokens[Math.floor(rand() * tokens.length)] ?? tokens[0];
+    const size = Math.round(minSize + rand() * (maxSize - minSize));
+    const x = Math.round(14 + rand() * (w - size - 28));
+    const y = Math.round(size + 10 + rand() * (h - size * 2 - 20));
+    const rot = Math.round(-28 + rand() * 56);
+    const op = (0.07 + rand() * 0.07).toFixed(2);
+    marks.push(`<text x='${x}' y='${y}' font-size='${size}' opacity='${op}' transform='rotate(${rot} ${x} ${y})'>${esc(tok)}</text>`);
+  }
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' font-family='Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif'>${marks.join("")}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 export function buildPageSkinCss(html: string): string {
   const k = skinInputFrom(html);
   if (!k) return "";
@@ -172,6 +204,8 @@ export function buildPageSkinCss(html: string): string {
     rule(atc.map((s) => s + ":hover"), `transform:translateY(-2px) scale(1.015)!important;box-shadow:0 16px 30px -10px rgba(var(--sk-acc-rgb),.8)!important`),
     rule([".shopify-payment-button__button--unbranded", ".shopify-payment-button .button", ".product-form__buttons .button--primary:not(#product-add-to-cart)"], `background:#fff!important;color:var(--sk-acc-dark)!important;border:2px solid var(--sk-acc)!important;border-radius:999px!important;box-shadow:none!important`),
   );
+  const leaf = [...k.fall, ...deco].find((t) => /[🍃🌿🍀🌱🌸✿]/u.test(t)) || k.fall[0] || deco[0];
+  if (leaf) parts.push(rule([".kt-p"], `font-size:0!important`), rule([".kt-p::after"], `content:"${leaf}";font-size:16px`));
   if (deco[0]) parts.push(rule(atc.map((s) => s + "::before"), `content:"${deco[0]}";margin-right:.45em;display:inline-block`));
 
   // everything around the buttons: payment-methods trigger, delivery timeline, the reviews block
@@ -182,6 +216,24 @@ export function buildPageSkinCss(html: string): string {
     rule([".three_step_card *", ".delivery_msg .step_template *"], `color:var(--sk-ink)!important`),
     rule([".ka-reviews"], `background:linear-gradient(180deg,var(--sk-deep),var(--sk-deep2))!important;border-radius:22px!important`),
     rule([".ka-reviews__label", ".ka-reviews__header *"], `color:var(--sk-acc2)!important;font-family:inherit`),
+    rule([".ka-review"], `background:rgba(255,255,255,.07)!important;border:1px solid rgba(var(--sk-acc-rgb),.3)!important;box-shadow:none!important`),
+    rule([".ka-review__tag"], `background:rgba(var(--sk-acc-rgb),.2)!important;color:var(--sk-acc2)!important`),
+    rule([".ka-review__quote"], `color:rgba(var(--sk-acc-rgb),.14)!important`),
+    rule([".ka-review__text"], `color:${toHex(linkOnDeep)}!important`),
+    rule([".ka-review__readmore", ".ka-review__helpful"], `color:var(--sk-acc2)!important`),
+    rule([".ka-review__avatar"], `background:var(--sk-acc)!important;color:var(--sk-on-acc)!important`),
+    rule([".ka-reviews__playpause", ".ka-reviews__nav button", ".ka-reviews__arrow"], `background:var(--sk-deep3)!important;color:var(--sk-acc2)!important;border:1px solid rgba(var(--sk-acc-rgb),.4)!important`),
+    rule([".ka-reviews__progress-wrap"], `background:rgba(255,255,255,.12)!important`),
+    rule([".ka-reviews__progress-bar"], `background:var(--sk-acc)!important`),
+    rule([".ka-reviews__summary-stars svg", ".ka-review__stars svg"], `fill:var(--sk-acc2)!important;color:var(--sk-acc2)!important`),
+    // the "Why shop with us" section
+    rule(["trust-badges-katrustbadges"], `background:linear-gradient(180deg,var(--sk-deep),var(--sk-deep2))!important;border:1px solid rgba(var(--sk-acc-rgb),.25)!important`),
+    rule([".kt-ht"], `color:${toHex(headOnDeep)}!important;${fh ? `font-family:${fh}!important;` : ""}letter-spacing:.2px`),
+    rule([".kt-s"], `background:rgba(255,255,255,.06)!important;border-color:rgba(var(--sk-acc-rgb),.35)!important;border-radius:16px!important`),
+    rule([".kt-s *"], `color:${toHex(linkOnDeep)}!important`),
+    rule([".kt-w"], `background:rgba(var(--sk-acc-rgb),.16)!important;border-color:rgba(var(--sk-acc-rgb),.55)!important`),
+    rule([".kt-w svg", ".kt-w svg *"], `stroke:var(--sk-acc2)!important`),
+    rule([".kt-c"], `background:var(--sk-acc)!important;color:var(--sk-on-acc)!important;border-color:var(--sk-deep)!important`),
     rule([".productView-moreItem a", ".product-form__input a"], `color:var(--sk-acc-dark)!important`),
   );
 
@@ -209,21 +261,32 @@ export function buildPageSkinCss(html: string): string {
     );
   }
 
-  // falling characters (only when the model asked for them; off on small screens and for reduced motion)
+  // scattered, translucent, product-related characters drifting down in a few slow layers (never a regular row).
+  // Each layer is an SVG tile with a handful of characters at seeded random spots / sizes / tilts; tiles of different
+  // sizes loop out of phase, and the whole layer is moved with a transform (cheap), so it never looks like a pattern.
   if (k.fall.length) {
-    const row = repeat(k.fall, 10);
+    const L1 = [
+      scatterTile(k.fall, 420, 400, 3, 11, 15, 26),
+      scatterTile(k.fall, 560, 600, 4, 23, 13, 24),
+      scatterTile(k.fall, 700, 1200, 6, 37, 14, 28),
+    ];
+    const L2 = [scatterTile(k.fall, 500, 500, 3, 51, 12, 22), scatterTile(k.fall, 800, 1000, 5, 67, 13, 26)];
+    const layer = (tiles: string[], sizes: string, h: number, anim: string) =>
+      `content:"";position:fixed;left:0;right:0;top:-${h}px;height:calc(100vh + ${h}px);z-index:3;pointer-events:none;background-image:${tiles.join(",")};background-size:${sizes};background-repeat:repeat;${anim}`;
     parts.push(
-      `${SCOPE}::before,${SCOPE}::after{content:"${row}";position:fixed;left:0;right:0;top:-60px;z-index:3;pointer-events:none;white-space:nowrap;overflow:hidden;text-align:center;font-size:20px;letter-spacing:9vw;opacity:.22;animation:skFall 17s linear infinite}`,
-      `${SCOPE}::after{letter-spacing:13vw;margin-left:5vw;font-size:16px;opacity:.16;animation-duration:23s;animation-delay:-9s}`,
+      `${SCOPE}::before{${layer(L1, "420px 400px,560px 600px,700px 1200px", 1200, "animation:skFall 54s linear infinite,skDrift 9s ease-in-out infinite alternate")}}`,
+      `${SCOPE}::after{${layer(L2, "500px 500px,800px 1000px", 1000, "animation:skFall2 41s linear infinite,skDrift 13s ease-in-out infinite alternate-reverse;opacity:.85")}}`,
     );
   }
 
   parts.push(
     `@keyframes skGlow{0%,100%{box-shadow:0 10px 24px -10px rgba(${rgb(k.acc)},.6)}50%{box-shadow:0 14px 30px -8px rgba(${rgb(k.acc)},.95)}}`,
     `@keyframes skSway{from{transform:translateX(-14px)}to{transform:translateX(14px)}}`,
-    `@keyframes skFall{from{transform:translateY(-8vh)}to{transform:translateY(112vh)}}`,
+    `@keyframes skFall{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,1200px,0)}}`,
+    `@keyframes skFall2{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,1000px,0)}}`,
+    `@keyframes skDrift{from{translate:-18px 0}to{translate:18px 0}}`,
     // phones / tablets: calmer, bigger tap targets, lighter decoration
-    `@media (max-width:749px){${k.fall.length ? `${SCOPE}::after{display:none}${SCOPE}::before{font-size:16px;opacity:.18}` : ""}${rule(atc, "width:100%!important;min-height:48px")}${deco.length ? rule(["footer.footer::before"], "font-size:18px;padding-top:12px") : ""}${rule([".productView-title"], "font-size:clamp(20px,6vw,26px)!important")}}`,
+    `@media (max-width:749px){${k.fall.length ? `${SCOPE}::after{display:none}${SCOPE}::before{opacity:.8}` : ""}${rule(atc, "width:100%!important;min-height:48px")}${deco.length ? rule(["footer.footer::before"], "font-size:18px;padding-top:12px") : ""}${rule([".productView-title"], "font-size:clamp(20px,6vw,26px)!important")}}`,
     `@media (min-width:750px) and (max-width:1024px){${deco.length ? rule(["footer.footer::before"], "font-size:20px") : ""}}`,
     `@media (prefers-reduced-motion:reduce){${k.fall.length ? `${SCOPE}::before,${SCOPE}::after{display:none!important}` : ""}${rule(atc, "animation:none!important")}${deco.length ? rule(["footer.footer::before"], "animation:none!important") : ""}}`,
   );

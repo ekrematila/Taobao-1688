@@ -99,13 +99,13 @@ export interface LayoutDef {
 export const LAYOUTS: LayoutDef[] = [
   { label: "40%", minKeys: 47, extended: true, examples: ["OLKB Planck", "Vortex Core"] },
   { label: "60%", minKeys: 61, examples: ["Anne Pro 2", "Ducky One 3 Mini", "Royal Kludge RK61"] },
-  { label: "HHKB", minKeys: 60, extended: true, examples: ["HHKB Professional Hybrid Type-S"] },
   { label: "65%", minKeys: 68, examples: ["Keychron K6", "Ducky One 3 SF", "Royal Kludge RK68"] },
   { label: "Alice", minKeys: 68, extended: true, examples: ["Keychron Q8"] },
-  { label: "75%", minKeys: 82, examples: ["GMMK Pro", "Keychron K3", "NuPhy Air75"] },
+  { label: "75%", minKeys: 82, examples: ["GMMK Pro", "Keychron Q1 Pro", "NuPhy Halo75"] },
   { label: "TKL", minKeys: 87, examples: ["Ducky One 3 TKL", "Leopold FC750R", "Keychron C3 Pro"] },
   { label: "96%", minKeys: 98, examples: ["Keychron Q5", "Royal Kludge RK96", "Keychron K4"] },
   { label: "100%", minKeys: 104, examples: ["Keychron K10", "Ducky One 3 Full-Size", "Leopold FC900R"] },
+  { label: "Numpad", minKeys: 104, examples: ["Keychron Q0 Plus"] },
 ];
 const KEY_COUNT_CHIPS = [61, 64, 68, 75, 84, 87, 98, 104, 108];
 export const BIG_KIT_KEYS = 130;
@@ -127,7 +127,7 @@ export function layoutsFor(keys: number): LayoutDef[] {
   return LAYOUTS.filter((l) => l.minKeys <= keys && (!l.extended || keys >= BIG_KIT_KEYS));
 }
 
-export function layoutsSectionHtml(keys: number | null | undefined): string {
+export function layoutsSectionHtml(keys: number | null | undefined, opts: { crossStem?: boolean } = {}): string {
   if (!keys || keys < 61) return "";
   const list = layoutsFor(keys);
   if (list.length < 2) return "";
@@ -141,7 +141,7 @@ export function layoutsSectionHtml(keys: number | null | undefined): string {
     `<div class="bm-layouts">${chips}</div>` +
     `<div class="bm-layouts bm-layouts-keys">${counts}<span>${keys} keys in this set</span></div>` +
     `<div class="bm-compat-eg">${rows}</div>` +
-    `<p class="bm-layouts-note">ANSI &amp; ISO layout compatible. The keyboards above are examples for reference only, not endorsements — unsure about yours? Please contact us.</p></div>`
+    `<p class="bm-layouts-note">${opts.crossStem ? "Fits MX-style cross-stem keyboards (not low-profile or Topre boards). " : ""}ANSI &amp; ISO layout compatible. The boards above are examples for reference only, not endorsements — unsure about yours? Please contact us.</p></div>`
   );
 }
 
@@ -177,6 +177,8 @@ export function buildPageBlocks(args: {
   /** keycap set → the complete 'Compatible Layouts' section is built from the key count */
   isKeycapSet?: boolean;
   keyCount?: number | null;
+  /** the product says it takes MX-style (十字轴 / cross-stem) switches */
+  crossStem?: boolean;
 }): PageBlocks {
   const { product, profile } = args;
   const sw: Swatch[] = [];
@@ -192,7 +194,7 @@ export function buildPageBlocks(args: {
     swatches: swatchBlockHtml(sw),
     ship: profile ? shipBlockHtml(profile) : "",
     related: profile ? relatedBlockHtml(pickRelatedLinks(profile, productText(product, args.listingTitle))) : "",
-    layouts: args.isKeycapSet ? layoutsSectionHtml(args.keyCount) : "",
+    layouts: args.isKeycapSet ? layoutsSectionHtml(args.keyCount, { crossStem: args.crossStem }) : "",
   };
 }
 
@@ -218,12 +220,23 @@ export function injectPageBlocks(html: string, blocksIn?: Partial<PageBlocks> | 
 
 /** the AI writes `.bm-glance` ("At a glance") but not its CSS — add it when the page has the block and no rule for it */
 export const GLANCE_CSS =
-  "<style>.bm-glance{margin:14px 0;padding:14px 16px;border:1px solid var(--line2,#e4e4e7);border-left:4px solid var(--gold,var(--acc,#a1a1aa));border-radius:var(--r,14px);background:var(--milk,#fafafa)}" +
-  ".bm-glance-t{margin:0 0 6px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--head,var(--ink,#18181b))}" +
-  ".bm-glance ul{margin:0!important;padding:0!important;list-style:none!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;gap:6px 18px!important;align-items:start!important}" +
-  ".bm-glance li{margin:0!important;padding:0!important;list-style:none!important;font-size:14px!important;line-height:1.45!important;color:var(--body,#3f3f46)}.bm-glance li b{color:var(--head,var(--ink,#18181b))}</style>";
+  "<style>.bm-glance{margin:16px 0 20px;padding:16px 18px 18px;border:1px solid var(--line2,#e4e4e7);border-left:4px solid var(--gold,var(--acc,#a1a1aa));border-radius:var(--r,14px);background:var(--milk,#fafafa)}" +
+  ".bm-glance-t{margin:0 0 12px!important;font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--head,var(--ink,#18181b))}" +
+  ".bm-glance ul{margin:0!important;padding:0!important;list-style:none!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;gap:12px 20px!important;align-items:start!important}" +
+  ".bm-glance li{margin:0!important;padding:0!important;list-style:none!important;display:flex!important;flex-direction:column!important;gap:2px!important;font-size:14px!important;line-height:1.35!important;font-weight:600;color:var(--ink,#18181b)}" +
+  ".bm-glance li b{font-size:10.5px!important;font-weight:700!important;letter-spacing:.1em;text-transform:uppercase;color:var(--soft,#71717a)}</style>";
+
+/** `<b>Type:</b>` → `<b>Type</b>` inside the glance box (the label sits above its value now) */
+function stripGlanceColons(html: string): string {
+  const at = html.search(/<div\b[^>]*class=["'][^"']*\bbm-glance\b/);
+  if (at < 0) return html;
+  const end = html.indexOf("</ul>", at);
+  if (end < 0) return html;
+  return html.slice(0, at) + html.slice(at, end).replace(/<b>\s*([^<]*?)\s*:\s*<\/b>/g, "<b>$1</b>") + html.slice(end);
+}
 
 export function ensureGlanceCss(html: string): string {
+  html = stripGlanceColons(html);
   if (!/class=["'][^"']*\bbm-glance\b/.test(html) || /\.bm-glance\s*\{/.test(html)) return html;
   const at = html.search(/<div\b[^>]*class=["'][^"']*\bbm-glance\b/);
   return at < 0 ? html : html.slice(0, at) + GLANCE_CSS + html.slice(at);
@@ -262,7 +275,7 @@ export const FONT_RULE = [
   "SAYFA TEMASI — ürüne uygun (sistem bunları ürün sayfasının TAMAMINA uygular: duyuru çubuğu, başlık, fiyat, Add to Cart / Buy it now, footer, arka plan, animasyon):",
   "1) FONT: `.bm{}` bloğuna `--fh:'Başlık Fontu';` ve `--fb:'Gövde Fontu';` ekle (yalnızca listeden, tırnaklı tek isim): sevimli/kawaii/pastel → Fredoka + Nunito · anime/eğlenceli → Baloo 2 + Poppins · minimal/temiz/modern → DM Sans + Inter · zarif/premium/lüks → Playfair Display + Lato · gaming/fütüristik/teknik → Rajdhani + Inter · retro/vintage → DM Serif Display + DM Sans · koyu/dramatik → Oswald + Barlow · doğal/toprak/matcha → Lora + Nunito Sans · canlı/renkli/cesur → Poppins + Montserrat · tatlı/yumuşak → Quicksand + Nunito Sans · geek/tech minimal → Space Grotesk + Inter.",
   "2) RENK: `--gold` (ana vurgu — BUTON ARKA PLANI olacak: doygun, #rrggbb), `--gold2` (açık vurgu), `--ink` (koyu ana renk — FOOTER'ın zemini bundan türetilir), `--lav` (çok açık zemin) hex (#rrggbb) yazılmalı; hepsi FOTOĞRAFLARDAKİ baskın renklere göre seçilir.",
-  "3) KARAKTERLER: `--deco:'🐻 ☃️ 🔥 🍵';` (3–5 emoji/karakter; ürünün GERÇEK teması ve fotoğraflardaki objeler — alakasız emoji yok; footer şeridinde ve Add to Cart düğmesinde kullanılır) ve YALNIZCA tema gerçekten uyuyorsa `--fall:'❄ ❅ ❆';` (yavaşça düşen süs karakterleri: kış=❄ ❅, tatlı/kawaii=♡ ✿ ✦, doğa=🍃; ciddi/teknik/koyu/premium üründe YAZMA). `--mood:cute;` (cute|calm|bold|elegant|tech|retro|dark|natural).",
+  "3) KARAKTERLER: `--deco:'🐻 ☃️ 🔥 🍵';` (3–5 emoji; ürünün GERÇEK teması ve fotoğraflardaki objeler — alakasız emoji yok; footer şeridinde ve Add to Cart düğmesinde kullanılır). `--fall:'🍃 🌿 ❄ ✿ 🐻';` (4–6 FARKLI karakter; sayfaya rastgele serpiştirilmiş, çok saydam, yavaş süzülen süsler): ürünün/fotoğrafın gerçek motiflerinden seç — üründe yaprak/yeşillik varsa 🍃 🌿, kar/kış varsa ❄, çiçek varsa 🌸 ✿, ayıcık varsa 🐻 gibi; dümdüz sembol (♡ ✦) yerine ürüne özgü olanlar. Ciddi/teknik/koyu/premium üründe `--fall` YAZMA. `--mood:cute;` (cute|calm|bold|elegant|tech|retro|dark|natural).",
   "Sen `font-family`'yi ve mağaza teması kurallarını ayrıca YAZMA — sistem ekler; renk, rozet, emoji ve metin tonu aynı havaya uysun.",
 ].join("\n");
 

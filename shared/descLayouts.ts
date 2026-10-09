@@ -757,6 +757,15 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // 4g) compatible layouts chips: one consistent style, wrapped evenly
   `.bm-layouts{display:flex!important;flex-wrap:wrap!important;gap:6px 8px!important;align-items:center!important}` +
   `.bm-layouts span{display:inline-flex!important;align-items:center!important;line-height:1.2!important;padding:5px 10px!important;white-space:nowrap!important}` +
+  // 4h) tidy rhythm: headings with room above and below, lists flush with their heading (no stray indent), even card gaps
+  `.bm-info h3{margin:26px 0 10px!important;font-size:15px!important;line-height:1.3!important;letter-spacing:.01em!important}` +
+  `.bm-info>h3:first-child{margin-top:0!important}` +
+  `.bm-feat{display:grid!important;gap:9px!important;margin:10px 0 0!important;padding:0!important;list-style:none!important}` +
+  `.bm-feat li{margin:0!important;padding:12px 14px!important;border:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:14px!important;background:var(--milk)!important}` +
+  `.bm-feat li:hover{padding-left:14px!important}` +
+  `.bm-spec{margin-top:10px!important}` +
+  `.bm-faq{margin-top:10px!important}` +
+  `.bm-layouts-note{margin:12px 0 0!important}` +
   // 4d) feature rows: the emoji gets a fixed square so every icon sits on the same line as its title, whatever the model wrote
   `.bm-feat li{display:flex!important;align-items:flex-start!important;gap:10px!important}` +
   `.bm-feat li .ico{flex:0 0 30px!important;width:30px!important;height:30px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:18px!important;line-height:1!important;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}` +

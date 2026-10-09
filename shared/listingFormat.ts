@@ -86,6 +86,7 @@ export function pageBlocksFor(
     listingTitle: title,
     isKeycapSet,
     keyCount: isKeycapSet ? keycapCountOf(product) : null,
+    crossStem: Object.entries(product.props || {}).some(([k, v]) => /适配轴体|轴体类型|switch/i.test(k) && /十字|cross|MX/i.test(String(v))),
     variantImageUrl: (v) => {
       if (!v.imageUrl) return null;
       const im = (product.images || []).find((i) => i.url === v.imageUrl);

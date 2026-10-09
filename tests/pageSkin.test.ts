@@ -32,7 +32,7 @@ test("the skin themes the WHOLE page: announcement bar, header, title/price, Add
   assert.deepEqual(unscoped, [], "every top-level rule is scoped with body:has(.bm)");
   assert.match(css, /'Fredoka',-apple-system/);
   assert.match(css, /content:"🐻  ☃️  🐻/, "characters become the footer strip");
-  assert.match(css, /@keyframes skFall/);
+  assert.match(css, /@keyframes skFall\{/);
   assert.match(css, /@media \(max-width:749px\)/);
   assert.match(css, /prefers-reduced-motion/);
 });
@@ -52,7 +52,9 @@ test("falling characters only when the model asked for them; without characters 
   assert.doesNotMatch(plain, /body:has\(\.bm\)::before/);
   assert.doesNotMatch(plain, /footer\.footer::before/);
   const fall = buildPageSkinCss(PAGE("--fall:'♡ ✿';"));
-  assert.match(fall, /body:has\(\.bm\)::before,body:has\(\.bm\)::after\{content:/);
+  assert.match(fall, /body:has\(\.bm\)::before\{content:"";position:fixed/);
+  assert.match(fall, /data:image\/svg\+xml/, "characters are scattered inside SVG tiles, not a text row");
+  assert.match(fall, /@keyframes skFall2/);
 });
 
 test("model-supplied characters cannot break out of the stylesheet", () => {
@@ -81,9 +83,10 @@ test("compatible layouts: 130+ pieces list EVERY standard layout (more than 8), 
   assert.equal(keycapCountOf(product({}, "no count here")), null);
   const big = layoutsFor(140).map((l) => l.label);
   assert.ok(big.length > 8, big.join(","));
-  for (const need of ["60%", "65%", "75%", "TKL", "96%", "100%", "Alice", "HHKB", "40%"]) assert.ok(big.includes(need), need);
+  for (const need of ["60%", "65%", "75%", "TKL", "96%", "100%", "Alice", "40%", "Numpad"]) assert.ok(big.includes(need), need);
+  assert.ok(!big.includes("HHKB"), "HHKB is a Topre board: our MX cross-stem sets do not fit it");
   const mid = layoutsFor(110).map((l) => l.label);
-  assert.ok(mid.includes("100%") && !mid.includes("Alice") && !mid.includes("40%"), mid.join(","));
+  assert.ok(mid.includes("100%") && mid.includes("Numpad") && !mid.includes("Alice") && !mid.includes("40%"), mid.join(","));
   assert.deepEqual(layoutsFor(87).map((l) => l.label), ["60%", "65%", "75%", "TKL"]);
   const html = layoutsSectionHtml(140);
   assert.match(html, /<h3>Compatible Layouts<\/h3>/);
@@ -110,4 +113,25 @@ test("pageBlocksFor builds the layouts section for keycap sets only", () => {
   assert.match(pageBlocksFor(kc, null, DEFAULT_STORE_PROFILES)!.layouts, /Alice/);
   const bag = { ...product({ 款式名称: "云朵包" }, "Ita bag"), titleTranslated: "Clear Window Ita Bag" };
   assert.equal(pageBlocksFor(bag, null, DEFAULT_STORE_PROFILES)!.layouts, "");
+});
+
+test("the scattered characters are random-looking, translucent and the same for the same product", async () => {
+  const { scatterTile } = await import("../shared/pageSkin.ts");
+  const a = scatterTile(["🍃", "🌿", "❄"], 700, 1200, 6, 37, 14, 28);
+  assert.equal(a, scatterTile(["🍃", "🌿", "❄"], 700, 1200, 6, 37, 14, 28), "seeded: stable output");
+  const svg = decodeURIComponent(a.replace(/^url\("data:image\/svg\+xml,/, "").replace(/"\)$/, ""));
+  const ys = [...svg.matchAll(/ y='(\d+)'/g)].map((m) => Number(m[1]));
+  const xs = [...svg.matchAll(/ x='(\d+)'/g)].map((m) => Number(m[1]));
+  assert.equal(ys.length, 6);
+  assert.ok(new Set(ys).size >= 5 && new Set(xs).size >= 5, "scattered, not a row");
+  const ops = [...svg.matchAll(/opacity='([0-9.]+)'/g)].map((m) => Number(m[1]));
+  assert.ok(ops.every((o) => o <= 0.2), "translucent");
+  assert.ok(xs.every((x) => x >= 10 && x <= 700) && ys.every((y) => y >= 10 && y <= 1200), "inside the tile");
+});
+
+test("the Add-to-Cart surroundings follow the product, the delivery timeline keeps its own look", () => {
+  const css = buildPageSkinCss(PAGE("--fall:'🍃 ❄';"));
+  for (const sel of [".ka-payments-trigger", ".ka-review", ".ka-reviews__progress-bar", "trust-badges-katrustbadges", ".kt-s", ".kt-c", ".kt-p::after"]) assert.ok(css.includes(sel), sel);
+  assert.match(css, /\.kt-p::after\{content:"🍃"/, "the section's falling leaf is the product's own leaf");
+  assert.ok(css.includes(".three_step_card"), "the timeline box still gets its mint wash");
 });
