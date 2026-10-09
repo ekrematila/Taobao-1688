@@ -4,7 +4,7 @@
 import { DESC_STYLES, TITLE_VOCAB } from "./models.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, detectProfiles, LAYOUT_COMPAT, profilePhrase } from "./keycaps.ts";
 import { cleanSpecs } from "./specs.ts";
-import { buildPageBlocks, productText, type PageBlocks } from "./pageBlocks.ts";
+import { buildPageBlocks, keycapCountOf, productText, type PageBlocks } from "./pageBlocks.ts";
 import { pickStoreProfile, type StoreProfile } from "./storeProfiles.ts";
 import { ETSY_TAG_VOCAB, ETSY_SEARCH_ADJ } from "./exampleData.ts";
 import type {
@@ -73,16 +73,19 @@ export function pageBlocksFor(
   if (!profiles?.length) return undefined;
   const title = listing?.fields.find((f) => f.key === "title")?.value;
   const text = productText(product, title);
+  const isKeycapSet = detectKeyboardLayout(product).isKeycapSet;
   const profile = pickStoreProfile(profiles, {
     channel: "shopify",
     productText: text,
-    isKeycapSet: detectKeyboardLayout(product).isKeycapSet,
+    isKeycapSet,
     preferId: listing?.meta?.storeProfileId,
   });
   return buildPageBlocks({
     product,
     profile,
     listingTitle: title,
+    isKeycapSet,
+    keyCount: isKeycapSet ? keycapCountOf(product) : null,
     variantImageUrl: (v) => {
       if (!v.imageUrl) return null;
       const im = (product.images || []).find((i) => i.url === v.imageUrl);

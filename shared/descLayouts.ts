@@ -4,6 +4,7 @@
 import { cleanSpecs } from "./specs";
 import type { DescImageCrop } from "./types";
 import { ensureGlanceCss, injectPageBlocks, type PageBlocks } from "./pageBlocks";
+import { applyPageSkin } from "./pageSkin";
 
 /** a description image with its optional non-destructive display crop. */
 export interface DescImg {
@@ -89,6 +90,8 @@ export interface DescMeta {
   note?: string;
   /** verified blocks (shipping & returns, related links, swatches) placed above the page's call-to-action */
   blocks?: Partial<PageBlocks>;
+  /** theme the WHOLE store page after the product (default on) */
+  skin?: boolean;
 }
 
 /**
@@ -102,6 +105,12 @@ export const MAX_DESC_IMAGES = 20;
 /** İ→I, ı→i — a stray Turkish letter from the prompt looks broken in an English listing. */
 const deTr = (s: string) => s.replace(/İ/g, "I").replace(/ı/g, "i");
 
+/** the verified blocks go in, then the product's skin for the whole store page */
+function finishPage(html: string, meta?: DescMeta): string {
+  const withBlocks = injectPageBlocks(html, meta?.blocks);
+  return meta?.skin === false ? withBlocks : applyPageSkin(withBlocks);
+}
+
 export function renderDescriptionHtml(
   layoutId: string | undefined,
   baseHtml: string,
@@ -112,7 +121,7 @@ export function renderDescriptionHtml(
   // it, a page (or Shopify theme) with lang="tr" turns "Highlights" into
   // "HİGHLİGHTS" (dotted capital I) at render time, which deTr can't catch
   // because the source string is plain ASCII.
-  return `<div lang="en">${injectPageBlocks(ensureGlanceCss(deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))), meta?.blocks)}</div>`;
+  return `<div lang="en">${finishPage(ensureGlanceCss(deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))), meta)}</div>`;
 }
 
 /**
@@ -223,7 +232,7 @@ export function renderImportBody(
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
   const base0 = cleanDescValue(baseHtml);
   if (isPreStyled(base0)) {
-    return oneLine(`<div lang="en">${injectPageBlocks(ensureGlanceCss(deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))), meta?.blocks)}</div>`);
+    return oneLine(`<div lang="en">${finishPage(ensureGlanceCss(deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))), meta)}</div>`);
   }
   if (isSelfContainedLayout(layoutId)) {
     return oneLine(renderDescriptionHtml(layoutId, baseHtml, imgs, meta));
@@ -730,6 +739,24 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm-compat-eg .bm-eg b{flex:0 0 46px!important;min-width:46px!important;font-size:12.5px!important}` +
   `.bm-compat-eg .bm-eg span{flex:1 1 auto!important;min-width:0!important;font-size:12.5px!important;font-weight:400!important}` +
   `.bm-layouts-note{margin:10px 0 0!important;font-size:12.5px!important;line-height:1.5!important}` +
+  // 4e) FAQ rows: ONE plus sign at the far right (the model's own .bm-plus span used to sit right after the question text,
+  //     next to a second "+"), with a real gap between the question and the sign
+  `summary.bm-faq-q .bm-plus{display:none!important}` +
+  `summary.bm-faq-q{gap:14px!important;align-items:center!important}` +
+  `summary.bm-faq-q>span:first-child{flex:1 1 auto!important;min-width:0!important;line-height:1.35!important}` +
+  `summary.bm-faq-q::after{flex:0 0 auto!important;margin-left:auto!important}` +
+  // 4f) hero: centred, with air between the subtitle and the badges, and tuned per screen size
+  `.bm-hero{text-align:center!important}` +
+  `.bm-hero .bm-eyebrow,.bm-hero h2,.bm-hero .sub{text-align:center!important}` +
+  `.bm-hero h2{font-size:clamp(20px,4.4vw,30px)!important;line-height:1.2!important;margin-left:auto!important;margin-right:auto!important}` +
+  `.bm-hero .sub{margin:8px auto 16px!important;max-width:64ch!important;line-height:1.5!important;font-size:clamp(13px,2.4vw,15px)!important}` +
+  `.bm-badges{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;align-items:center!important;gap:8px 10px!important;overflow:visible!important;margin:14px auto 0!important}` +
+  `.bm-badges span{white-space:nowrap!important;line-height:1.2!important}` +
+  `@media (max-width:640px){.bm-hero{padding:20px 14px!important}.bm-badges{gap:6px 8px!important}.bm-badges span{font-size:12px!important;padding:6px 10px!important}.bm-hero h2{font-size:clamp(19px,6vw,24px)!important}}` +
+  `@media (min-width:641px) and (max-width:1024px){.bm-badges span{font-size:12.5px!important}}` +
+  // 4g) compatible layouts chips: one consistent style, wrapped evenly
+  `.bm-layouts{display:flex!important;flex-wrap:wrap!important;gap:6px 8px!important;align-items:center!important}` +
+  `.bm-layouts span{display:inline-flex!important;align-items:center!important;line-height:1.2!important;padding:5px 10px!important;white-space:nowrap!important}` +
   // 4d) feature rows: the emoji gets a fixed square so every icon sits on the same line as its title, whatever the model wrote
   `.bm-feat li{display:flex!important;align-items:flex-start!important;gap:10px!important}` +
   `.bm-feat li .ico{flex:0 0 30px!important;width:30px!important;height:30px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:18px!important;line-height:1!important;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}` +

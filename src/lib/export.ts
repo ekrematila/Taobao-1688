@@ -105,6 +105,7 @@ export function shopifyBodyHtml(p: NormalisedProduct, l: GeneratedListing): stri
     name: field(l, "title") || p.titleTranslated || p.title,
     props: p.props,
     blocks: pageBlocksFor(p, l, STORE_PROFILES),
+    skin: l.meta?.pageSkin !== false,
   });
 }
 
@@ -114,6 +115,7 @@ export function importBodyHtml(p: NormalisedProduct, l: GeneratedListing): strin
     name: field(l, "title") || p.titleTranslated || p.title,
     props: p.props,
     blocks: pageBlocksFor(p, l, STORE_PROFILES),
+    skin: l.meta?.pageSkin !== false,
   });
 }
 

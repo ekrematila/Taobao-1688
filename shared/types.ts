@@ -264,6 +264,8 @@ export interface GeneratedListing {
     descStyle?: string;
     /** which store policy profile (Settings → Mağaza politikaları) feeds the Shipping & Returns block */
     storeProfileId?: string;
+    /** false = keep the store theme as it is (only the description card is styled); default: the whole page is themed */
+    pageSkin?: boolean;
     /** statements in the generated page that the source data does not back up (deterministic check at generation time) */
     factWarnings?: { rule: string; snippet: string; why: string }[];
   };

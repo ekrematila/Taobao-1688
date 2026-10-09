@@ -79,6 +79,86 @@ export interface PageBlocks {
   swatches: string;
   ship: string;
   related: string;
+  /** the whole 'Compatible Layouts' section for keycap sets (replaces what the model wrote) */
+  layouts: string;
+}
+
+
+/* ------------------------- compatible layouts (keycap sets) ------------------------- */
+
+export interface LayoutDef {
+  label: string;
+  /** the fewest keys a set needs to cover this layout */
+  minKeys: number;
+  /** only listed for big kits (130+ pieces: they carry the extra bottom-row / split pieces) */
+  extended?: boolean;
+  /** real boards of this layout — shown as EXAMPLES only */
+  examples: string[];
+}
+
+export const LAYOUTS: LayoutDef[] = [
+  { label: "40%", minKeys: 47, extended: true, examples: ["OLKB Planck", "Vortex Core"] },
+  { label: "60%", minKeys: 61, examples: ["Anne Pro 2", "Ducky One 3 Mini", "Royal Kludge RK61"] },
+  { label: "HHKB", minKeys: 60, extended: true, examples: ["HHKB Professional Hybrid Type-S"] },
+  { label: "65%", minKeys: 68, examples: ["Keychron K6", "Ducky One 3 SF", "Royal Kludge RK68"] },
+  { label: "Alice", minKeys: 68, extended: true, examples: ["Keychron Q8"] },
+  { label: "75%", minKeys: 82, examples: ["GMMK Pro", "Keychron K3", "NuPhy Air75"] },
+  { label: "TKL", minKeys: 87, examples: ["Ducky One 3 TKL", "Leopold FC750R", "Keychron C3 Pro"] },
+  { label: "96%", minKeys: 98, examples: ["Keychron Q5", "Royal Kludge RK96", "Keychron K4"] },
+  { label: "100%", minKeys: 104, examples: ["Keychron K10", "Ducky One 3 Full-Size", "Leopold FC900R"] },
+];
+const KEY_COUNT_CHIPS = [61, 64, 68, 75, 84, 87, 98, 104, 108];
+export const BIG_KIT_KEYS = 130;
+
+/** how many keys the set has: the product's own key-count spec, else "140 keys" in the title */
+export function keycapCountOf(p: Pick<NormalisedProduct, "title" | "titleTranslated" | "props">): number | null {
+  for (const [k, v] of Object.entries(p.props || {})) {
+    if (/颗数|键数|键位数|key ?count|keys|数量/i.test(k)) {
+      const n = parseInt(String(v).replace(/[^0-9]/g, ""), 10);
+      if (n >= 30 && n <= 250) return n;
+    }
+  }
+  const m = `${p.titleTranslated || ""} ${p.title}`.match(/(?<![0-9])(1[0-9]{2}|[3-9][0-9])\s*(?:keys?|key ?caps?|pcs|pieces|键|颗)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** the layouts a set with `keys` pieces covers: all standard sizes it has the keys for; 130+ pieces → every layout incl. the special ones */
+export function layoutsFor(keys: number): LayoutDef[] {
+  return LAYOUTS.filter((l) => l.minKeys <= keys && (!l.extended || keys >= BIG_KIT_KEYS));
+}
+
+export function layoutsSectionHtml(keys: number | null | undefined): string {
+  if (!keys || keys < 61) return "";
+  const list = layoutsFor(keys);
+  if (list.length < 2) return "";
+  const chips = list.map((l) => `<span>${escH(l.label)}</span>`).join("");
+  const counts = KEY_COUNT_CHIPS.filter((n) => n <= keys).map((n) => `<span>${n} keys</span>`).join("");
+  const rows = list
+    .map((l) => `<div class="bm-eg"><b>${escH(l.label)}</b><span>${l.examples.map(escH).join(" · ")}</span></div>`)
+    .join("");
+  return (
+    `<div data-ps="layouts"><h3>Compatible Layouts</h3>` +
+    `<div class="bm-layouts">${chips}</div>` +
+    `<div class="bm-layouts bm-layouts-keys">${counts}<span>${keys} keys in this set</span></div>` +
+    `<div class="bm-compat-eg">${rows}</div>` +
+    `<p class="bm-layouts-note">ANSI &amp; ISO layout compatible. The keyboards above are examples for reference only, not endorsements — unsure about yours? Please contact us.</p></div>`
+  );
+}
+
+/** swap the model's own 'Compatible Layouts' section for the complete one (or add it before Specifications) */
+function placeLayouts(html: string, section: string): string {
+  if (!section || html.includes('data-ps="layouts"')) return html;
+  const own = html.search(/<h3\b[^>]*>[^<]*compatible\s+layouts[^<]*<\/h3>/i);
+  if (own >= 0) {
+    const next = html.indexOf("<h3", own + 10);
+    // the section ends at the next heading; without one, at the note / CTA that closes the info column
+    const tail = html.slice(own).search(/<div\b[^>]*class=["'][^"']*\b(?:bm-note|bm-cta)\b/i);
+    const end = next >= 0 ? next : tail >= 0 ? own + tail : -1;
+    if (end > own) return html.slice(0, own) + section + html.slice(end);
+    return html;
+  }
+  const spec = html.search(/<h3\b[^>]*>[^<]*specifications[^<]*<\/h3>/i);
+  return spec >= 0 ? html.slice(0, spec) + section + html.slice(spec) : html;
 }
 
 /** words that describe the product, for matching related links */
@@ -94,6 +174,9 @@ export function buildPageBlocks(args: {
   listingTitle?: string;
   /** public url of the picture for a variant (null = none) */
   variantImageUrl: (v: NormalisedProduct["variants"][number]) => string | null;
+  /** keycap set → the complete 'Compatible Layouts' section is built from the key count */
+  isKeycapSet?: boolean;
+  keyCount?: number | null;
 }): PageBlocks {
   const { product, profile } = args;
   const sw: Swatch[] = [];
@@ -109,6 +192,7 @@ export function buildPageBlocks(args: {
     swatches: swatchBlockHtml(sw),
     ship: profile ? shipBlockHtml(profile) : "",
     related: profile ? relatedBlockHtml(pickRelatedLinks(profile, productText(product, args.listingTitle))) : "",
+    layouts: args.isKeycapSet ? layoutsSectionHtml(args.keyCount) : "",
   };
 }
 
@@ -117,8 +201,10 @@ export function buildPageBlocks(args: {
  * (`bm-cta`) when it has one, otherwise at the very end of the wrapper. A page that already
  * carries a block of that kind (data-ps="…") is left alone.
  */
-export function injectPageBlocks(html: string, blocks?: Partial<PageBlocks> | null): string {
-  if (!blocks) return html;
+export function injectPageBlocks(html: string, blocksIn?: Partial<PageBlocks> | null): string {
+  if (!blocksIn) return html;
+  const blocks = blocksIn;
+  if (blocks.layouts) html = placeLayouts(html, blocks.layouts);
   const add = (["swatches", "ship", "related"] as const)
     .filter((k) => blocks[k] && !html.includes(`data-ps="${k}"`))
     .map((k) => blocks[k])
@@ -134,8 +220,8 @@ export function injectPageBlocks(html: string, blocks?: Partial<PageBlocks> | nu
 export const GLANCE_CSS =
   "<style>.bm-glance{margin:14px 0;padding:14px 16px;border:1px solid var(--line2,#e4e4e7);border-left:4px solid var(--gold,var(--acc,#a1a1aa));border-radius:var(--r,14px);background:var(--milk,#fafafa)}" +
   ".bm-glance-t{margin:0 0 6px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--head,var(--ink,#18181b))}" +
-  ".bm-glance ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:4px 16px}" +
-  ".bm-glance li{margin:0;font-size:14px;line-height:1.5;color:var(--body,#3f3f46)}.bm-glance li b{color:var(--head,var(--ink,#18181b))}</style>";
+  ".bm-glance ul{margin:0!important;padding:0!important;list-style:none!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;gap:6px 18px!important;align-items:start!important}" +
+  ".bm-glance li{margin:0!important;padding:0!important;list-style:none!important;font-size:14px!important;line-height:1.45!important;color:var(--body,#3f3f46)}.bm-glance li b{color:var(--head,var(--ink,#18181b))}</style>";
 
 export function ensureGlanceCss(html: string): string {
   if (!/class=["'][^"']*\bbm-glance\b/.test(html) || /\.bm-glance\s*\{/.test(html)) return html;
@@ -171,11 +257,13 @@ export const BREVITY_RULE = [
   "- Bölüm sayısı ve uzunluk için operatörün bandı yalnızca ÜST sınırdır: bandın altında kalmak SERBEST ve TERCİH EDİLİR; bandı doldurmak için asla metin ekleme.",
 ].join("\n");
 
-/** Typography that fits the product (the system loads the web font from the two variables the model sets). */
+/** Typography + theme characters that fit the product — the system turns them into the WHOLE product page's look. */
 export const FONT_RULE = [
-  "TİPOGRAFİ — ürüne uygun: `.bm{}` bloğuna iki değişken ekle: `--fh:'Başlık Fontu';` ve `--fb:'Gövde Fontu';` (yalnızca aşağıdaki listeden, tırnaklı tek isim). Font da ürünün havasına uysun:",
-  "sevimli/kawaii/pastel → Fredoka + Nunito · anime/eğlenceli → Baloo 2 + Poppins · minimal/temiz/modern → DM Sans + Inter · zarif/premium/lüks → Playfair Display + Lato · gaming/fütüristik/teknik → Rajdhani + Inter · retro/vintage → DM Serif Display + DM Sans · koyu/dramatik → Oswald + Barlow · doğal/toprak/matcha → Lora + Nunito Sans · canlı/renkli/cesur → Poppins + Montserrat · tatlı/yumuşak (alternatif) → Quicksand + Nunito Sans · geek/tech minimal → Space Grotesk + Inter.",
-  "Sistem bu iki fontu otomatik yükler ve tüm sayfaya uygular — sen `font-family`'yi ayrıca yazma; renk, rozet, emoji ve metin tonu da aynı havaya uysun.",
+  "SAYFA TEMASI — ürüne uygun (sistem bunları ürün sayfasının TAMAMINA uygular: duyuru çubuğu, başlık, fiyat, Add to Cart / Buy it now, footer, arka plan, animasyon):",
+  "1) FONT: `.bm{}` bloğuna `--fh:'Başlık Fontu';` ve `--fb:'Gövde Fontu';` ekle (yalnızca listeden, tırnaklı tek isim): sevimli/kawaii/pastel → Fredoka + Nunito · anime/eğlenceli → Baloo 2 + Poppins · minimal/temiz/modern → DM Sans + Inter · zarif/premium/lüks → Playfair Display + Lato · gaming/fütüristik/teknik → Rajdhani + Inter · retro/vintage → DM Serif Display + DM Sans · koyu/dramatik → Oswald + Barlow · doğal/toprak/matcha → Lora + Nunito Sans · canlı/renkli/cesur → Poppins + Montserrat · tatlı/yumuşak → Quicksand + Nunito Sans · geek/tech minimal → Space Grotesk + Inter.",
+  "2) RENK: `--gold` (ana vurgu — BUTON ARKA PLANI olacak: doygun, #rrggbb), `--gold2` (açık vurgu), `--ink` (koyu ana renk — FOOTER'ın zemini bundan türetilir), `--lav` (çok açık zemin) hex (#rrggbb) yazılmalı; hepsi FOTOĞRAFLARDAKİ baskın renklere göre seçilir.",
+  "3) KARAKTERLER: `--deco:'🐻 ☃️ 🔥 🍵';` (3–5 emoji/karakter; ürünün GERÇEK teması ve fotoğraflardaki objeler — alakasız emoji yok; footer şeridinde ve Add to Cart düğmesinde kullanılır) ve YALNIZCA tema gerçekten uyuyorsa `--fall:'❄ ❅ ❆';` (yavaşça düşen süs karakterleri: kış=❄ ❅, tatlı/kawaii=♡ ✿ ✦, doğa=🍃; ciddi/teknik/koyu/premium üründe YAZMA). `--mood:cute;` (cute|calm|bold|elegant|tech|retro|dark|natural).",
+  "Sen `font-family`'yi ve mağaza teması kurallarını ayrıca YAZMA — sistem ekler; renk, rozet, emoji ve metin tonu aynı havaya uysun.",
 ].join("\n");
 
 /** Etsy (plain-text) listings: the same honesty rule, shorter. */

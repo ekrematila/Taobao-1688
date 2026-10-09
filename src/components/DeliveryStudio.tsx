@@ -426,6 +426,16 @@ export default function DeliveryStudio({
     }
   }
 
+  /** theme the WHOLE store page after the product (colours, fonts, Add to Cart, footer, animations) — on by default */
+  async function togglePageSkin(on: boolean) {
+    if (!draft.listing) return;
+    await api.patchDraft(draft.id, {
+      listing: { ...draft.listing, meta: { ...(draft.listing.meta ?? {}), pageSkin: on ? undefined : false } },
+      label: on ? t("delivery.skinOn") : t("delivery.skinOff"),
+    });
+    onSaved();
+  }
+
   async function applyGateNow(next: boolean) {
     setConfirmGate(null);
     setApplyAdvice(next);
@@ -1400,6 +1410,15 @@ export default function DeliveryStudio({
               {busy === "gen-local" ? <span className="spin" /> : t("delivery.generateLocal")}
             </button>
           </div>
+          {channel === "shopify" && draft.listing && (
+            <label className="row" style={{ gap: 8, alignItems: "flex-start", margin: 0 }} title={t("delivery.skinHint")}>
+              <input type="checkbox" checked={draft.listing.meta?.pageSkin !== false} onChange={(e) => togglePageSkin(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>
+                <b>{t("delivery.skin")}</b>
+                <span className="tiny muted" style={{ display: "block" }}>{t("delivery.skinHint")}</span>
+              </span>
+            </label>
+          )}
           {channel === "shopify" && (
             <div className="col" style={{ gap: 6, padding: 10, border: "1px dashed var(--line)", borderRadius: 10 }}>
               <label className="field" style={{ margin: 0 }}>

@@ -245,6 +245,7 @@ export async function pushToShopify(
     name: field(listing, "title") || product.titleTranslated || product.title,
     props: product.props,
     blocks,
+    skin: listing.meta?.pageSkin !== false,
   });
 
   const vlist = outputVariants(product, listing);
