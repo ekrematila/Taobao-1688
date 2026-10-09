@@ -737,7 +737,12 @@ router.post(
     const page = async (path: string) => {
       const r = await fetch(base + path, { headers: { "User-Agent": "Mozilla/5.0 (compatible; ProductStudio)" }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(`${base}${path} → HTTP ${r.status}`);
-      return htmlToText(await r.text()).slice(0, 14000);
+      const html = await r.text();
+      // ONLY the policy text itself — a Shopify theme repeats promo banners ("free shipping $49+") around it, which are not policy
+      const from = html.search(/shopify-policy__container|<main\b/i);
+      const to = html.search(/<\/main>/i);
+      const main = from >= 0 ? html.slice(from, to > from ? to : undefined) : html;
+      return htmlToText(main).slice(0, 14000);
     };
     const [shipping, refund] = await Promise.all([page("/policies/shipping-policy"), page("/policies/refund-policy")]);
     const system = [
