@@ -488,6 +488,6 @@ test("no falling / floating characters survive, whoever wrote them (model CSS, o
 test("the shorter column stays in view: the script picks it and the CSS makes it sticky", () => {
   const out = renderDescriptionHtml("stacked-plain", STACKED_DESC_EXAMPLE, imgs);
   assert.ok(/function stickShorter\(\)/.test(out), "script present");
-  assert.ok(/\.bm \.bm-grid>\.bm-stk\{position:sticky!important/.test(out), "sticky rule");
-  assert.ok(/\.bm \.bm-grid>\.bm-flow\{position:static!important/.test(out), "flow rule");
+  assert.ok(/\.bm-grid>\.bm-stk\s*\{\s*position:sticky!important/.test(out), "sticky rule");
+  assert.ok(/\.bm-grid>\.bm-flow\s*\{\s*position:static!important/.test(out), "flow rule");
 });
