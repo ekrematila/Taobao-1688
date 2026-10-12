@@ -957,7 +957,7 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // The images column is much taller than the text column on a page with several (tall) description pictures — the
   // right side used to be empty below the text. The text column now follows the page (sticky, its own gentle
   // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.
-  `.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}` +
+  `.bm .bm-grid>.bm-c2,.bm .bm-grid>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}` +
   `.bm .bm-grid>.bm-c2::-webkit-scrollbar,.bm .bm-grid>.bm-acc-desc::-webkit-scrollbar{display:none}` +
   // Same guarantee for the NEW per-section "Description"/"Images" tabs
   // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
