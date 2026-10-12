@@ -468,6 +468,8 @@ ${FIND_ATC_FN}
     b.style.height = b.scrollHeight + 'px';
     b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
     setTimeout(finish, 450);
+    /* inside the sticky text panel the answer can open below the visible part: glide it into view instead of leaving it cut off */
+    try{ var pn = item.closest('.bm-c2,.bm-acc-desc'); if(pn && pn.scrollHeight > pn.clientHeight + 4){ setTimeout(function(){ item.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 120); } }catch(e){}
   }
   /* The mobile "Description"/"Images" tabs: same reliable height-animation
      pattern as the FAQ above (native <details> open/close is instant with no
@@ -891,7 +893,8 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // The images column is much taller than the text column on a page with several (tall) description pictures — the
   // right side used to be empty below the text. The text column now follows the page (sticky, its own gentle
   // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.
-  `.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(120,120,140,.35) transparent}` +
+  `.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}` +
+  `.bm .bm-grid>.bm-c2::-webkit-scrollbar,.bm .bm-grid>.bm-acc-desc::-webkit-scrollbar{display:none}` +
   // Same guarantee for the NEW per-section "Description"/"Images" tabs
   // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
   // a missing `open` there would otherwise hide half the description

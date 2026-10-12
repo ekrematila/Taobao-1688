@@ -132,7 +132,8 @@ test("the Add-to-Cart surroundings follow the product, the delivery timeline kee
   const css = buildPageSkinCss(PAGE("--fall:'🍃 ❄';"));
   for (const sel of [".ka-payments-trigger", ".ka-review", ".ka-reviews__progress-bar", "trust-badges-katrustbadges", ".kt-s", ".kt-c", ".kt-p::after"]) assert.ok(css.includes(sel), sel);
   assert.match(css, /\.kt-p::after\{content:"🍃"/, "the section's falling leaf is the product's own leaf");
-  assert.ok(css.includes(".three_step_card"), "the timeline box still gets its mint wash");
+  assert.ok(!css.includes(".three_step_card") && !css.includes("delivery_msg"), "the delivery timeline keeps the store's own white look");
+  assert.match(css, /#MainContent[^{]*\{background:#fff!important/, "the page background stays white");
 });
 
 test("a page saved with an OLD skin (falling characters) gets a fresh skin without them", () => {

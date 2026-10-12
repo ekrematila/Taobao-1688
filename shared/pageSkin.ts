@@ -170,8 +170,8 @@ export function buildPageSkinCss(html: string): string {
   parts.push(
     `${SCOPE}{--sk-acc:${accHex};--sk-acc2:${acc2Hex};--sk-acc-dark:${toHex(accDark)};--sk-on-acc:${onAcc};--sk-lav:${lavHex};--sk-ink:${toHex(k.ink)};--sk-deep:${toHex(deep)};--sk-deep2:${toHex(deep2)};--sk-deep3:${toHex(deep3)};--sk-acc-rgb:${rgb(k.acc)}}`,
   );
-  // page background: a soft wash of the palette that fades into white behind the product
-  parts.push(rule(["#MainContent", ".wrapper-body"], `background:linear-gradient(180deg,var(--sk-lav) 0,#fff 760px)!important`));
+  // the product page itself stays plain white (no palette wash behind the product)
+  parts.push(rule(["#MainContent", ".wrapper-body"], `background:#fff!important`));
   if (fb) parts.push(`${SCOPE},${SCOPE} button,${SCOPE} input,${SCOPE} select,${SCOPE} textarea{font-family:${fb}!important}`);
   if (fh)
     parts.push(
@@ -184,7 +184,7 @@ export function buildPageSkinCss(html: string): string {
     rule([".announcement-bar *", "announcement-bar-component *"], `color:var(--sk-on-acc)!important`),
     rule(
       ["sticky-header-mobile", ".header-mobile", "sticky-header", ".header-navigation-wrapper", ".header-navigation"],
-      `background:linear-gradient(180deg,var(--sk-lav),#fff)!important;border-bottom:1px solid rgba(var(--sk-acc-rgb),.25)`,
+      `background:#fff!important;border-bottom:1px solid rgba(var(--sk-acc-rgb),.25)`,
     ),
   );
 
@@ -212,8 +212,7 @@ export function buildPageSkinCss(html: string): string {
   parts.push(
     rule([".ka-payments-trigger", ".ka-payments-trigger *"], `color:var(--sk-on-acc)!important`),
     rule([".ka-payments-trigger"], `background:linear-gradient(135deg,var(--sk-acc2),var(--sk-acc))!important;border-radius:999px!important;border:0!important;box-shadow:0 8px 18px -10px rgba(var(--sk-acc-rgb),.8)!important`),
-    rule([".three_step_card", ".delivery_msg .step_template", ".delivery_msg .li_border_1"], `border-color:rgba(var(--sk-acc-rgb),.5)!important;background:var(--sk-lav)!important;border-radius:14px`),
-    rule([".three_step_card *", ".delivery_msg .step_template *"], `color:var(--sk-ink)!important`),
+    // the delivery timeline (order / shipped / at your doorstep) is NOT themed: it keeps the store's own white look
     rule([".ka-reviews"], `background:linear-gradient(180deg,var(--sk-deep),var(--sk-deep2))!important;border-radius:22px!important`),
     rule([".ka-reviews__label", ".ka-reviews__header *"], `color:var(--sk-acc2)!important;font-family:inherit`),
     rule([".ka-review"], `background:rgba(255,255,255,.07)!important;border:1px solid rgba(var(--sk-acc-rgb),.3)!important;box-shadow:none!important`),
