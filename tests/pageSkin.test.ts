@@ -152,3 +152,11 @@ test("RULE: announcement bar + header are ONE soft vertical gradient (product co
   assert.doesNotMatch(css, /announcement-bar[^{]*\{background:linear-gradient\(90deg/);
   assert.doesNotMatch(css, /sticky-header[^{]*\{background:#fff/);
 });
+
+test("the skin is the FIRST thing in the description, so the store theme changes as soon as the page starts loading", async () => {
+  const { applyPageSkin } = await import("../shared/pageSkin.ts");
+  const out = applyPageSkin(PAGE());
+  assert.ok(out.startsWith('<style data-ps-skin="1">'), "skin first");
+  assert.ok(out.indexOf("data-ps-skin") < out.indexOf('class="bm"'));
+  assert.equal((out.match(/data-ps-skin/g) || []).length, 1);
+});

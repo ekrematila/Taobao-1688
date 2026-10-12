@@ -310,6 +310,8 @@ export function applyPageSkin(html: string): string {
   const clean = html.replace(/<style data-ps-skin="1">[\s\S]*?<\/style>/g, "");
   const css = buildPageSkinCss(clean);
   if (!css) return clean;
-  const end = clean.lastIndexOf("</div>");
-  return end >= 0 ? clean.slice(0, end) + css + clean.slice(end) : clean + css;
+  // FIRST thing in the description: the browser applies it as soon as it reaches the description (not after the whole
+  // 35 K page + its images were parsed) — the store theme's bar/header/title change before the visitor sees them.
+  // (`body:has(.bm)` re-evaluates by itself the moment the `.bm` block is parsed.)
+  return css + clean;
 }

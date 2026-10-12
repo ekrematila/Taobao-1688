@@ -1114,6 +1114,7 @@ export function applyProductFonts(html: string): string {
   const body = stack(fb || fh);
   const head = stack(fh || fb);
   const css =
+    `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
     `<style>@import url('https://fonts.googleapis.com/css2?${fam}&display=swap');` +
     `.bm,.bm button,.bm summary{font-family:${body}!important}` +
     `.bm h1,.bm h2,.bm h3,.bm .bm-eyebrow,.bm .bm-glance-t,.bm .bm-feat b,.bm .bm-sub,.bm summary.bm-bar{font-family:${head}!important}</style>`;
