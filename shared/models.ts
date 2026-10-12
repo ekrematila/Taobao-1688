@@ -61,6 +61,9 @@ export const GPT_MODELS: ClaudeModel[] = [
 ];
 CLAUDE_MODELS.push(...GPT_MODELS);
 
+/** the model that rewrites a store page in "update the page for this product" */
+export const ADAPT_DEFAULT_MODEL = "gpt-6.1-sol";
+
 /** the model that picks the Shopify taxonomy attributes unless the operator chooses another */
 export const ATTR_DEFAULT_MODEL = "claude-haiku-5-5";
 

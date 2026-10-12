@@ -14,7 +14,7 @@ import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, setStoreProfiles, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
 import { DEFAULT_STORE_PROFILES, pickStoreProfile } from "@shared/storeProfiles.ts";
 import { productText as pageProductText } from "@shared/pageBlocks.ts";
-import { ATTR_DEFAULT_MODEL, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
+import { ADAPT_DEFAULT_MODEL, ATTR_DEFAULT_MODEL, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
@@ -115,6 +115,8 @@ export default function DeliveryStudio({
   const [descStyle, setDescStyle] = useState("product");
   const [storeProfileId, setStoreProfileId] = useState(""); // "" = pick automatically from the product
   const [adaptNote, setAdaptNote] = useState("");
+  // the model that rewrites the page in "update for this product" — GPT-6.1 Sol unless chosen otherwise (never Manus)
+  const [adaptModel, setAdaptModel] = useState(ADAPT_DEFAULT_MODEL);
   // shipping & customs (persisted on draft.product so exports/push can read them).
   // "Type" is not its own field — it mirrors the Ürün türü (productType) value.
   const [category, setCategory] = useState("");
@@ -243,6 +245,7 @@ export default function DeliveryStudio({
       setDescThinking(typeof dc.descThinking === "string" ? dc.descThinking : "");
       setDescStyle(dc.descStyle ?? "product");
       setStoreProfileId(typeof dc.storeProfileId === "string" ? dc.storeProfileId : "");
+      setAdaptModel(typeof dc.adaptModel === "string" && dc.adaptModel ? dc.adaptModel : ADAPT_DEFAULT_MODEL);
       setPerVariantCustoms(!!dc.perVariantCustoms);
       setAutoVariants(dc.autoVariants === "off" || dc.autoVariants === "ai" ? dc.autoVariants : "free");
       setEtsyBase(dc.etsyBase === "max" ? "max" : "min");
@@ -289,13 +292,13 @@ export default function DeliveryStudio({
         .patchDraft(draft.id, {
           imageState: {
             ...((draft.imageState as any) ?? {}),
-            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms, autoVariants, etsyBase },
+            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, adaptModel, perVariantCustoms, autoVariants, etsyBase },
           },
         })
         .catch(() => {});
     }, 600);
     return () => clearTimeout(id);
-  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms, autoVariants, etsyBase]);
+  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, adaptModel, perVariantCustoms, autoVariants, etsyBase]);
 
   // persist shipping & customs onto draft.product (debounced, silent, fresh-merged)
   useEffect(() => {
@@ -410,7 +413,24 @@ export default function DeliveryStudio({
   /** "Ürün sayfasını ürüne göre güncelle": the saved page is the template — every element is rewritten from THIS product's verified data */
   async function adaptPage() {
     setBusy("adapt");
-    const r = generateListingJob({ ...genInput("ai"), adaptPage: true, adaptNote: adaptNote.trim() || undefined, fields: [{ key: "description" }] }, setJob);
+    // the chosen model alone does the rewrite: no second-pass model, no Manus, and the app's default effort / thinking
+    const r = generateListingJob(
+      {
+        ...genInput("ai"),
+        model: adaptModel,
+        effort: undefined,
+        thinking: undefined,
+        descProvider: undefined,
+        descManusProfile: undefined,
+        descModel: undefined,
+        descEffort: undefined,
+        descThinking: undefined,
+        adaptPage: true,
+        adaptNote: adaptNote.trim() || undefined,
+        fields: [{ key: "description" }],
+      },
+      setJob,
+    );
     jobRef.current = r as RunningJob<unknown>;
     try {
       await r.promise;
@@ -1515,6 +1535,12 @@ export default function DeliveryStudio({
               <label className="field" style={{ margin: 0 }}>
                 {t("delivery.adaptTitle")}
                 <textarea rows={2} value={adaptNote} onChange={(e) => setAdaptNote(e.target.value)} placeholder={t("delivery.adaptPh")} />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                {t("delivery.adaptModel")}
+                <select value={adaptModel} onChange={(e) => setAdaptModel(e.target.value)}>
+                  <ModelOptions withLabel extraIds={[adaptModel]} />
+                </select>
               </label>
               <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button
