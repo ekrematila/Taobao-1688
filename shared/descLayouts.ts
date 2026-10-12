@@ -804,6 +804,11 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm-zoomtag,.bm-lightbox,[data-bm-lightbox]{display:none!important}` +
   `.bm-media img,.bm-media .bm-stage,.pd-media img{cursor:default!important}` +
   `.bm-media img,.pd-media img,.bm-media img:hover,.pd-media img:hover{transform:none!important;filter:none!important;transition:none!important}` +
+  // stacked pictures read as ONE continuous strip: no gap between them, and only the strip's outer corners are rounded
+  // (the first picture's top and the last picture's bottom) — never each picture on its own, whatever the model's CSS says
+  `.bm .bm-media{display:block!important;gap:0!important;row-gap:0!important;font-size:0!important;line-height:0!important;border-radius:var(--r,14px)!important;overflow:hidden!important}` +
+  `.bm .bm-media>img,.bm .bm-media>.bm-stage{display:block!important;width:100%!important;max-width:100%!important;margin:0!important;border-radius:0!important;border:0!important;box-shadow:none!important}` +
+  `.bm .bm-media>img+img,.bm .bm-media>.bm-stage+.bm-stage,.bm .bm-media>img+.bm-stage,.bm .bm-media>.bm-stage+img{margin-top:-1px!important}` +
   // 4j) the root card is capped for a narrow desktop theme column — widen it
   //     on devices that actually have the room (desktop/tablet) regardless of
   //     what the model's own `.bm{}` max-width says.

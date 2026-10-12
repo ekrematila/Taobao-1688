@@ -378,6 +378,22 @@ export default function StitchPanel({
       );
       const ratio = RATIOS.find((r) => r.key === ratioKey)?.ratio ?? null;
       if (ratio) rects = rects.map((r) => coverCrop(analysis.pixels, r, ratio));
+      // a fixed output ratio can stretch a box into its neighbour — the same strip of picture would then appear at the
+      // bottom of one piece AND the top of the next (a visible repeat). Meet in the middle instead.
+      {
+        const order = rects.map((_, i) => i).sort((x, y) => rects[x].y - rects[y].y);
+        for (let oi = 0; oi < order.length; oi++)
+          for (let oj = oi + 1; oj < order.length; oj++) {
+            const A = rects[order[oi]];
+            const B = rects[order[oj]];
+            const sameColumn = A.x < B.x + B.w && B.x < A.x + A.w;
+            if (!sameColumn || A.y + A.h <= B.y) continue;
+            const mid = Math.round((A.y + A.h + B.y) / 2);
+            A.h = Math.max(1, mid - A.y);
+            B.h = Math.max(1, B.y + B.h - mid);
+            B.y = mid;
+          }
+      }
       const out: string[] = [];
       for (const r of rects) {
         const w = Math.max(1, Math.round(r.w * k));
