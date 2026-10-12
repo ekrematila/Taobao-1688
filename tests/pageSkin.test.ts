@@ -142,3 +142,13 @@ test("a page saved with an OLD skin (falling characters) gets a fresh skin witho
   assert.doesNotMatch(out, /skFall/);
   assert.equal((out.match(/data-ps-skin/g) || []).length, 1);
 });
+
+test("RULE: announcement bar + header are ONE soft vertical gradient (product colour fading to white), bold dark bar text — not a saturated bar over a flat white header", async () => {
+  const { buildPageSkinCss } = await import("../shared/pageSkin.ts");
+  const css = buildPageSkinCss(PAGE("--gold:#8a5cc4;--ink:#2b1a55;--lav:#f3eef8;"));
+  assert.match(css, /announcement-bar-component\{background:linear-gradient\(180deg,#[0-9a-f]{6},#[0-9a-f]{6}\)!important/);
+  assert.match(css, /sticky-header[^{]*\{background:linear-gradient\(180deg,#[0-9a-f]{6},#fff 85%\)!important/);
+  assert.match(css, /announcement-bar-component \*\{color:#[0-9a-f]{6}!important;font-weight:700!important/);
+  assert.doesNotMatch(css, /announcement-bar[^{]*\{background:linear-gradient\(90deg/);
+  assert.doesNotMatch(css, /sticky-header[^{]*\{background:#fff/);
+});

@@ -178,13 +178,17 @@ export function buildPageSkinCss(html: string): string {
       rule([".productView-title", ".productView-title *", "h1", "footer.footer h2", "footer.footer h3", "footer.footer .footer-block__heading"], `font-family:${fh}!important`),
     );
 
-  // announcement bar + header
+  // announcement bar + header — OPERATOR RULE: ONE soft gradient that starts in the product's colour in the announcement bar
+  // and fades to white through the header (bold dark text in the bar). Never a saturated side-to-side bar over a flat white header.
+  const barTop = toHex(mix(k.acc, WHITE, 0.62));
+  const barBot = toHex(mix(k.acc, WHITE, 0.84));
+  const barInk = toHex(darkenFor(mix(k.ink, BLACK, 0.2), mix(k.acc, WHITE, 0.62), 7));
   parts.push(
-    rule([".announcement-bar", "announcement-bar-component"], `background:linear-gradient(90deg,var(--sk-acc),var(--sk-acc2))!important;color:var(--sk-on-acc)!important`),
-    rule([".announcement-bar *", "announcement-bar-component *"], `color:var(--sk-on-acc)!important`),
+    rule([".announcement-bar", "announcement-bar-component"], `background:linear-gradient(180deg,${barTop},${barBot})!important;color:${barInk}!important`),
+    rule([".announcement-bar *", "announcement-bar-component *"], `color:${barInk}!important;font-weight:700!important`),
     rule(
       ["sticky-header-mobile", ".header-mobile", "sticky-header", ".header-navigation-wrapper", ".header-navigation"],
-      `background:#fff!important;border-bottom:1px solid rgba(var(--sk-acc-rgb),.25)`,
+      `background:linear-gradient(180deg,${barBot},#fff 85%)!important;border-bottom:0!important`,
     ),
   );
 
