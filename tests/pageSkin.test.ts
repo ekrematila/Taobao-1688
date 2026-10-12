@@ -32,7 +32,7 @@ test("the skin themes the WHOLE page: announcement bar, header, title/price, Add
   assert.deepEqual(unscoped, [], "every top-level rule is scoped with body:has(.bm)");
   assert.match(css, /'Fredoka',-apple-system/);
   assert.match(css, /content:"🐻  ☃️  🐻/, "characters become the footer strip");
-  assert.match(css, /@keyframes skFall\{/);
+  assert.doesNotMatch(css, /skFall/, "no falling characters");
   assert.match(css, /@media \(max-width:749px\)/);
   assert.match(css, /prefers-reduced-motion/);
 });
@@ -133,4 +133,11 @@ test("the Add-to-Cart surroundings follow the product, the delivery timeline kee
   for (const sel of [".ka-payments-trigger", ".ka-review", ".ka-reviews__progress-bar", "trust-badges-katrustbadges", ".kt-s", ".kt-c", ".kt-p::after"]) assert.ok(css.includes(sel), sel);
   assert.match(css, /\.kt-p::after\{content:"🍃"/, "the section's falling leaf is the product's own leaf");
   assert.ok(css.includes(".three_step_card"), "the timeline box still gets its mint wash");
+});
+
+test("a page saved with an OLD skin (falling characters) gets a fresh skin without them", () => {
+  const old = PAGE("--fall:'♡ ✿';").replace("</div></div>", `</div><style data-ps-skin="1">body:has(.bm)::before{content:"";position:fixed;animation:skFall 54s}@keyframes skFall{}</style></div>`);
+  const out = applyPageSkin(old);
+  assert.doesNotMatch(out, /skFall/);
+  assert.equal((out.match(/data-ps-skin/g) || []).length, 1);
 });

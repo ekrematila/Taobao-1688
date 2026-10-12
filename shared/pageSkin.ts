@@ -261,35 +261,15 @@ export function buildPageSkinCss(html: string): string {
     );
   }
 
-  // scattered, translucent, product-related characters drifting down in a few slow layers (never a regular row).
-  // Each layer is an SVG tile with a handful of characters at seeded random spots / sizes / tilts; tiles of different
-  // sizes loop out of phase, and the whole layer is moved with a transform (cheap), so it never looks like a pattern.
-  // (switched off: the drifting characters were too much — the product-themed decoration stays in the footer / button / leaf)
-  if (false as boolean) {
-    const L1 = [
-      scatterTile(k.fall, 420, 400, 1, 11, 15, 24),
-      scatterTile(k.fall, 560, 600, 2, 23, 13, 22),
-      scatterTile(k.fall, 700, 1200, 3, 37, 14, 26),
-    ];
-    const L2 = [scatterTile(k.fall, 500, 500, 1, 51, 12, 20), scatterTile(k.fall, 800, 1000, 2, 67, 13, 24)];
-    const layer = (tiles: string[], sizes: string, h: number, anim: string) =>
-      `content:"";position:fixed;left:0;right:0;top:-${h}px;height:calc(100vh + ${h}px);z-index:3;pointer-events:none;background-image:${tiles.join(",")};background-size:${sizes};background-repeat:repeat;${anim}`;
-    parts.push(
-      `${SCOPE}::before{${layer(L1, "420px 400px,560px 600px,700px 1200px", 1200, "animation:skFall 54s linear infinite,skDrift 9s ease-in-out infinite alternate")}}`,
-      `${SCOPE}::after{${layer(L2, "500px 500px,800px 1000px", 1000, "animation:skFall2 41s linear infinite,skDrift 13s ease-in-out infinite alternate-reverse;opacity:.85")}}`,
-    );
-  }
+  // (no drifting / falling characters are drawn any more — the operator does not want them)
 
   parts.push(
     `@keyframes skGlow{0%,100%{box-shadow:0 10px 24px -10px rgba(${rgb(k.acc)},.6)}50%{box-shadow:0 14px 30px -8px rgba(${rgb(k.acc)},.95)}}`,
     `@keyframes skSway{from{transform:translateX(-14px)}to{transform:translateX(14px)}}`,
-    `@keyframes skFall{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,1200px,0)}}`,
-    `@keyframes skFall2{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,1000px,0)}}`,
-    `@keyframes skDrift{from{translate:-18px 0}to{translate:18px 0}}`,
     // phones / tablets: calmer, bigger tap targets, lighter decoration
-    `@media (max-width:749px){${k.fall.length ? `${SCOPE}::after{display:none}${SCOPE}::before{opacity:.8}` : ""}${rule(atc, "width:100%!important;min-height:48px")}${deco.length ? rule(["footer.footer::before"], "font-size:18px;padding-top:12px") : ""}${rule([".productView-title"], "font-size:clamp(20px,6vw,26px)!important")}}`,
+    `@media (max-width:749px){${rule(atc, "width:100%!important;min-height:48px")}${deco.length ? rule(["footer.footer::before"], "font-size:18px;padding-top:12px") : ""}${rule([".productView-title"], "font-size:clamp(20px,6vw,26px)!important")}}`,
     `@media (min-width:750px) and (max-width:1024px){${deco.length ? rule(["footer.footer::before"], "font-size:20px") : ""}}`,
-    `@media (prefers-reduced-motion:reduce){${k.fall.length ? `${SCOPE}::before,${SCOPE}::after{display:none!important}` : ""}${rule(atc, "animation:none!important")}${deco.length ? rule(["footer.footer::before"], "animation:none!important") : ""}}`,
+    `@media (prefers-reduced-motion:reduce){${rule(atc, "animation:none!important")}${deco.length ? rule(["footer.footer::before"], "animation:none!important") : ""}}`,
   );
 
   return `<style data-ps-skin="1">${parts.join("\n")}</style>`;
@@ -297,9 +277,10 @@ export function buildPageSkinCss(html: string): string {
 
 /** the skin <style> goes in once, right after the page's own styles */
 export function applyPageSkin(html: string): string {
-  if (html.includes("data-ps-skin")) return html;
-  const css = buildPageSkinCss(html);
-  if (!css) return html;
-  const end = html.lastIndexOf("</div>");
-  return end >= 0 ? html.slice(0, end) + css + html.slice(end) : html + css;
+  // a page saved earlier may carry an OLD skin (e.g. the drifting characters that are gone now) — always rebuild it
+  const clean = html.replace(/<style data-ps-skin="1">[\s\S]*?<\/style>/g, "");
+  const css = buildPageSkinCss(clean);
+  if (!css) return clean;
+  const end = clean.lastIndexOf("</div>");
+  return end >= 0 ? clean.slice(0, end) + css + clean.slice(end) : clean + css;
 }
