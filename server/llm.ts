@@ -27,7 +27,7 @@ import {
 import { detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { readExample } from "./examples.ts";
 import { runManusTask, manusConfigured, imageForVision } from "./manus.ts";
-import { BREVITY_RULE, FACT_GUARD_ETSY, FACT_GUARD_RULE, FONT_RULE, GLANCE_RULE, adaptRule, evidenceText, findUnsupportedClaims, htmlToText, productText, storeFactsLine } from "@shared/pageBlocks.ts";
+import { BREVITY_RULE, RELEVANCE_RULE, FACT_GUARD_ETSY, FACT_GUARD_RULE, FONT_RULE, GLANCE_RULE, adaptRule, evidenceText, findUnsupportedClaims, htmlToText, productText, storeFactsLine } from "@shared/pageBlocks.ts";
 import { pickStoreProfile, profileText } from "@shared/storeProfiles.ts";
 import { readStoreProfiles } from "./storeProfiles.ts";
 import type {
@@ -1130,7 +1130,7 @@ export async function generateListing(
     preferId: input.storeProfileId,
   });
   const guardBlock = isShopify
-    ? [BREVITY_RULE, FACT_GUARD_RULE, GLANCE_RULE, isSelfContainedLayout(input.descriptionLayout) ? FONT_RULE : "", storeFactsLine(storeProfile)].filter(Boolean).join("\n")
+    ? [BREVITY_RULE, RELEVANCE_RULE, FACT_GUARD_RULE, GLANCE_RULE, isSelfContainedLayout(input.descriptionLayout) ? FONT_RULE : "", storeFactsLine(storeProfile)].filter(Boolean).join("\n")
     : [
         FACT_GUARD_ETSY,
         storeProfile ? `MAĞAZA GERÇEKLERİ (kargo/iade/işlem süresinden SÖZ EDECEKSEN yalnızca bunları kullan; başka rakam/vaat uydurma): ${profileText(storeProfile)}` : "",

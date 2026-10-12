@@ -359,8 +359,8 @@ const FIND_ATC_FN = `
  * `window.__bmInit` never gets set at all.
  */
 const BM_CTA_ONCLICK =
-  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);}return false;})();`;
-const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow").replace(/__bmInit/g, "__pdInit");
+  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);if(!a.disabled&&!window.__bmAdding){window.__bmAdding=1;setTimeout(function(){try{a.click();}catch(e){}setTimeout(function(){window.__bmAdding=0;},3000);},1250);}}return false;})();`;
+const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow").replace(/__bmInit/g, "__pdInit").replace(/__bmAdding/g, "__pdAdding");
 
 /** Force the CTA hook's onclick to the canonical, known-valid string — replaces
  *  whatever the model wrote (or adds it, if the model left it off).
@@ -402,6 +402,13 @@ ${FIND_ATC_FN}
     if(!el) return;
     el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
     setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
+  }
+  /* The in-page button REALLY adds to the cart: once the page has settled on the theme's own Add to Cart and the glow
+     has started, press that button (so the selected variant + quantity are used). Guarded against double adds. */
+  function addNow(el){
+    if(!el || el.disabled || window.__bmAdding) return;
+    window.__bmAdding = 1;
+    setTimeout(function(){ try{ el.click(); }catch(e){} setTimeout(function(){ window.__bmAdding = 0; }, 3000); }, 600);
   }
   /* These descriptions can be long, so the real Add-to-Cart button can be a
      long smooth-scroll away -- the old 1600ms/2000ms safety caps could fire
@@ -516,7 +523,7 @@ ${FIND_ATC_FN}
     var atc = findAtc();
     if(!atc) return;
     atc.scrollIntoView({behavior:'smooth', block:'center'});
-    afterScrollSettles(function(){ glow(atc); });
+    afterScrollSettles(function(){ glow(atc); addNow(atc); });
   });
 })();
 </script>`;
@@ -648,6 +655,7 @@ ${FIND_ATC_FN}
     afterScrollSettles(function(){
       atc.classList.remove('pd-atc-glow'); void atc.offsetWidth; atc.classList.add('pd-atc-glow');
       setTimeout(function(){ atc.classList.remove('pd-atc-glow'); }, 2600);
+      if(!atc.disabled && !window.__pdAdding){ window.__pdAdding = 1; setTimeout(function(){ try{ atc.click(); }catch(e){} setTimeout(function(){ window.__pdAdding = 0; }, 3000); }, 600); }
     });
   });
 })();
@@ -853,6 +861,14 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-acc>summary{display:none!important}` +
   `.bm .bm-acc>.bm-c1{display:block!important}` +
   `.bm .bm-acc>.bm-grid{display:grid!important}` +
+  // our own call-out / chip areas are always centred, whatever the model's CSS says
+  `.bm .bm-cta{display:flex!important;flex-direction:column;align-items:center;text-align:center}` +
+  `.bm .bm-cta p{margin-left:auto;margin-right:auto;text-align:center}` +
+  `.bm .bm-trust,.bm .bm-badges{justify-content:center!important;text-align:center}` +
+  // The images column is much taller than the text column on a page with several (tall) description pictures — the
+  // right side used to be empty below the text. The text column now follows the page (sticky, its own gentle
+  // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.
+  `.bm .bm-grid:has(.bm-media>img:nth-child(4))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(4))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(120,120,140,.35) transparent}` +
   // Same guarantee for the NEW per-section "Description"/"Images" tabs
   // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
   // a missing `open` there would otherwise hide half the description

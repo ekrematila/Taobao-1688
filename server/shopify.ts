@@ -379,15 +379,24 @@ export async function pushToShopify(
     }
   }
   if (localUploads.length && id) {
-    const results = await Promise.allSettled(
-      localUploads.map((u) =>
-        fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/products/${id}/images.json`, {
+    // one at a time, with retries: Shopify answers 409 "product is currently being modified" (and 429) to parallel image
+    // uploads on the same product, and a swallowed failure left description / variant pictures missing
+    const results: PromiseSettledResult<{ ok: boolean; j: any }>[] = [];
+    for (const u of localUploads) {
+      let last: { ok: boolean; j: any } = { ok: false, j: {} };
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const r = await fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/products/${id}/images.json`, {
           method: "POST",
           headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
           body: JSON.stringify({ image: { attachment: u.attachment, filename: u.filename, alt: u.alt } }),
-        }).then(async (r) => ({ ok: r.ok, j: (await r.json().catch(() => ({}))) as any })),
-      ),
-    );
+        });
+        last = { ok: r.ok, j: (await r.json().catch(() => ({}))) as any };
+        if (r.ok || ![409, 429, 500, 502, 503].includes(r.status)) break;
+        await new Promise((res) => setTimeout(res, 1200 * (attempt + 1)));
+      }
+      if (!last.ok) console.error(`[shopify-push] image upload failed: ${u.filename} ${JSON.stringify(last.j).slice(0, 200)}`);
+      results.push({ status: "fulfilled", value: last });
+    }
     results.forEach((r, i) => {
       const u = localUploads[i];
       if (r.status === "fulfilled" && r.value.ok && r.value.j?.image) {

@@ -279,6 +279,12 @@ export const FONT_RULE = [
   "Sen `font-family`'yi ve mağaza teması kurallarını ayrıca YAZMA — sistem ekler; renk, rozet, emoji ve metin tonu aynı havaya uysun.",
 ].join("\n");
 
+/** Every line of the page must be about THIS product; emoji sparse. */
+export const RELEVANCE_RULE = [
+  "ÜRÜNE ÖZGÜ — HER SATIR BU ÜRÜNÜN: başlık, madde, SSS, rozet, CTA cümlesi ve alt notlar yalnızca bu ürünün gerçek özelliğini, temasını, içeriğini veya kullanımını anlatsın. Başka ürüne de yazılabilecek genel dolgu cümleleri ('Elevate your setup', 'Bring joy to your desk' gibi) YAZMA; CTA cümlesi bile ürünün temasından/karakterinden gelsin (kısa, abartısız).",
+  "EMOJİ AZ: bölüm başlıklarında EN FAZLA 1 emoji; paragraf, SSS ve madde metinlerinde emoji YOK; sayfada toplam ≤ 8 emoji; hepsi ürünle alakalı. `--fall` 3–4 karakter.",
+].join("\n");
+
 /** Etsy (plain-text) listings: the same honesty rule, shorter. */
 export const FACT_GUARD_ETSY = [
   "GERÇEKLİK KORUMASI — KESİN: açıklamadaki her iddia kaynak veride (başlık/özellikler/açıklama/varyantlar), OPERATÖR DETAYLARI'nda veya fotoğrafta NET görünen bir şeyde bulunmalı. Doğrulanmamış omuz/çapraz askı, ölçü, ağırlık, kapasite, malzeme kompozisyonu, su geçirmezlik, bakım talimatı, garanti, aksesuar YAZMA — şüphede çıkar; bilgi yoksa konuyu atla ('not specified' yazma). Başlık/etiketlerde de bu iddialardan KULLANMA.",

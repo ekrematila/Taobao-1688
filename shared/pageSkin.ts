@@ -135,7 +135,7 @@ export function scatterTile(tokens: string[], w: number, h: number, count: numbe
     const x = Math.round(14 + rand() * (w - size - 28));
     const y = Math.round(size + 10 + rand() * (h - size * 2 - 20));
     const rot = Math.round(-28 + rand() * 56);
-    const op = (0.07 + rand() * 0.07).toFixed(2);
+    const op = (0.035 + rand() * 0.035).toFixed(2); // very faint: a hint of the theme, never a distraction
     marks.push(`<text x='${x}' y='${y}' font-size='${size}' opacity='${op}' transform='rotate(${rot} ${x} ${y})'>${esc(tok)}</text>`);
   }
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' font-family='Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif'>${marks.join("")}</svg>`;
@@ -266,11 +266,11 @@ export function buildPageSkinCss(html: string): string {
   // sizes loop out of phase, and the whole layer is moved with a transform (cheap), so it never looks like a pattern.
   if (k.fall.length) {
     const L1 = [
-      scatterTile(k.fall, 420, 400, 3, 11, 15, 26),
-      scatterTile(k.fall, 560, 600, 4, 23, 13, 24),
-      scatterTile(k.fall, 700, 1200, 6, 37, 14, 28),
+      scatterTile(k.fall, 420, 400, 1, 11, 15, 24),
+      scatterTile(k.fall, 560, 600, 2, 23, 13, 22),
+      scatterTile(k.fall, 700, 1200, 3, 37, 14, 26),
     ];
-    const L2 = [scatterTile(k.fall, 500, 500, 3, 51, 12, 22), scatterTile(k.fall, 800, 1000, 5, 67, 13, 26)];
+    const L2 = [scatterTile(k.fall, 500, 500, 1, 51, 12, 20), scatterTile(k.fall, 800, 1000, 2, 67, 13, 24)];
     const layer = (tiles: string[], sizes: string, h: number, anim: string) =>
       `content:"";position:fixed;left:0;right:0;top:-${h}px;height:calc(100vh + ${h}px);z-index:3;pointer-events:none;background-image:${tiles.join(",")};background-size:${sizes};background-repeat:repeat;${anim}`;
     parts.push(
