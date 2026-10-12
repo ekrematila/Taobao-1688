@@ -39,3 +39,21 @@ test("an AI result comes back at EXACTLY the source's size (same shape) or at it
   assert.equal(await matchSourceSize(same, { w: 790, h: 1580 }), same);
   assert.ok(readFileSync(mediaPath(out.slice("/api/media/".length))).length > 0);
 });
+
+test("a result parked inside flat side bars (Manus 1:3 frame) is cut out and brought back to the source's exact size", async () => {
+  process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "ps-"));
+  const sharp = (await import("sharp")).default;
+  const { matchSourceSize, mediaPath, localImageSize, persistDataUrl } = await import("../server/imagestore.ts");
+  // a 100x400 "picture" (varied content) centred in a 150x400 black frame → pillarbox
+  const W = 100, H = 400;
+  const px = Buffer.alloc(W * H * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 3; px[i] = (x * 5 + y) % 256; px[i + 1] = (y * 3) % 256; px[i + 2] = 120 + ((x + y) % 100); }
+  const pic = await sharp(px, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+  const framed = await sharp({ create: { width: 150, height: 400, channels: 3, background: "#000" } }).composite([{ input: pic, left: 25, top: 0 }]).png().toBuffer();
+  const url = persistDataUrl("data:image/png;base64," + framed.toString("base64"));
+  const out = await matchSourceSize(url, { w: 200, h: 800 }); // source ratio 1:4 = the picture's ratio
+  assert.deepEqual(await localImageSize(out), { w: 200, h: 800 });
+  const { data } = await sharp(mediaPath(out.slice("/api/media/".length))).raw().toBuffer({ resolveWithObject: true });
+  const edge = data[0] + data[1] + data[2]; // first pixel is picture content, not black bar
+  assert.ok(edge > 30, "the black bar is gone");
+});

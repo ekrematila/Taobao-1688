@@ -110,13 +110,56 @@ export function persistDataUrl(dataUrl: string): string {
 }
 
 /**
+ * Image models answer in their own frame (Manus: a 1:3 canvas for a tall strip) and park the picture inside it
+ * with flat bars — the picture itself keeps the source's proportions. Find those bars (flat near-black / near-white
+ * edge rows and columns); returns the picture's box, or null when there are no bars to remove.
+ */
+export async function findContentBox(
+  file: string,
+  srcRatio: number,
+): Promise<{ left: number; top: number; width: number; height: number } | null> {
+  const sharp = (await import("sharp")).default;
+  const { data, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: C } = info;
+  const sx = Math.max(1, Math.floor(W / 300));
+  const sy = Math.max(1, Math.floor(H / 300));
+  const flat = (vals: { mean: number; range: number }) => vals.range < 24 && (vals.mean < 22 || vals.mean > 233);
+  const col = (x: number) => {
+    let sum = 0, n = 0, lo = 255, hi = 0;
+    for (let y = 0; y < H; y += sy) for (let c = 0; c < C; c++) { const v = data[(y * W + x) * C + c]; sum += v; n++; if (v < lo) lo = v; if (v > hi) hi = v; }
+    return { mean: sum / n, range: hi - lo };
+  };
+  const row = (y: number) => {
+    let sum = 0, n = 0, lo = 255, hi = 0;
+    for (let x = 0; x < W; x += sx) for (let c = 0; c < C; c++) { const v = data[(y * W + x) * C + c]; sum += v; n++; if (v < lo) lo = v; if (v > hi) hi = v; }
+    return { mean: sum / n, range: hi - lo };
+  };
+  let l = 0, r = W - 1, t = 0, b = H - 1;
+  while (l < r && flat(col(l))) l++;
+  while (r > l && flat(col(r))) r--;
+  while (t < b && flat(row(t))) t++;
+  while (b > t && flat(row(b))) b--;
+  const pad = 1; // the bar's anti-aliased edge
+  if (l > 0) l += pad;
+  if (r < W - 1) r -= pad;
+  if (t > 0) t += pad;
+  if (b < H - 1) b -= pad;
+  const width = r - l + 1;
+  const height = b - t + 1;
+  const trimmed = l > 0 || t > 0 || r < W - 1 || b < H - 1;
+  if (!trimmed || width < W * 0.2 || height < H * 0.2) return null;
+  // only a real letterbox: what is left must have the source's proportions
+  if (Math.abs(width / height / srcRatio - 1) > 0.04) return null;
+  return { left: l, top: t, width, height };
+}
+
+/**
  * Give an AI result the SAME pixel size as the picture it was made from, at full quality.
- * Image models answer at their own size (a multiple of 16, a capped long edge…), so a translated
- * picture came back smaller or slightly off. When the aspect ratios agree (within 4%) the result is
- * resampled to exactly `src` w×h (Lanczos, lossless PNG / near-lossless JPEG); when they don't, only the
+ * Image models answer at their own size / in their own frame, so a translated picture came back smaller, slightly
+ * off, or parked inside flat bars. Bars are cut away first; then, when the aspect ratios agree (within 4%), the
+ * picture is resampled to exactly `src` w×h (Lanczos, lossless PNG / near-lossless JPEG); when they don't, only the
  * WIDTH is matched and the AI's own proportions are kept — never a stretched picture.
- * Returns the (possibly new) `/api/media/...` url; unchanged when sharp is unavailable or the size
- * already matches.
+ * Returns the (possibly new) `/api/media/...` url; unchanged when sharp is unavailable or the size already matches.
  */
 export async function matchSourceSize(mediaUrl: string, src: { w: number; h: number }): Promise<string> {
   if (!mediaUrl.startsWith("/api/media/") || !src.w || !src.h) return mediaUrl;
@@ -128,11 +171,16 @@ export async function matchSourceSize(mediaUrl: string, src: { w: number; h: num
     const w = meta.width ?? 0;
     const h = meta.height ?? 0;
     if (!w || !h || (w === src.w && h === src.h)) return mediaUrl;
-    const sameShape = Math.abs(w / h / (src.w / src.h) - 1) <= 0.04;
+    const box = await findContentBox(file, src.w / src.h);
+    const cw = box?.width ?? w;
+    const ch = box?.height ?? h;
+    const sameShape = Math.abs(cw / ch / (src.w / src.h) - 1) <= 0.04;
     const outW = src.w;
-    const outH = sameShape ? src.h : Math.max(1, Math.round((h * src.w) / w));
+    const outH = sameShape ? src.h : Math.max(1, Math.round((ch * src.w) / cw));
     const png = meta.format === "png";
-    const pipe = sharp(file).resize(outW, outH, { fit: "fill", kernel: "lanczos3" });
+    let pipe = sharp(file);
+    if (box) pipe = pipe.extract(box);
+    pipe = pipe.resize(outW, outH, { fit: "fill", kernel: "lanczos3" });
     const buf = png ? await pipe.png({ compressionLevel: 6 }).toBuffer() : await pipe.jpeg({ quality: 95, chromaSubsampling: "4:4:4" }).toBuffer();
     return persist(buf, png ? "image/png" : "image/jpeg");
   } catch {
