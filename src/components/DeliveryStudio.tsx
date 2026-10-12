@@ -1735,11 +1735,15 @@ export default function DeliveryStudio({
                   {t("delivery.dlAll")}
                 </button>
               </div>
-              {channel === "shopify" && hasShopify && (
-                <button className="btn" onClick={push} disabled={!!busy}>
-                  {busy === "push" ? <span className="spin" /> : t("delivery.pushShopify")}
-                </button>
-              )}
+              <button
+                className="btn primary"
+                onClick={push}
+                disabled={!!busy || !hasShopify}
+                title={hasShopify ? t("delivery.pushShopifyHint") : t("delivery.pushShopifyNeedsSetup")}
+              >
+                {busy === "push" ? <span className="spin" /> : t("delivery.pushShopify")}
+              </button>
+              {!hasShopify && <span className="tiny muted">{t("delivery.pushShopifyNeedsSetup")}</span>}
               {busy === "push" && job && <JobProgress job={job} onCancel={() => jobRef.current?.cancel()} />}
               {channel === "etsy" && (
                 <div className="row" style={{ alignItems: "center" }}>
