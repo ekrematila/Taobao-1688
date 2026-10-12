@@ -142,7 +142,7 @@ import {
   withDraftLock,
 } from "./drafts.ts";
 import { ONEBOUND_ENDPOINTS, type ApiCallInput, type GeneratedField, type ProductImage, type Settings } from "@shared/types.ts";
-import { claudePricing, DEFAULT_PRODUCT_TYPES } from "@shared/models.ts";
+import { ATTR_DEFAULT_MODEL, claudePricing, DEFAULT_PRODUCT_TYPES } from "@shared/models.ts";
 
 const app = express();
 app.use(express.json({ limit: "64mb" }));
@@ -620,12 +620,12 @@ router.post(
     if (!node) return res.json({ picks: {} });
     const attributes = attributesForCategory(node.gid);
     if (!attributes.length) return res.json({ picks: {} });
-    const { picks: names } = await suggestAttributes(
+    const { picks: names, summary, model: usedModel } = await suggestAttributes(
       product,
       draft?.listing ?? null,
       node.path,
       attributes.map((a) => ({ handle: a.handle, name: a.name, values: a.values.map((v) => v.name) })),
-      { draftId: draft?.id },
+      { draftId: draft?.id, model: String(req.body?.model || "").trim() || ATTR_DEFAULT_MODEL },
     );
     // map exact value names → { attrGid, valueGids, valueNames }
     const picks: Record<string, { attrGid: string; attrName: string; valueGids: string[]; valueNames: string[] }> = {};
@@ -641,7 +641,7 @@ router.post(
           valueNames: vals.map((v) => v.name),
         };
     }
-    res.json({ picks });
+    res.json({ picks, summary, model: usedModel });
   }),
 );
 

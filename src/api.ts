@@ -97,10 +97,10 @@ export const api = {
           Object.entries(params).filter(([, v]) => v) as [string, string][],
         ).toString(),
     ),
-  suggestAttributes: (draftId: string, category?: string) =>
-    post<{ picks: Record<string, import("@shared/types.ts").ProductAttrPick> }>(
+  suggestAttributes: (draftId: string, category?: string, model?: string) =>
+    post<{ picks: Record<string, import("@shared/types.ts").ProductAttrPick>; summary?: string; model?: string }>(
       "/taxonomy/attributes/suggest",
-      { draftId, category },
+      { draftId, category, model },
     ),
   call: (input: ApiCallInput) => post<ApiCallResult & { draftId?: string }>("/onebound/call", input),
 

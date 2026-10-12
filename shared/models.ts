@@ -33,6 +33,7 @@ export const CLAUDE_MODELS: ClaudeModel[] = [
   { id: "claude-fable-5-1", label: "Fable 5.1 · top tier", inPer1M: 10, outPer1M: 50, tier: "fable", cacheReadX: 0.025 },
   { id: "claude-opus-5-5", label: "Opus 5.5 · recommended", inPer1M: 4, outPer1M: 20, tier: "opus", cacheReadX: 0.05 },
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5 · balanced (default)", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
+  { id: "claude-haiku-5-5", label: "Haiku 5.5 · fast & cheap", inPer1M: 1, outPer1M: 5, tier: "haiku", priceKnown: false },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 · cheapest", inPer1M: 1, outPer1M: 5, tier: "haiku" },
   { id: "claude-opus-5", label: "Opus 5", inPer1M: 5, outPer1M: 25, tier: "opus" },
   { id: "claude-sonnet-5", label: "Sonnet 5", inPer1M: 2, outPer1M: 10, tier: "sonnet" },
@@ -59,6 +60,9 @@ export const GPT_MODELS: ClaudeModel[] = [
   { id: "gpt-5.5", label: "GPT-5.5", inPer1M: 5, outPer1M: 30, cachedInPer1M: 0.5, tier: "gpt", provider: "openai", allowsNone: true },
 ];
 CLAUDE_MODELS.push(...GPT_MODELS);
+
+/** the model that picks the Shopify taxonomy attributes unless the operator chooses another */
+export const ATTR_DEFAULT_MODEL = "claude-haiku-5-5";
 
 /** Merge models discovered live (see server/modelCatalog.ts) into the catalogue so
  *  pricing / provider / effort lookups work for them too. Idempotent. */

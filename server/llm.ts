@@ -2091,7 +2091,7 @@ export async function suggestAttributes(
   categoryPath: string,
   attrs: AttrForAI[],
   opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
-): Promise<{ picks: Record<string, string[]>; usage: LlmUsage; model: string }> {
+): Promise<{ picks: Record<string, string[]>; usage: LlmUsage; model: string; summary: string }> {
   const desc = (listing?.fields.find((f) => f.key === "description")?.value || product.descHtml || "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
@@ -2099,6 +2099,7 @@ export async function suggestAttributes(
   const handleList = attrs.map((a) => a.handle).join(", ");
   const system = [
     "You classify a product against Shopify's Standard Product Taxonomy attributes.",
+    "FIRST understand the product: what it is, what is in the box, material, profile/shape, compatibility, and the colours you can actually SEE in the attached photos (the photos beat any guess from the title). THEN choose the values.",
     "You are given a set of ATTRIBUTES. Each has a `handle`, a display name, and a FIXED list of allowed values.",
     "Choose, per attribute, the value(s) the product data clearly supports. Use EXACT value strings from that attribute's list — never invent, reword, or prefix them.",
     "Most attributes take exactly ONE value. Pick multiple only when the product genuinely has several (e.g. Color).",
@@ -2108,6 +2109,7 @@ export async function suggestAttributes(
     "OUTPUT: a single strict JSON object. Its keys MUST be attribute handles taken verbatim from this list:",
     handleList,
     'Each value is an array of chosen value strings. Do NOT use the product name as a key. No prose, no code fences.',
+    'Add ONE extra key "_summary": a string of at most 30 words stating what you understood the product to be (type, contents, material, profile, colours seen). It is shown to the operator.',
     'Example shape: {"color":["Black","Purple"],"keycap-profile":["OEM"]}',
   ].join("\n");
   const user = [
@@ -2123,18 +2125,44 @@ export async function suggestAttributes(
   ]
     .filter(Boolean)
     .join("\n");
-  const { text, usage, model } = await ask(system, user, "attributeSuggest", {
-    model: opts.model,
-    maxTokens: 1200,
-    signal: opts.signal,
-    draftId: opts.draftId,
-  });
+  // the product's own photos (first few gallery pictures): colours, legends and shapes are read from what is SEEN
+  const photos: { data: string; mime: string }[] = [];
+  for (const im of product.images.filter((i) => i.role === "gallery").slice(0, 3)) {
+    try {
+      photos.push(await imageForVision(im.url));
+    } catch {
+      /* an unreadable photo is skipped, the text still carries the product */
+    }
+  }
+  const askOnce = (model?: string) =>
+    ask(system, user, "attributeSuggest", {
+      model,
+      maxTokens: 1500,
+      signal: opts.signal,
+      draftId: opts.draftId,
+      images: photos.length ? photos : undefined,
+      effort: "low",
+      thinking: "off",
+    });
+  let res;
+  try {
+    res = await askOnce(opts.model);
+  } catch (e) {
+    // a brand-new model id this key can't use yet → the previous Haiku, same job
+    if ((e as Error)?.name === "AbortError" || !opts.model || !/^claude-haiku-5/.test(opts.model)) throw e;
+    console.warn(`[attributes] ${opts.model} failed (${String((e as Error).message).slice(0, 100)}) — retrying with claude-haiku-4-5`);
+    res = await askOnce("claude-haiku-4-5");
+  }
+  const { text, usage, model } = res;
+  let summary = "";
   let parsed: any = {};
   try {
     parsed = JSON.parse((text.match(/\{[\s\S]*\}/) || ["{}"])[0]);
   } catch {
     /* leave empty */
   }
+  if (typeof parsed?._summary === "string") summary = stripCJK(parsed._summary).slice(0, 300);
+  delete parsed._summary;
   // canonical lookup: lower-cased value name → { handle, name }[]
   const canon = new Map<string, { handle: string; name: string }[]>();
   for (const a of attrs)
@@ -2179,7 +2207,7 @@ export async function suggestAttributes(
       if (hits && hits.length <= 2) for (const { handle, name } of hits) add(handle, name);
     }
   }
-  return { picks, usage, model };
+  return { picks, usage, model, summary };
 }
 
 /* --------------------- variant names for a channel ------------------- */

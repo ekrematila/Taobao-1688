@@ -14,7 +14,7 @@ import { downloadBlob, slugify } from "../lib/image";
 import { etsyZip, importBodyHtml, importBodyHtmlPreview, listingJson, plainText, setStoreProfiles, shopifyBodyHtml, shopifyCsv, wooCsv } from "../lib/export";
 import { DEFAULT_STORE_PROFILES, pickStoreProfile } from "@shared/storeProfiles.ts";
 import { productText as pageProductText } from "@shared/pageBlocks.ts";
-import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
+import { ATTR_DEFAULT_MODEL, DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HTML_CHAR_BANDS, EFFORT_LEVELS, EFFORT_LABEL, THINKING_MODES, THINKING_LABEL, normalizeManusProfile } from "@shared/models.ts";
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
@@ -2017,6 +2017,23 @@ function AttributesModal({
   const toast = useToast();
   const [picks, setPicks] = useState<Record<string, ProductAttrPick>>(value);
   const [aiBusy, setAiBusy] = useState(false);
+  // which AI model picks the attributes — Haiku 5.5 unless the operator chose another (remembered)
+  const [aiModel, setAiModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem("attrModel") || ATTR_DEFAULT_MODEL;
+    } catch {
+      return ATTR_DEFAULT_MODEL;
+    }
+  });
+  const [aiSummary, setAiSummary] = useState("");
+  const chooseModel = (m: string) => {
+    setAiModel(m);
+    try {
+      localStorage.setItem("attrModel", m);
+    } catch {
+      /* private mode — the choice just isn't remembered */
+    }
+  };
   const q = useQuery({
     queryKey: ["taxAttrs", draftId, category],
     queryFn: () => api.taxonomyAttributes({ draftId, category: category || undefined }),
@@ -2048,7 +2065,8 @@ function AttributesModal({
   const runAi = async () => {
     setAiBusy(true);
     try {
-      const r = await api.suggestAttributes(draftId, category || undefined);
+      const r = await api.suggestAttributes(draftId, category || undefined, aiModel);
+      setAiSummary(r.summary || "");
       if (Object.keys(r.picks).length) {
         applySuggested(r.picks);
         toast(t("delivery.attrAiOk", { n: Object.keys(r.picks).length }), "ok");
@@ -2072,6 +2090,9 @@ function AttributesModal({
         <p className="sub" style={{ marginTop: 2 }}>{t("delivery.attrHint")}</p>
 
         <div className="row" style={{ gap: 6, margin: "8px 0", flexWrap: "wrap" }}>
+          <select value={aiModel} onChange={(e) => chooseModel(e.target.value)} title={t("delivery.attrModel")} style={{ maxWidth: 190 }}>
+            <ModelOptions extraIds={[aiModel]} />
+          </select>
           <button className="btn sm" onClick={runAi} disabled={aiBusy || !attrs.length}>
             {aiBusy ? <span className="spin" /> : "✨ " + t("delivery.attrAi")}
           </button>
@@ -2087,6 +2108,11 @@ function AttributesModal({
           </button>
         </div>
 
+        {aiSummary && (
+          <p className="tiny" style={{ margin: "0 0 8px", background: "var(--bg-soft, #f3f6ff)", padding: "6px 8px", borderRadius: 6 }}>
+            🧠 {t("delivery.attrSummary", { s: aiSummary })}
+          </p>
+        )}
         {q.isLoading && <p className="tiny muted">…</p>}
         {!q.isLoading && !attrs.length && <p className="tiny muted">{t("delivery.attrEmpty")}</p>}
 
