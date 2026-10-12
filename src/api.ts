@@ -129,6 +129,8 @@ export const api = {
   restore: (revId: number) => post<Draft>(`/revisions/${revId}/restore`),
 
   pushShopify: (draftId: string) => post<{ adminUrl: string; id: number }>("/shopify/push", { draftId }),
+  /** the push as a background job (progress, no long-request timeout) */
+  pushShopifyStart: (draftId: string) => post<{ jobId: string }>("/shopify/push", { draftId, async: true }),
 
   etsyAppStatus: () => req<{ configured: boolean; url: string; reachable: boolean }>("/etsy-app/status"),
   pairEtsyApp: (url?: string) => post<{ url: string; connected: boolean }>("/etsy-app/pair", { url }),

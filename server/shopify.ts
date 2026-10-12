@@ -167,10 +167,22 @@ export async function verifyShopify(
 }
 
 /** Create a draft product in the configured Shopify store. Returns the admin URL. */
+/** the checklist a push shows while it runs (also the labels `onStep` reports) */
+export const SHOPIFY_PUSH_STEPS = [
+  "Ürün ve görseller hazırlanıyor",
+  "Shopify'da taslak oluşturuluyor",
+  "Görseller yükleniyor",
+  "Varyant görselleri bağlanıyor",
+  "Açıklama görselleri yerleştiriliyor",
+  "Nitelikler ve gümrük bilgileri",
+] as const;
+
 export async function pushToShopify(
   product: NormalisedProduct,
   listing: GeneratedListing,
+  onStep: (label: (typeof SHOPIFY_PUSH_STEPS)[number]) => void = () => {},
 ): Promise<{ adminUrl: string; id: number }> {
+  onStep(SHOPIFY_PUSH_STEPS[0]);
   const shopToken = activeShopifyToken();
   if (!shopifyConfigured()) throw new ShopifyError("Shopify yapılandırılmamış (Ayarlar → Shopify).", 400);
 
@@ -249,7 +261,8 @@ export async function pushToShopify(
     skin: listing.meta?.pageSkin !== false,
   });
 
-  const vlist = outputVariants(product, listing);
+  // this IS a Shopify push: variants are priced / named by Shopify's rules whatever channel the saved listing was made for
+  const vlist = outputVariants(product, { ...listing, channel: "shopify" });
   const split = (v: (typeof vlist)[number]) =>
     (v.nameTranslated || v.name || "Default").split(/\s*\/\s*/).slice(0, 3);
   const axisCount = Math.max(1, ...vlist.map((v) => split(v).length));
@@ -329,6 +342,7 @@ export async function pushToShopify(
     },
   };
 
+  onStep(SHOPIFY_PUSH_STEPS[1]);
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -354,6 +368,7 @@ export async function pushToShopify(
   // image once created — remote ones came back with the create response
   // (aligned 1:1 with `remoteForCreate`); local ones are uploaded individually
   // next (small requests, immune to the 413 that a bundled create risked).
+  onStep(SHOPIFY_PUSH_STEPS[2]);
   const createdRemote: any[] = json.product?.images ?? [];
   const byUpload = new Map<Up, { id: number; src: string }>();
   let ri = 0;
@@ -381,6 +396,7 @@ export async function pushToShopify(
     });
   }
 
+  onStep(SHOPIFY_PUSH_STEPS[3]);
   // Attach each variant's own picture to the Shopify variant (the storefront then switches the photo with the option).
   const madeVariants: any[] = json.product?.variants ?? [];
   if (id && madeVariants.length === variantUp.length) {
@@ -397,6 +413,7 @@ export async function pushToShopify(
     );
   }
 
+  onStep(SHOPIFY_PUSH_STEPS[4]);
   // Swap each body_html placeholder (alicdn / /api/media) for the permanent
   // Shopify CDN URL, and restore the operator's intended gallery order (local
   // uploads landed at the end of the list) — one combined follow-up PUT.
@@ -430,6 +447,7 @@ export async function pushToShopify(
     }).catch(() => {});
   }
 
+  onStep(SHOPIFY_PUSH_STEPS[5]);
   // Human-readable per-attribute metafields (namespace "custom", key = the
   // taxonomy attribute handle with dashes → underscores). Best-effort: a failure
   // here never affects the created draft.

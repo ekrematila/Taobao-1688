@@ -43,7 +43,7 @@ import {
   suggestAttributes,
   logClaudeUsage,
 } from "./llm.ts";
-import {
+import { SHOPIFY_PUSH_STEPS,
   pushToShopify,
   shopifyConfigured,
   ShopifyError,
@@ -807,6 +807,12 @@ router.post(
       ctx.step(local ? "Şablonla içerik kuruluyor" : "Kod / içerik yazılıyor");
       const listing = local ? localListing(draft.product!, input) : await generateListing(draft.product!, input, ctx.signal);
       ctx.step("Kanal kurallarına göre biçimleniyor");
+      if (input.adaptPage) {
+        // never "succeed" without a new page — and never let an empty answer wipe the saved one
+        const nd = String(listing.fields.find((f) => f.key === "description")?.value ?? "").trim();
+        if (!nd) throw new Error("Sayfa güncellenemedi: model yeni bir açıklama döndürmedi. Mevcut sayfan olduğu gibi duruyor — tekrar dene.");
+        if (nd === String(input.currentDescription ?? "").trim()) throw new Error("Sayfa güncellenemedi: model hiçbir şeyi değiştirmedi. Mevcut sayfan olduğu gibi duruyor — nota neyin değişmesi gerektiğini yazıp tekrar dene.");
+      }
       const requested = new Set<string>((input.fields || []).map((f: any) => f.key));
       const fullSet = FULL_LISTING_FIELDS[input.channel] || [];
       const isPartial = fullSet.length > 0 && fullSet.some((k) => !requested.has(k));
@@ -2269,7 +2275,24 @@ router.post(
   wrap(async (req, res) => {
     const draft = getDraft(req.body?.draftId);
     if (!draft?.product || !draft.listing) return res.status(400).json({ error: "Ürün veya listeleme eksik." });
-    const out = await pushToShopify(draft.product, draft.listing);
+    if (draft.listing.channel !== "shopify")
+      return res.status(400).json({ error: "Bu taslak Shopify için üretilmemiş (içerik Etsy kanalıyla üretilmiş) — kanalı Shopify seçip içeriği yeniden üret." });
+    const { product, listing } = draft;
+    // A push uploads many pictures one by one and can run longer than the proxy in front of the app waits for an
+    // answer — as a background job the browser polls progress instead of waiting on one long request.
+    if (req.body?.async) {
+      const jobId = startJob("shopify-push", async (ctx) => {
+        ctx.plan([...SHOPIFY_PUSH_STEPS]);
+        try {
+          return await pushToShopify(product, listing, (label) => ctx.step(label));
+        } catch (e) {
+          console.error(`[shopify-push] ${draft.id} FAILED:`, (e as Error).message);
+          throw e;
+        }
+      });
+      return res.json({ jobId });
+    }
+    const out = await pushToShopify(product, listing);
     res.json(out);
   }),
 );

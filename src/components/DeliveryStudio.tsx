@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, categoryResearchJob, generateListingJob, nameVariantsJob, type Draft } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { JobCancelled, type RunningJob } from "../lib/jobs";
+import { JobCancelled, runJob, type RunningJob } from "../lib/jobs";
 import JobProgress from "./JobProgress";
 import Collapsible from "./Collapsible";
 import ListingPreview from "./ListingPreview";
@@ -748,14 +748,17 @@ export default function DeliveryStudio({
     if (!(await imageGateOk("shopify"))) return;
     if (!(await consistencyGateOk())) return;
     setBusy("push");
+    const r = runJob<{ adminUrl: string; id: number }>(() => api.pushShopifyStart(draft.id), setJob);
+    jobRef.current = r as RunningJob<unknown>;
     try {
-      const r = await api.pushShopify(draft.id);
+      const out = await r.promise;
       toast(t("delivery.pushShopify") + " ✓", "ok");
-      window.open(r.adminUrl, "_blank");
+      window.open(out.adminUrl, "_blank");
     } catch (e) {
-      toast((e as Error).message, "err");
+      if (!(e instanceof JobCancelled)) toast(t("delivery.pushFailed", { msg: (e as Error).message }), "err");
     } finally {
       setBusy("");
+      setJob(null);
     }
   }
 
@@ -1522,7 +1525,9 @@ export default function DeliveryStudio({
                 >
                   {busy === "adapt" ? <span className="spin" /> : `🧩 ${t("delivery.adaptRun")}`}
                 </button>
-                <span className="tiny muted" style={{ flex: 1, minWidth: 200 }}>{t("delivery.adaptHint")}</span>
+                <span className="tiny muted" style={{ flex: 1, minWidth: 200 }}>
+                  {draft.listing?.fields.some((f) => f.key === "description" && f.value.trim()) ? t("delivery.adaptHint") : "⚠ " + t("delivery.adaptNeedPage")}
+                </span>
               </div>
             </div>
           )}
@@ -1709,6 +1714,7 @@ export default function DeliveryStudio({
                   {busy === "push" ? <span className="spin" /> : t("delivery.pushShopify")}
                 </button>
               )}
+              {busy === "push" && job && <JobProgress job={job} onCancel={() => jobRef.current?.cancel()} />}
               {channel === "etsy" && (
                 <div className="row" style={{ alignItems: "center" }}>
                   <select
@@ -2340,6 +2346,10 @@ function VariantEditor({
   /** save only when something really changed (a click in and out of a field must not create a revision) */
   const commitIfChanged = (next: ProductVariant[]) => (JSON.stringify(next) !== sig ? commit(next) : setRows(next));
   const etsy = channel === "etsy";
+  const toast = useToast();
+  // bulk price: one price (and compare-at) for the selected variants, or for all of them
+  const [bulkP, setBulkP] = useState("");
+  const [bulkC, setBulkC] = useState("");
   const dirtyPrice = useRef<Set<number>>(new Set());
   const unpriced = unpricedCount(rows, channel);
   const srcPrices = rows.map((v) => v.priceCny).filter((n): n is number => n != null && n > 0);
@@ -2386,6 +2396,28 @@ function VariantEditor({
         j === i ? { ...v, price: snapPrice(v.price, "shopify"), compareAtPrice: snapPrice(v.compareAtPrice, "shopify"), pricedFor: "manual" as const } : v,
       ),
     );
+  };
+  /** set the typed price / compare-at on the selected variants (none selected = all); the ending is enforced (.90) */
+  const applyBulk = (clearCompare = false) => {
+    const p = bulkP.trim() === "" ? undefined : num(bulkP);
+    const c = bulkC.trim() === "" ? undefined : num(bulkC);
+    if (!clearCompare && p === undefined && c === undefined) return;
+    if (p != null && c != null && c <= p) return toast(t("delivery.bulkCompareLow"), "err");
+    const targets = sel.size ? sel : new Set(rows.map((_, j) => j));
+    let dropped = 0;
+    const next = rows.map((v, j) => {
+      if (!targets.has(j)) return v;
+      const price = p !== undefined && p != null ? snapPrice(p, "shopify") : v.price;
+      let compareAtPrice = clearCompare ? null : c !== undefined && c != null ? snapPrice(c, "shopify") : v.compareAtPrice ?? null;
+      if (compareAtPrice != null && price != null && compareAtPrice <= price) {
+        compareAtPrice = null; // a "was" price at or below the price makes no sense
+        dropped++;
+      }
+      return { ...v, price, compareAtPrice, pricedFor: "manual" as const };
+    });
+    commit(next);
+    toast(t("delivery.bulkDone", { n: targets.size }), "ok");
+    if (dropped) toast(t("delivery.bulkCleared", { n: dropped }), "info");
   };
   const num = (s: string): number | null => {
     const n = parseFloat(s.replace(",", "."));
@@ -2528,6 +2560,25 @@ function VariantEditor({
                 <option value="max">{t("delivery.variantBaseMax")}</option>
               </select>
             )}
+          </div>
+        )}
+        {!etsy && rows.length > 1 && (
+          <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", border: "1px dashed var(--line)", borderRadius: 8 }}>
+            <b className="tiny">{t("delivery.bulkTitle")}</b>
+            <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {t("delivery.variantPrice")}
+              <input type="number" min={0} step="0.01" value={bulkP} onChange={(e) => setBulkP(e.target.value)} placeholder="76.90" style={{ width: 84 }} />
+            </label>
+            <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {t("delivery.variantCompareAt")}
+              <input type="number" min={0} step="0.01" value={bulkC} onChange={(e) => setBulkC(e.target.value)} placeholder="109.90" style={{ width: 84 }} />
+            </label>
+            <button className="btn sm" onClick={() => applyBulk(false)} disabled={busy || (bulkP.trim() === "" && bulkC.trim() === "")}>
+              {sel.size ? t("delivery.bulkApplySel", { n: sel.size }) : t("delivery.bulkApplyAll", { n: rows.length })}
+            </button>
+            <button className="btn ghost sm" onClick={() => applyBulk(true)} disabled={busy} title={t("delivery.bulkClearCompareTip")}>
+              {t("delivery.bulkClearCompare")}
+            </button>
           </div>
         )}
         {rows.map((v, i) => {

@@ -1288,7 +1288,8 @@ export async function generateListing(
   // OPTIONAL 2nd pass for the HTML `description` only — with a DIFFERENT Claude
   // model, or with MANUS (an agent task). Title/tags stay on the main model.
   // Falls back silently to the first-pass description on any error.
-  const wantManusDesc = isShopify && input.descProvider === "manus" && manusConfigured();
+  // "update this page for the product" always runs on Claude: Manus's kickoff message is capped far below the size of a page
+  const wantManusDesc = isShopify && input.descProvider === "manus" && manusConfigured() && !input.adaptPage;
   const wantClaudeDesc = isShopify && !wantManusDesc && !!input.descModel && input.descModel !== model;
   if (wantManusDesc || wantClaudeDesc) {
     try {
