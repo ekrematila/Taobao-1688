@@ -202,3 +202,8 @@ export async function localImageSize(url: string): Promise<{ w: number; h: numbe
     return null;
   }
 }
+
+/** Store raw image bytes under /api/media (content-addressed, like every other saved picture). */
+export function persistBuffer(buf: Buffer, mime: string): string {
+  return persist(buf, mime);
+}

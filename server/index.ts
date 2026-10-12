@@ -85,6 +85,7 @@ import {
 } from "./taxonomy.ts";
 import { freeTranslate } from "./translate.ts";
 import { autoFillVariants } from "./variantAuto.ts";
+import { assembleTiles, cutTiles, planTiles, type TilePlan } from "./tileTranslate.ts";
 import { localAdvice, localCategoryResearch, localListing } from "./localContent.ts";
 import { allExamples } from "./examples.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
@@ -1149,7 +1150,7 @@ router.post(
 router.post(
   "/api/ai/translate-images",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile, engine, imageModel, imageQuality } = req.body ?? {};
+    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile, engine, imageModel, imageQuality, tileTall } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     const useOpenAI = engine === "openai";
@@ -1275,12 +1276,104 @@ router.post(
         }
       };
 
+      // ONE picture through the chosen engine → a stored local result (or null when there was nothing to translate)
+      const engineOne = async (u: string) => {
+        if (useOpenAI) {
+          const r = await openaiTranslateImage({
+            imageUrl: u,
+            targetLanguage: target,
+            productContext: context,
+            instruction,
+            model: imageModelFor(imageModel),
+            quality: typeof imageQuality === "string" ? imageQuality : undefined,
+            draftId: draft.id,
+            ctx,
+          });
+          return { local: r.changed ? r.resultUrl : null, credits: 0, taskUrl: "", model: r.model };
+        }
+        return withManusAccount(async () => {
+          const r = await translateImage({ imageUrl: u, targetLanguage: target, productContext: context, instruction, speed, agentProfile, ctx });
+          if (r.taskId) logManusUsage("translate-image", r.creditsUsed, r.creditsEstimated, draft.id, r.taskId, { from: u, to: r.resultUrl, changed: r.changed, model: r.model, taskUrl: r.taskUrl });
+          // the result URL expires and needs this account's auth — store it now, inside the account binding
+          const local = r.changed && r.resultUrl ? await persistFromUrl(r.resultUrl, manusFileAuthHeaders()) : null;
+          return { local, credits: r.creditsUsed || 0, taskUrl: r.taskUrl || "", model: r.model };
+        });
+      };
+
+      // A TALL picture (e.g. several description strips merged) is cut at its quietest rows, every piece is translated
+      // at full size, and the pieces are put back with a short cross-fade — exactly the source's size, products unharmed.
+      const oneTiled = async (i: number, srcLocal: string, tp: TilePlan) => {
+        const tiles = await cutTiles(srcLocal, tp);
+        const n = tiles.length;
+        const finals: string[] = [...tiles];
+        let changedAny = false;
+        let failed = 0;
+        let credits = 0;
+        let taskUrl = "";
+        let model = "";
+        let tcursor = 0;
+        const tileWorker = async () => {
+          for (;;) {
+            const k = tcursor++;
+            if (k >= n) return;
+            ctx.throwIfCancelled();
+            ctx.setStatus(`Görsel ${i + 1}/${urls.length} · parça ${k + 1}/${n} çevriliyor`);
+            try {
+              const r = await engineOne(tiles[k]);
+              credits += r.credits;
+              taskUrl = taskUrl || r.taskUrl;
+              model = r.model || model;
+              if (r.local) {
+                const t = tp.tiles[k];
+                finals[k] = await matchSourceSize(r.local, { w: tp.w, h: t.bottom - t.top });
+                changedAny = true;
+              }
+            } catch (e) {
+              if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
+              failed++;
+              console.error(`[translate-images] #${i + 1} piece ${k + 1}/${n} FAILED:`, (e as Error).message);
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(3, n) }, tileWorker));
+        if (failed === n) throw new Error("Hiçbir parça çevrilemedi.");
+        if (!changedAny) {
+          items[i] = { sourceUrl: urls[i], resultUrl: null, changed: false, taskUrl: "", creditsUsed: credits, creditsEstimated: false };
+          done++;
+          console.warn(`[translate-images] #${i + 1}/${urls.length} no Chinese overlay text (${n} pieces, skipped)`);
+          ctx.skip(labels[done - 1]);
+          return;
+        }
+        const resultUrl = await assembleTiles(tp, finals);
+        const item = { sourceUrl: urls[i], resultUrl, changed: true, taskId: "", taskUrl, creditsUsed: credits, creditsEstimated: false, model, local: true, ...(failed ? { error: `${failed}/${n} parça çevrilemedi` } : {}) };
+        items[i] = item;
+        await applyOne(item);
+        done++;
+        console.log(`[translate-images] #${i + 1}/${urls.length} OK tiled ${n} pieces${failed ? ` (${failed} failed)` : ""} model=${model}`);
+        ctx.step(labels[done - 1]);
+      };
+
       const worker = async () => {
         for (;;) {
           const i = cursor++;
           if (i >= urls.length) return;
           ctx.throwIfCancelled();
           try {
+            if (tileTall !== false) {
+              let tp: TilePlan | null = null;
+              let local = "";
+              try {
+                local = urls[i].startsWith("/api/media/") ? urls[i] : /^https?:\/\//i.test(urls[i]) ? await persistFromUrl(urls[i].split("#dup-")[0]) : "";
+                tp = local ? await planTiles(local) : null;
+              } catch {
+                tp = null; // can't read it → the normal single-picture path below
+              }
+              if (tp && local) {
+                await oneTiled(i, local, tp);
+                ctx.setStatus(`${done}/${urls.length} görsel çevrildi`);
+                continue;
+              }
+            }
             if (useOpenAI) {
               await oneOpenAI(i);
               ctx.setStatus(`${done}/${urls.length} görsel çevrildi`);
