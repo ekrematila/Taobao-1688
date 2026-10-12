@@ -407,6 +407,37 @@ const BM_SCRIPT = `<script>
   if(window.__bmInit) return; window.__bmInit = 1;
 ${SYNC_ACCENT_FN}
   syncAccentColor();
+  /* Desktop: of the two columns the SHORTER one stays put while the page scrolls up or down (the taller one scrolls past it).
+     Heights are measured with both columns in normal flow, then the shorter gets .bm-stk (sticky) and the other .bm-flow. */
+  function stickShorter(){
+    try{
+      var gs = document.querySelectorAll('.bm .bm-grid');
+      for(var gi=0; gi<gs.length; gi++){
+        var g = gs[gi];
+        var L = g.querySelector(':scope>.bm-acc-media, :scope>.bm-media'), R = g.querySelector(':scope>.bm-acc-desc, :scope>.bm-c2');
+        if(!L || !R) continue;
+        L.classList.remove('bm-stk'); R.classList.remove('bm-stk');
+        if(!window.matchMedia('(min-width:900px)').matches){ L.classList.remove('bm-flow'); R.classList.remove('bm-flow'); continue; }
+        L.classList.add('bm-flow'); R.classList.add('bm-flow'); L.style.removeProperty('--bm-top'); R.style.removeProperty('--bm-top');
+        var hl = L.offsetHeight, hr = R.offsetHeight;
+        if(Math.abs(hl - hr) < 40){ L.classList.remove('bm-flow'); R.classList.remove('bm-flow'); continue; }
+        var S = hl < hr ? L : R, O = hl < hr ? R : L, hs = Math.min(hl, hr);
+        O.classList.add('bm-flow'); S.classList.remove('bm-flow'); S.classList.add('bm-stk');
+        /* a sticky column taller than the screen would hide its bottom: let it slide up until its end shows */
+        S.style.setProperty('--bm-top', Math.min(96, Math.round(window.innerHeight - hs - 24)) + 'px');
+      }
+    }catch(e){}
+  }
+  (function(){
+    var tm = 0;
+    function later(ms){ clearTimeout(tm); tm = setTimeout(stickShorter, ms); }
+    stickShorter();
+    window.addEventListener('load', function(){ later(50); });
+    window.addEventListener('resize', function(){ later(150); });
+    document.addEventListener('load', function(e){ if(e.target && e.target.tagName === 'IMG') later(120); }, true);
+    document.addEventListener('click', function(e){ if(e.target && e.target.closest && e.target.closest('.bm-grid')) later(700); }, true);
+    setTimeout(stickShorter, 1200); setTimeout(stickShorter, 3500);
+  })();
   /* A <details name="…"> group is exclusive NATIVELY: opening one closes the others at once, bypassing the slide animation (the open
      answer above the clicked one vanished in a single frame and the whole page lurched). The script owns single-open, so drop the name. */
   try{var dn=document.querySelectorAll('details.bm-faq-item[name], details.pd-faq-item[name]');for(var di=0;di<dn.length;di++)dn[di].removeAttribute('name');}catch(e){}
@@ -959,6 +990,9 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.
   `.bm .bm-grid>.bm-c2,.bm .bm-grid>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}` +
   `.bm .bm-grid>.bm-c2::-webkit-scrollbar,.bm .bm-grid>.bm-acc-desc::-webkit-scrollbar{display:none}` +
+  // the SHORTER column stays in view while the page scrolls (set by BM_SCRIPT: .bm-stk = sticky, .bm-flow = normal flow)
+  `.bm .bm-grid>.bm-flow{position:static!important;max-height:none!important;overflow:visible!important;align-self:start!important}` +
+  `.bm .bm-grid>.bm-stk{position:sticky!important;top:var(--bm-top,96px)!important;max-height:none!important;overflow:visible!important;align-self:start!important}` +
   // Same guarantee for the NEW per-section "Description"/"Images" tabs
   // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
   // a missing `open` there would otherwise hide half the description
