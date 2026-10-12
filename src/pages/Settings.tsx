@@ -740,7 +740,17 @@ export default function SettingsPage() {
                 <br />
                 <span className="mono" style={{ userSelect: "all" }}>
                   {s.data?.shopifyRedirectUri || `${window.location.origin}${withBase("/api/shopify/oauth/callback")}`}
-                </span>
+                </span>{" "}
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => {
+                    const u = s.data?.shopifyRedirectUri || `${window.location.origin}${withBase("/api/shopify/oauth/callback")}`;
+                    navigator.clipboard?.writeText(u).then(() => toast(t("settings.copied"), "ok"), () => {});
+                  }}
+                >
+                  {t("settings.copyUrl")}
+                </button>
               </p>
               <button
                 className="btn primary sm"

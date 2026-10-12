@@ -121,6 +121,41 @@ export class ShopifyError extends Error {
   }
 }
 
+let lastShopifyCall = 0;
+/**
+ * One follow-up REST call to a product that was just created. Shopify answers 409 ("product is currently being modified") and
+ * 429 to calls that arrive too close together, so calls are spaced out and retried (honouring Retry-After) — firing them in
+ * parallel gave a ~40% error rate in the app's API monitor and silently dropped variant pictures / attributes.
+ */
+async function shopifyCall(
+  domain: string,
+  token: string,
+  method: "POST" | "PUT",
+  path: string,
+  body: unknown,
+): Promise<{ ok: boolean; status: number; j: any }> {
+  let last = { ok: false, status: 0, j: {} as any };
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const wait = Math.max(0, lastShopifyCall + 500 - Date.now());
+    lastShopifyCall = Date.now() + wait;
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    try {
+      const r = await fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/${path}`, {
+        method,
+        headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      last = { ok: r.ok, status: r.status, j: (await r.json().catch(() => ({}))) as any };
+      if (r.ok || ![409, 429, 500, 502, 503].includes(r.status)) return last;
+      const ra = Number(r.headers.get("retry-after"));
+      await new Promise((res) => setTimeout(res, ra > 0 ? Math.min(ra, 10) * 1000 : 1200 * (attempt + 1)));
+    } catch {
+      await new Promise((res) => setTimeout(res, 1200 * (attempt + 1)));
+    }
+  }
+  return last;
+}
+
 export function shopifyConfigured(): boolean {
   return Boolean(activeShopifyDomain() && activeShopifyToken());
 }
@@ -383,17 +418,10 @@ export async function pushToShopify(
     // uploads on the same product, and a swallowed failure left description / variant pictures missing
     const results: PromiseSettledResult<{ ok: boolean; j: any }>[] = [];
     for (const u of localUploads) {
-      let last: { ok: boolean; j: any } = { ok: false, j: {} };
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const r = await fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/products/${id}/images.json`, {
-          method: "POST",
-          headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ image: { attachment: u.attachment, filename: u.filename, alt: u.alt } }),
-        });
-        last = { ok: r.ok, j: (await r.json().catch(() => ({}))) as any };
-        if (r.ok || ![409, 429, 500, 502, 503].includes(r.status)) break;
-        await new Promise((res) => setTimeout(res, 1200 * (attempt + 1)));
-      }
+      const r = await shopifyCall(domain, shopToken, "POST", `products/${id}/images.json`, {
+        image: { attachment: u.attachment, filename: u.filename, alt: u.alt },
+      });
+      const last = { ok: r.ok, j: r.j };
       if (!last.ok) console.error(`[shopify-push] image upload failed: ${u.filename} ${JSON.stringify(last.j).slice(0, 200)}`);
       results.push({ status: "fulfilled", value: last });
     }
@@ -409,17 +437,12 @@ export async function pushToShopify(
   // Attach each variant's own picture to the Shopify variant (the storefront then switches the photo with the option).
   const madeVariants: any[] = json.product?.variants ?? [];
   if (id && madeVariants.length === variantUp.length) {
-    await Promise.allSettled(
-      madeVariants.map((cv, i) => {
-        const img = variantUp[i] ? byUpload.get(variantUp[i]!) : undefined;
-        if (!img || !cv?.id) return Promise.resolve();
-        return fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/variants/${cv.id}.json`, {
-          method: "PUT",
-          headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ variant: { id: cv.id, image_id: img.id } }),
-        });
-      }),
-    );
+    for (let i = 0; i < madeVariants.length; i++) {
+      const cv = madeVariants[i];
+      const img = variantUp[i] ? byUpload.get(variantUp[i]!) : undefined;
+      if (!img || !cv?.id) continue;
+      await shopifyCall(domain, shopToken, "PUT", `variants/${cv.id}.json`, { variant: { id: cv.id, image_id: img.id } });
+    }
   }
 
   onStep(SHOPIFY_PUSH_STEPS[4]);
@@ -443,17 +466,13 @@ export async function pushToShopify(
     .filter((c): c is { id: number; src: string } => !!c)
     .map((c, i) => ({ id: c.id, position: i + 1 }));
   if (id && (rewrote || localUploads.length)) {
-    await fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/products/${id}.json`, {
-      method: "PUT",
-      headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        product: {
-          id,
-          body_html: rewrote ? bodyHtml : undefined,
-          images: orderedImages.length ? orderedImages : undefined,
-        },
-      }),
-    }).catch(() => {});
+    await shopifyCall(domain, shopToken, "PUT", `products/${id}.json`, {
+      product: {
+        id,
+        body_html: rewrote ? bodyHtml : undefined,
+        images: orderedImages.length ? orderedImages : undefined,
+      },
+    });
   }
 
   onStep(SHOPIFY_PUSH_STEPS[5]);
@@ -461,23 +480,16 @@ export async function pushToShopify(
   // taxonomy attribute handle with dashes → underscores). Best-effort: a failure
   // here never affects the created draft.
   if (attrEntries.length && id) {
-    await Promise.allSettled(
-      attrEntries.map(([h, p]) =>
-        fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/products/${id}/metafields.json`, {
-          method: "POST",
-          headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            metafield: {
-              namespace: "custom",
-              key: h.replace(/-/g, "_").slice(0, 30),
-              type: p.valueNames.length > 1 ? "list.single_line_text_field" : "single_line_text_field",
-              value:
-                p.valueNames.length > 1 ? JSON.stringify(p.valueNames) : p.valueNames[0],
-            },
-          }),
-        }),
-      ),
-    );
+    for (const [h, p] of attrEntries) {
+      await shopifyCall(domain, shopToken, "POST", `products/${id}/metafields.json`, {
+        metafield: {
+          namespace: "custom",
+          key: h.replace(/-/g, "_").slice(0, 30),
+          type: p.valueNames.length > 1 ? "list.single_line_text_field" : "single_line_text_field",
+          value: p.valueNames.length > 1 ? JSON.stringify(p.valueNames) : p.valueNames[0],
+        },
+      });
+    }
   }
 
   // HS code + country of origin live on the inventory item, not the variant —
@@ -487,28 +499,20 @@ export async function pushToShopify(
     (v) => v.hsCode || product.hsCode || v.countryOfOrigin || product.originCountry,
   );
   if (needCustoms && created.length) {
-    await Promise.allSettled(
-      created.map((cv, i) => {
-        const v = vlist[i] || {};
-        const hs = v.hsCode || product.hsCode || "";
-        const co = (v.countryOfOrigin || product.originCountry || "").toUpperCase().slice(0, 2);
-        if (!hs && !co) return Promise.resolve();
-        return fetch(
-          `https://${domain}/admin/api/${env.shopifyApiVersion}/inventory_items/${cv.inventory_item_id}.json`,
-          {
-            method: "PUT",
-            headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              inventory_item: {
-                id: cv.inventory_item_id,
-                harmonized_system_code: hs || undefined,
-                country_code_of_origin: /^[A-Z]{2}$/.test(co) ? co : undefined,
-              },
-            }),
-          },
-        );
-      }),
-    );
+    for (let i = 0; i < created.length; i++) {
+      const cv = created[i];
+      const v = vlist[i] || {};
+      const hs = v.hsCode || product.hsCode || "";
+      const co = (v.countryOfOrigin || product.originCountry || "").toUpperCase().slice(0, 2);
+      if (!hs && !co) continue;
+      await shopifyCall(domain, shopToken, "PUT", `inventory_items/${cv.inventory_item_id}.json`, {
+        inventory_item: {
+          id: cv.inventory_item_id,
+          harmonized_system_code: hs || undefined,
+          country_code_of_origin: /^[A-Z]{2}$/.test(co) ? co : undefined,
+        },
+      });
+    }
   }
 
   return { id, adminUrl: `https://${domain}/admin/products/${id}` };
