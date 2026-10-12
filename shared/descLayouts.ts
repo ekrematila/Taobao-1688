@@ -933,6 +933,8 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   //    the real native tap-to-collapse/expand behaviour keeps working there.
   `@media (min-width:900px){` +
   `.bm .bm-acc>summary{display:none!important}` +
+  `.bm details.bm-acc::details-content{content-visibility:visible!important;display:contents!important}` +
+  `.bm .bm-c2:empty,.bm .bm-media:empty{display:none!important}` +
   `.bm .bm-acc>.bm-c1{display:block!important}` +
   `.bm .bm-acc>.bm-grid{display:grid!important}` +
   // our own call-out / chip areas are always centred, whatever the model's CSS says
@@ -1004,6 +1006,28 @@ function forceBmAccDisclosure(html: string): string {
   return `${before}<details class="bm-acc" open><summary class="bm-bar">${label}</summary>${middle}</details>${after}`;
 }
 
+/**
+ * Every `<details class="…bm-acc…">` must carry its `<summary class="bm-bar">` and an `open` attribute, and must not be
+ * an empty shell. A model (or an old stored page) sometimes omits them: without a summary the browser paints its own
+ * default label ("▼ Details" / "▼ Ayrıntılar") at the top of the column, without `open` the whole column is collapsed,
+ * and an empty `.bm-c2` / `.bm-media` leaves a bordered empty box.
+ */
+export function normaliseBmAcc(html: string): string {
+  if (!/bm-acc/.test(html)) return html;
+  let out = html.replace(/<details\b([^>]*)>(\s*)(<summary\b)?/gi, (all, attrs: string, ws: string, sum?: string) => {
+    const cls = /\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] || "";
+    if (!/(^|\s)bm-acc(\s|$)/.test(cls)) return all;
+    const open = /\sopen\b/i.test(" " + attrs) ? attrs : attrs + " open";
+    if (sum) return `<details${open}>${ws}${sum}`;
+    const label = /bm-acc-media/.test(cls) ? "Images" : /bm-acc-desc/.test(cls) ? "Description" : "Product Details";
+    return `<details${open}><summary class="bm-bar">${label}<i></i></summary>${ws}`;
+  });
+  // a column wrapper with nothing in it (no text, no picture) is dropped together with its (now empty) disclosure
+  const empty = /<details\b[^>]*\bbm-acc-(?:media|desc)\b[^>]*>\s*<summary\b[^>]*>[\s\S]*?<\/summary>\s*<div\b[^>]*\bclass\s*=\s*["'][^"']*\bbm-(?:c2|media)\b[^"']*["'][^>]*>\s*<\/div>\s*<\/details>/gi;
+  out = out.replace(empty, "");
+  return out;
+}
+
 /** Google fonts the model may pick for a product (name → css2 family spec). Anything else is ignored. */
 const PRODUCT_FONTS: Record<string, string> = {
   Fredoka: "Fredoka:wght@400;500;600;700",
@@ -1062,7 +1086,7 @@ export function trimBmPage(html: string): string {
 function ensureBmScaffold(html: string): string {
   if (!/class\s*=\s*["']bm["']/i.test(html)) return html;
   let out = html.replace(/<script\b[^>]*>(?:(?!<\/?script\b)[\s\S])*?<\/script\s*>/gi, "");
-  out = trimBmPage(applyProductFonts(forceBmAccDisclosure(out)));
+  out = trimBmPage(applyProductFonts(normaliseBmAcc(forceBmAccDisclosure(out))));
   out = forceCtaOnclick(out, "data-bm-goto-atc", BM_CTA_ONCLICK);
   // older `.bm` block (fallback card, pre-v2 model output) → add the v2-only CSS
   out = out

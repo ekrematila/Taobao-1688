@@ -439,3 +439,21 @@ test("the 'fun fact' line and the generic comparison table are dropped from a pa
   assert.doesNotMatch(markup, /Fun fact|bm-compare|Why PC over matte/);
   assert.match(out, /<h3>FAQ<\/h3>/);
 });
+
+test("a model page whose column <details> lack <summary>/open is repaired (no default label, nothing collapsed)", () => {
+  const broken = STACKED_DESC_EXAMPLE
+    .replace(/(<details class="bm-acc bm-acc-(?:media|desc)") open>\s*<summary class="bm-bar">[\s\S]*?<\/summary>/g, "$1>");
+  assert.ok(!/<details class="bm-acc bm-acc-media"[^>]*>\s*<summary/.test(broken), "test setup: summaries stripped");
+  const out = renderDescriptionHtml("stacked-plain", broken, imgs);
+  for (const kind of ["media", "desc"]) {
+    const m = new RegExp(`<details class="bm-acc bm-acc-${kind}"([^>]*)>\s*<summary class="bm-bar">`).exec(out);
+    assert.ok(m, `${kind}: summary restored`);
+    assert.ok(/\bopen\b/.test(m![1]), `${kind}: open restored`);
+  }
+});
+
+test("an empty column shell (bordered empty box) is removed", () => {
+  const html = STACKED_DESC_EXAMPLE.replace(/(<details class="bm-acc bm-acc-desc" open>\s*<summary[\s\S]*?<\/summary>)[\s\S]*?(<\/details>)(?=\s*<\/div>)/, '$1<div class="bm-c2"> </div>$2');
+  const out = renderDescriptionHtml("stacked-plain", html, imgs);
+  assert.ok(!/bm-acc-desc" open>/.test(out) || !/<div class="bm-c2">\s*<\/div>\s*<\/details>/.test(out));
+});
