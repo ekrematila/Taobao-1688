@@ -242,7 +242,33 @@ export interface Alignment {
   corr: number;
   /** vertical offset (low-res rows) at which they match best */
   shift: number;
+  /** mean colour difference over the picture (0–255). Faithful ≈ 4–6, a redrawn picture ≈ 54 */
+  colorDiff: number;
+  /** share of the picture that changed strongly. Lettering ≈ 1–3 %, a redrawn picture ≈ 50 % */
+  bigFrac: number;
   ok: boolean;
+}
+
+/** colour fidelity at 64 px wide: how much of the picture changed, and by how much */
+async function colourChange(src: string | Buffer, res: string | Buffer): Promise<{ colorDiff: number; bigFrac: number }> {
+  const sharp = (await import("sharp")).default;
+  const m = await sharp(src).metadata();
+  const w = 64;
+  const h = Math.max(8, Math.round((w * (m.height ?? 1)) / (m.width ?? 1)));
+  const read = async (x: string | Buffer) =>
+    (await sharp(x).removeAlpha().resize(w, h, { fit: "fill", kernel: "lanczos3" }).blur(0.8).raw().toBuffer({ resolveWithObject: true })).data;
+  const a = await read(src);
+  const b = await read(res);
+  let sum = 0;
+  let big = 0;
+  const n = w * h;
+  for (let i = 0; i < n; i++) {
+    let d = 0;
+    for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(a[i * 3 + c] - b[i * 3 + c]));
+    sum += d;
+    if (d > 40) big++;
+  }
+  return { colorDiff: sum / n, bigFrac: big / n };
 }
 
 /**
@@ -264,5 +290,7 @@ export async function tileAlignment(srcFile: string | Buffer, resFile: string | 
       shift = sh;
     }
   }
-  return { corr: at0, shift, ok: at0 >= 0.9 && best - at0 < 0.05 };
+  const { colorDiff, bigFrac } = await colourChange(srcFile, resFile);
+  // lettering changes a few % of the picture; anything more means the model redrew it (new colours, new scene, new product)
+  return { corr: at0, shift, colorDiff, bigFrac, ok: at0 >= 0.9 && best - at0 < 0.05 && colorDiff <= 18 && bigFrac <= 0.12 };
 }

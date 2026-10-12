@@ -1212,14 +1212,22 @@ router.post(
           // shortest side 800–1000 px, high quality.
           const sd = await sourceSize(it.sourceUrl);
           persisted = sd ? await matchSourceSize(persisted, sd) : await normaliseShortestEdge(persisted);
-          // a model that redraws the picture instead of only changing its lettering ruins the product shot — say so
-          if (!it.compareUrl && !it.checked && persisted.startsWith("/api/media/")) {
+          // RULE: only the overlay lettering may change. A model that redraws the picture (new scene, new colours,
+          // touched product / background) is REJECTED — the original stays, nothing is applied.
+          if (persisted.startsWith("/api/media/")) {
+            let al: Awaited<ReturnType<typeof tileAlignment>> | null = null;
             try {
               const srcBytes = Buffer.from((await imageToBase64(it.sourceUrl)).data, "base64");
-              const al = await tileAlignment(srcBytes, mediaPath(persisted.slice("/api/media/".length)));
-              if (!al.ok) it.warnings = [...(it.warnings ?? []), `Çeviri görselin düzenini değiştirmiş olabilir (benzerlik ${al.corr.toFixed(2)}) — sonucu kontrol et, gerekirse geri al`];
+              al = await tileAlignment(srcBytes, mediaPath(persisted.slice("/api/media/".length)));
             } catch {
-              /* unreadable source → no check */
+              /* unreadable source → no check possible */
+            }
+            if (al && !al.ok) {
+              console.warn(`[translate-images] REJECTED a redrawn result for ${it.sourceUrl} (corr=${al.corr.toFixed(3)} colour=${al.colorDiff.toFixed(1)} changed=${(al.bigFrac * 100).toFixed(0)}%)`);
+              it.changed = false;
+              it.resultUrl = null;
+              it.error = `Model görseli yeniden çizdi (benzerlik ${al.corr.toFixed(2)}, değişen alan %${Math.round(al.bigFrac * 100)}) — sonuç reddedildi, orijinal görsel korundu. Tekrar dene ya da parçalı modu kullan.`;
+              return;
             }
           }
         } catch {
@@ -1378,7 +1386,6 @@ router.post(
 
         // "both": the same picture ALSO translated as one long picture, kept next to the pieces version to compare
         let wholeUrl: string | null = null;
-        let wholeBad = false;
         if (mode === "both") {
           try {
             ctx.setStatus(`Görsel ${i + 1}/${urls.length} · tek parça sürüm çevriliyor`);
@@ -1388,8 +1395,11 @@ router.post(
               const sd = await sourceSize(srcLocal);
               wholeUrl = sd ? await matchSourceSize(r.local, sd) : r.local;
               const al = await tileAlignment(mediaPath(srcLocal.slice("/api/media/".length)), mediaPath(wholeUrl.slice("/api/media/".length)));
-              wholeBad = !al.ok;
-              if (wholeBad) warnings.push(`Tek parça sürüm orijinalle uyuşmuyor (benzerlik ${al.corr.toFixed(2)}) — model görseli yeniden çizmiş, parçalı sürümü kullan`);
+              if (!al.ok) {
+                // never offer a redrawn picture as an option
+                wholeUrl = null;
+                warnings.push(`Tek parça sürüm reddedildi: model görseli yeniden çizdi (benzerlik ${al.corr.toFixed(2)}, değişen alan %${Math.round(al.bigFrac * 100)}). Parçalı sürüm kullanıldı.`);
+              }
             }
           } catch (e) {
             if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
@@ -1408,7 +1418,7 @@ router.post(
             if (at < 0) return;
             const images = [...fresh.product.images];
             images[at] = { ...images[at], compare: "tiles" };
-            images.splice(at + 1, 0, { url: wholeUrl!, role: images[at].role, ops: ["translate"], translatedFrom: urls[i], compare: "whole", ...(wholeBad ? { compareBad: true } : {}) });
+            images.splice(at + 1, 0, { url: wholeUrl!, role: images[at].role, ops: ["translate"], translatedFrom: urls[i], compare: "whole" });
             patchDraft(draft.id, { product: { ...fresh.product, images } }, "Tek parça çeviri karşılaştırma için eklendi");
           });
         }
