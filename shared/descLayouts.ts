@@ -446,30 +446,42 @@ ${FIND_ATC_FN}
      fires, the open/close attribute never finishes updating, and the item
      gets stuck — it looks like it "won't open again" on the next click. The
      timeout guarantees the state always finishes settling either way. */
+  function slideClose(item, b, cls, after){
+    var done = false;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.height = ''; b.style.opacity = ''; b.style.transition = ''; b.style.overflow = ''; if(after) after(); }
+    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1), opacity .24s ease'; b.style.height = '0px'; b.style.opacity = '0';
+    b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
+    setTimeout(finish, 480);
+  }
+  /* A closed <details> keeps its content un-rendered, so a transition started in the same frame as [open] never runs
+     (the answer snapped open, or showed half-cut). Open it, hold it at height 0 for a moment so the browser has really
+     laid it out, THEN animate to the measured height. Only this element's own height transition may finish it. */
+  function slideOpen(item, b, cls){
+    item.setAttribute('open', ''); if(cls) item.classList.add(cls);
+    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.opacity = '0'; void b.offsetHeight;
+    setTimeout(function(){
+      var done = false;
+      function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; b.style.opacity = ''; b.style.transition = ''; }
+      b.style.transition = 'height .38s cubic-bezier(.25,.8,.3,1), opacity .3s ease';
+      b.style.height = b.scrollHeight + 'px'; b.style.opacity = '1';
+      b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
+      setTimeout(finish, 540);
+      /* inside the sticky text panel the answer can open below the visible part: glide it into view */
+      try{ var pn = item.closest('.bm-c2,.bm-acc-desc'); if(pn && pn.scrollHeight > pn.clientHeight + 4){ setTimeout(function(){ item.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 200); } }catch(e){}
+    }, 40);
+  }
   function closeFaq(item){
     var b = item.querySelector('.bm-faq-a');
     if(!b){ item.removeAttribute('open'); return; }
-    var done = false;
-    function finish(){ if(done) return; done = true; item.removeAttribute('open'); b.style.height = ''; }
-    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
-    b.style.transition = 'height .35s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
-    setTimeout(finish, 450);
+    slideClose(item, b, '');
   }
   function openFaq(item){
     var group = item.closest('.bm-faq') || document;
     group.querySelectorAll('.bm-faq-item[open]').forEach(function(o){ if(o !== item) closeFaq(o); });
-    item.setAttribute('open', '');
     var b = item.querySelector('.bm-faq-a');
-    if(!b) return;
-    var done = false;
-    function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; }
-    b.style.transition = 'height .35s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
-    b.style.height = b.scrollHeight + 'px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
-    setTimeout(finish, 450);
-    /* inside the sticky text panel the answer can open below the visible part: glide it into view instead of leaving it cut off */
-    try{ var pn = item.closest('.bm-c2,.bm-acc-desc'); if(pn && pn.scrollHeight > pn.clientHeight + 4){ setTimeout(function(){ item.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 120); } }catch(e){}
+    if(!b){ item.setAttribute('open', ''); return; }
+    slideOpen(item, b, '');
   }
   /* The mobile "Description"/"Images" tabs: same reliable height-animation
      pattern as the FAQ above (native <details> open/close is instant with no
@@ -622,26 +634,37 @@ ${FIND_ATC_FN}
     }, 90);
     setTimeout(function(){ clearInterval(iv); fire(); }, 4000);
   }
+  function slideClose(item, b, cls){
+    var done = false;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.height = ''; b.style.opacity = ''; b.style.transition = ''; b.style.overflow = ''; }
+    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1), opacity .24s ease'; b.style.height = '0px'; b.style.opacity = '0';
+    b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
+    setTimeout(finish, 480);
+  }
+  /* see the .bm script: a closed <details> has no layout, so open it, hold at 0, then animate to the measured height */
+  function slideOpen(item, b, cls){
+    item.setAttribute('open', ''); if(cls) item.classList.add(cls);
+    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.opacity = '0'; void b.offsetHeight;
+    setTimeout(function(){
+      var done = false;
+      function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; b.style.opacity = ''; b.style.transition = ''; }
+      b.style.transition = 'height .38s cubic-bezier(.25,.8,.3,1), opacity .3s ease';
+      b.style.height = b.scrollHeight + 'px'; b.style.opacity = '1';
+      b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
+      setTimeout(finish, 540);
+    }, 40);
+  }
   function closeFaq(item){
     var b = item.querySelector('.pd-faq-a'); if(!b){ item.removeAttribute('open'); item.classList.remove('pd-open'); return; }
-    var done = false;
-    function finish(){ if(done) return; done = true; item.removeAttribute('open'); item.classList.remove('pd-open'); b.style.height = ''; }
-    b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
-    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
-    setTimeout(finish, 450);
+    slideClose(item, b, 'pd-open');
   }
   function openFaq(item){
     var group = item.closest('.pd-ck__faq') || item.parentElement || document;
     group.querySelectorAll('.pd-faq-item[open], .pd-faq-item.pd-open').forEach(function(o){ if(o !== item) closeFaq(o); });
-    item.setAttribute('open', ''); item.classList.add('pd-open');
-    var b = item.querySelector('.pd-faq-a'); if(!b) return;
-    var done = false;
-    function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; }
-    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1)'; b.style.overflow = 'hidden'; b.style.height = '0px'; void b.offsetHeight;
-    b.style.height = b.scrollHeight + 'px';
-    b.addEventListener('transitionend', function te(){ b.removeEventListener('transitionend', te); finish(); }, {once:true});
-    setTimeout(finish, 450);
+    var b = item.querySelector('.pd-faq-a');
+    if(!b){ item.setAttribute('open', ''); item.classList.add('pd-open'); return; }
+    slideOpen(item, b, 'pd-open');
   }
   document.addEventListener('click', function(e){
     var q = e.target && e.target.closest && e.target.closest('.pd-faq-q');
@@ -696,8 +719,8 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `summary.bm-faq-q::-webkit-details-marker,summary.pd-faq-q::-webkit-details-marker{display:none}` +
   `summary.bm-faq-q::marker,summary.pd-faq-q::marker{content:""!important}` +
   `.bm-faq-q:hover,.pd-faq-q:hover{filter:brightness(.97)}` +
-  `details.bm-faq-item[open]>.bm-faq-a,details.pd-faq-item[open]>.pd-faq-a{animation:tpsFaqIn .28s ease}` +
-  `@keyframes tpsFaqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}` +
+  // (no CSS keyframe on the answer: it fought the JS height animation and made the open look cut / stuttery)
+  `details.bm-faq-item[open]>.bm-faq-a,details.pd-faq-item[open]>.pd-faq-a,.bm-faq-item[open] .bm-faq-a{animation:none!important}` +
   // 2c) a guaranteed +/- indicator on the question row itself, independent of
   //     whatever inner span/pseudo-element markup the model attempted for its
   //     own `.bm-plus` icon (observed in production: the model's own version
