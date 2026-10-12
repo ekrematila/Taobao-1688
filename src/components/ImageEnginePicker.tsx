@@ -71,6 +71,15 @@ export default function ImageEnginePicker({
           </select>
         </>
       )}
+      <select
+        value={ai.tileMode}
+        onChange={(e) => ai.set({ tileMode: e.target.value === "whole" ? "whole" : e.target.value === "both" ? "both" : "tiles" })}
+        title={t("ws.tileModeTip")}
+      >
+        <option value="tiles">{t("ws.tileTiles")}</option>
+        <option value="whole">{t("ws.tileWhole")}</option>
+        <option value="both">{t("ws.tileBoth")}</option>
+      </select>
     </>
   );
 

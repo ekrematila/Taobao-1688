@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
-import { getImageEngineChoice, setImageEngineChoice, subscribeImageEngine, type ImageEngine } from "./imageEngineStore";
+import { getImageEngineChoice, setImageEngineChoice, subscribeImageEngine, type ImageEngine, type TileMode } from "./imageEngineStore";
 
 /**
  * The image engine in effect + whether its API key exists. Until the operator picks one,
@@ -18,19 +18,20 @@ export function useImageAi() {
   // make the key-driven default explicit so non-React callers (api.ts) agree with the UI
   useEffect(() => {
     if (settings.data && !getImageEngineChoice() && engine === "openai")
-      setImageEngineChoice({ engine: "openai", model: "", quality: "high" });
+      setImageEngineChoice({ engine: "openai", model: "", quality: "high", tileMode: "tiles" });
   }, [settings.data, engine]);
 
   return {
     engine,
     model: choice?.model ?? "",
     quality: choice?.quality ?? "high",
+    tileMode: (choice?.tileMode ?? "tiles") as TileMode,
     hasManus,
     hasOpenai,
     /** the selected engine's key is configured, so image AI can run */
     ready: engine === "openai" ? hasOpenai : hasManus,
     openaiDefaults: settings.data?.openaiDefaults ?? {},
-    set: (patch: Partial<{ engine: ImageEngine; model: string; quality: string }>) =>
-      setImageEngineChoice({ engine, model: choice?.model ?? "", quality: choice?.quality ?? "high", ...patch }),
+    set: (patch: Partial<{ engine: ImageEngine; model: string; quality: string; tileMode: TileMode }>) =>
+      setImageEngineChoice({ engine, model: choice?.model ?? "", quality: choice?.quality ?? "high", tileMode: choice?.tileMode ?? "tiles", ...patch }),
   };
 }

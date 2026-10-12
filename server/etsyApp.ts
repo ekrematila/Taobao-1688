@@ -77,7 +77,7 @@ export function withAbsoluteMedia(input: NormalisedProduct): NormalisedProduct {
   const product = syncVariantImages(input); // edited variant pictures, even for a draft saved before the sync existed
   return {
     ...product,
-    images: product.images.map((im) => ({ ...im, url: absolutizeMedia(im.url) ?? im.url })),
+    images: product.images.filter((im) => im.compare !== "whole").map((im) => ({ ...im, url: absolutizeMedia(im.url) ?? im.url })),
     variants: product.variants.map(({ imageSrc: _src, ...v }) => (v.imageUrl ? { ...v, imageUrl: absolutizeMedia(v.imageUrl) } : v)),
     videoUrl: absolutizeMedia(product.videoUrl),
   };

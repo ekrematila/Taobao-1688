@@ -52,11 +52,11 @@ export function oneLineHtml(html: string): string {
 
 /** photos for a listing: gallery + variant + description-role images */
 function photoImgs(p: NormalisedProduct): ProductImage[] {
-  return dedupeByUrl(withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant" || i.role === "description")));
+  return dedupeByUrl(withClean(p.images.filter((i) => i.compare !== "whole" && (i.role === "gallery" || i.role === "variant" || i.role === "description"))));
 }
 /** the main product-card photos only (no in-description images) */
 function mainImgs(p: NormalisedProduct): ProductImage[] {
-  return dedupeByUrl(withClean(p.images.filter((i) => i.role === "gallery" || i.role === "variant")));
+  return dedupeByUrl(withClean(p.images.filter((i) => i.compare !== "whole" && (i.role === "gallery" || i.role === "variant"))));
 }
 /** images for the Shopify HTML body — always visual: description strips, then gallery, capped 20 */
 function descImgs(p: NormalisedProduct): ProductImage[] {
@@ -345,7 +345,7 @@ export async function etsyZip(p: NormalisedProduct, l: GeneratedListing): Promis
   // "title and description" = ALL listing photos (gallery + description strips),
   // even if there are more than Etsy's live cap — ordered details-last.
   const listingImgs = sortListingImages(
-    withClean(p.images.filter((i) => i.role === "gallery" || i.role === "description")),
+    withClean(p.images.filter((i) => i.compare !== "whole" && (i.role === "gallery" || i.role === "description"))),
   ).slice(0, 120);
   const tdDir = folder.folder("title and description")!;
   const tdLines: string[] = [];

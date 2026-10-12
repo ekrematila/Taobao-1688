@@ -85,7 +85,7 @@ import {
 } from "./taxonomy.ts";
 import { freeTranslate } from "./translate.ts";
 import { autoFillVariants } from "./variantAuto.ts";
-import { assembleTiles, cutTiles, planTiles, type TilePlan } from "./tileTranslate.ts";
+import { assembleTiles, cutTiles, planTiles, tileAlignment, type TilePlan } from "./tileTranslate.ts";
 import { localAdvice, localCategoryResearch, localListing } from "./localContent.ts";
 import { allExamples } from "./examples.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
@@ -1150,7 +1150,9 @@ router.post(
 router.post(
   "/api/ai/translate-images",
   wrap(async (req, res) => {
-    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile, engine, imageModel, imageQuality, tileTall } = req.body ?? {};
+    const { draftId, imageUrls, targetLanguage, instruction, speed, agentProfile, engine, imageModel, imageQuality, tileTall, tileMode } = req.body ?? {};
+    // how a TALL picture is translated: in full-size pieces (default), whole as one long picture, or both (compare)
+    const mode: "tiles" | "whole" | "both" = tileMode === "whole" || tileTall === false ? "whole" : tileMode === "both" ? "both" : "tiles";
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
     const useOpenAI = engine === "openai";
@@ -1210,6 +1212,16 @@ router.post(
           // shortest side 800–1000 px, high quality.
           const sd = await sourceSize(it.sourceUrl);
           persisted = sd ? await matchSourceSize(persisted, sd) : await normaliseShortestEdge(persisted);
+          // a model that redraws the picture instead of only changing its lettering ruins the product shot — say so
+          if (!it.compareUrl && !it.checked && persisted.startsWith("/api/media/")) {
+            try {
+              const srcBytes = Buffer.from((await imageToBase64(it.sourceUrl)).data, "base64");
+              const al = await tileAlignment(srcBytes, mediaPath(persisted.slice("/api/media/".length)));
+              if (!al.ok) it.warnings = [...(it.warnings ?? []), `Çeviri görselin düzenini değiştirmiş olabilir (benzerlik ${al.corr.toFixed(2)}) — sonucu kontrol et, gerekirse geri al`];
+            } catch {
+              /* unreadable source → no check */
+            }
+          }
         } catch {
           /* fall back to the ephemeral url */
         }
@@ -1300,37 +1312,55 @@ router.post(
         });
       };
 
-      // A TALL picture (e.g. several description strips merged) is cut at its quietest rows, every piece is translated
+      // A TALL picture (e.g. several description strips merged) is cut at a seam / gutter, every piece is translated
       // at full size, and the pieces are put back with a short cross-fade — exactly the source's size, products unharmed.
+      // A piece the model cropped / zoomed / shifted is NOT used: it is asked again once, then the original piece stays.
       const oneTiled = async (i: number, srcLocal: string, tp: TilePlan) => {
         const tiles = await cutTiles(srcLocal, tp);
         const n = tiles.length;
         const finals: string[] = [...tiles];
+        const warnings: string[] = [];
         let changedAny = false;
         let failed = 0;
         let credits = 0;
         let taskUrl = "";
         let model = "";
         let tcursor = 0;
+        const tileFile = (u: string) => mediaPath(u.slice("/api/media/".length));
         const tileWorker = async () => {
           for (;;) {
             const k = tcursor++;
             if (k >= n) return;
             ctx.throwIfCancelled();
-            ctx.setStatus(`Görsel ${i + 1}/${urls.length} · parça ${k + 1}/${n} çevriliyor`);
+            const t = tp.tiles[k];
             try {
-              const r = await engineOne(tiles[k]);
-              credits += r.credits;
-              taskUrl = taskUrl || r.taskUrl;
-              model = r.model || model;
-              if (r.local) {
-                const t = tp.tiles[k];
-                finals[k] = await matchSourceSize(r.local, { w: tp.w, h: t.bottom - t.top });
+              let good: string | null = null;
+              let unchanged = false;
+              for (let attempt = 1; attempt <= 2 && !good && !unchanged; attempt++) {
+                ctx.setStatus(`Görsel ${i + 1}/${urls.length} · parça ${k + 1}/${n} çevriliyor${attempt > 1 ? " (tekrar)" : ""}`);
+                const r = await engineOne(tiles[k]);
+                credits += r.credits;
+                taskUrl = taskUrl || r.taskUrl;
+                model = r.model || model;
+                if (!r.local) {
+                  unchanged = true; // nothing to translate in this piece
+                  break;
+                }
+                const matched = await matchSourceSize(r.local, { w: tp.w, h: t.bottom - t.top });
+                const al = await tileAlignment(tileFile(tiles[k]), tileFile(matched));
+                if (al.ok) good = matched;
+                else console.warn(`[translate-images] #${i + 1} piece ${k + 1}/${n} not the same picture (corr=${al.corr.toFixed(3)} shift=${al.shift}) attempt ${attempt}`);
+              }
+              if (good) {
+                finals[k] = good;
                 changedAny = true;
+              } else if (!unchanged) {
+                warnings.push(`${k + 1}. parça çerçevesi bozuldu (kesilmiş/kaymış) — orijinal parça korundu`);
               }
             } catch (e) {
               if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
               failed++;
+              warnings.push(`${k + 1}. parça çevrilemedi — orijinal parça korundu`);
               console.error(`[translate-images] #${i + 1} piece ${k + 1}/${n} FAILED:`, (e as Error).message);
             }
           }
@@ -1338,18 +1368,52 @@ router.post(
         await Promise.all(Array.from({ length: Math.min(3, n) }, tileWorker));
         if (failed === n) throw new Error("Hiçbir parça çevrilemedi.");
         if (!changedAny) {
-          items[i] = { sourceUrl: urls[i], resultUrl: null, changed: false, taskUrl: "", creditsUsed: credits, creditsEstimated: false };
+          items[i] = { sourceUrl: urls[i], resultUrl: null, changed: false, taskUrl: "", creditsUsed: credits, creditsEstimated: false, ...(warnings.length ? { warnings } : {}) };
           done++;
-          console.warn(`[translate-images] #${i + 1}/${urls.length} no Chinese overlay text (${n} pieces, skipped)`);
+          console.warn(`[translate-images] #${i + 1}/${urls.length} no usable translated piece (${n} pieces, skipped)`);
           ctx.skip(labels[done - 1]);
           return;
         }
         const resultUrl = await assembleTiles(tp, finals);
-        const item = { sourceUrl: urls[i], resultUrl, changed: true, taskId: "", taskUrl, creditsUsed: credits, creditsEstimated: false, model, local: true, ...(failed ? { error: `${failed}/${n} parça çevrilemedi` } : {}) };
+
+        // "both": the same picture ALSO translated as one long picture, kept next to the pieces version to compare
+        let wholeUrl: string | null = null;
+        let wholeBad = false;
+        if (mode === "both") {
+          try {
+            ctx.setStatus(`Görsel ${i + 1}/${urls.length} · tek parça sürüm çevriliyor`);
+            const r = await engineOne(srcLocal);
+            credits += r.credits;
+            if (r.local) {
+              const sd = await sourceSize(srcLocal);
+              wholeUrl = sd ? await matchSourceSize(r.local, sd) : r.local;
+              const al = await tileAlignment(mediaPath(srcLocal.slice("/api/media/".length)), mediaPath(wholeUrl.slice("/api/media/".length)));
+              wholeBad = !al.ok;
+              if (wholeBad) warnings.push(`Tek parça sürüm orijinalle uyuşmuyor (benzerlik ${al.corr.toFixed(2)}) — model görseli yeniden çizmiş, parçalı sürümü kullan`);
+            }
+          } catch (e) {
+            if (e instanceof Cancelled || (e as Error)?.name === "AbortError") throw e;
+            warnings.push(`Tek parça sürüm çevrilemedi: ${(e as Error).message}`);
+          }
+        }
+
+        const item = { sourceUrl: urls[i], resultUrl, changed: true, taskId: "", taskUrl, creditsUsed: credits, creditsEstimated: false, model, local: true, ...(warnings.length ? { warnings } : {}), ...(wholeUrl ? { compareUrl: wholeUrl } : {}) };
         items[i] = item;
         await applyOne(item);
+        if (wholeUrl) {
+          await withDraftLock(draft.id, async () => {
+            const fresh = getDraft(draft.id);
+            if (!fresh?.product) return;
+            const at = fresh.product.images.findIndex((im) => im.url === resultUrl);
+            if (at < 0) return;
+            const images = [...fresh.product.images];
+            images[at] = { ...images[at], compare: "tiles" };
+            images.splice(at + 1, 0, { url: wholeUrl!, role: images[at].role, ops: ["translate"], translatedFrom: urls[i], compare: "whole", ...(wholeBad ? { compareBad: true } : {}) });
+            patchDraft(draft.id, { product: { ...fresh.product, images } }, "Tek parça çeviri karşılaştırma için eklendi");
+          });
+        }
         done++;
-        console.log(`[translate-images] #${i + 1}/${urls.length} OK tiled ${n} pieces${failed ? ` (${failed} failed)` : ""} model=${model}`);
+        console.log(`[translate-images] #${i + 1}/${urls.length} OK ${n} pieces${warnings.length ? ` (${warnings.length} warning)` : ""}${wholeUrl ? " + whole" : ""} model=${model}`);
         ctx.step(labels[done - 1]);
       };
 
@@ -1359,7 +1423,7 @@ router.post(
           if (i >= urls.length) return;
           ctx.throwIfCancelled();
           try {
-            if (tileTall !== false) {
+            if (mode !== "whole") {
               let tp: TilePlan | null = null;
               let local = "";
               try {

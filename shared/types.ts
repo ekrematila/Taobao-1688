@@ -75,6 +75,10 @@ export interface ProductImage {
   /** non-destructive display crop for the HTML DESCRIPTION only (CSS aspect-ratio +
    *  object-fit:cover + object-position). Does not touch the source file. */
   descCrop?: DescImageCrop;
+  /** set on the two versions of one tall picture translated "both ways": in full-size pieces / as one long picture */
+  compare?: "tiles" | "whole";
+  /** the one-piece version does not match the original's layout (the model redrew the picture) */
+  compareBad?: boolean;
 }
 
 export interface DescImageCrop {
@@ -551,6 +555,10 @@ export interface ImageTranslateItemResult {
   model?: string;
   /** set when this image failed (rate limit, network, Manus error…) */
   error?: string;
+  /** a piece the model cropped / failed was kept as the original, etc. — worth a look */
+  warnings?: string[];
+  /** "both" mode: the same picture translated as one long picture, saved next to the pieces version */
+  compareUrl?: string;
 }
 export interface ImageTranslateJobResult {
   items: ImageTranslateItemResult[];

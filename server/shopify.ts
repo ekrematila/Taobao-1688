@@ -208,7 +208,7 @@ export async function pushToShopify(
     return u;
   };
 
-  for (const im of product.images.filter((x) => x.role === "gallery" || x.role === "variant")) addUp(im);
+  for (const im of product.images.filter((x) => x.compare !== "whole" && (x.role === "gallery" || x.role === "variant"))) addUp(im);
   // each variant remembers its own upload, so its picture can be attached to the created Shopify variant below
   const variantUp: (Up | null)[] = (product.variants ?? []).map((v) => (v.imageUrl ? addUp({ url: v.imageUrl, alt: v.nameTranslated || v.name || "" }) : null));
 

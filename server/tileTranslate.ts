@@ -52,21 +52,76 @@ function rowActivity(gray: Uint8Array, W: number, H: number): Float64Array {
   return out;
 }
 
-/** choose the cut rows for an image `W×H` — pure, testable on raw grayscale */
+/**
+ * Rows where one picture ends and the next begins: a hard edge across (almost) the WHOLE width, with calm rows on
+ * both sides. A photo's own edges never span the full width, text rows are busy on both sides.
+ */
+export function seamRows(gray: Uint8Array, W: number, H: number): Set<number> {
+  const step = Math.max(1, Math.floor(W / 300));
+  const frac = new Float64Array(H);
+  for (let y = 1; y < H; y++) {
+    let hit = 0;
+    let n = 0;
+    for (let x = 0; x < W; x += step) {
+      if (Math.abs(gray[y * W + x] - gray[(y - 1) * W + x]) >= 12) hit++;
+      n++;
+    }
+    frac[y] = hit / Math.max(1, n);
+  }
+  const out = new Set<number>();
+  for (let y = 4; y < H - 4; y++) {
+    if (frac[y] >= 0.8 && frac[y - 3] < 0.5 && frac[y + 3] < 0.5) out.add(y);
+  }
+  return out;
+}
+
+/** middle rows of flat runs (gutters between pictures) */
+function gutterRows(act: Float64Array): number[] {
+  const mids: number[] = [];
+  let start = -1;
+  for (let y = 0; y <= act.length; y++) {
+    const flat = y < act.length && act[y] < 2;
+    if (flat && start < 0) start = y;
+    if (!flat && start >= 0) {
+      if (y - start >= 8) mids.push(Math.round((start + y - 1) / 2));
+      start = -1;
+    }
+  }
+  return mids;
+}
+
+/**
+ * Choose the cut rows for an image `W×H` — pure, testable on raw grayscale.
+ * Order of preference: a real SEAM between two pictures → the middle of a flat GUTTER → the quietest row.
+ * A cut must never slice through a product or a line of text, so the first two get a wide search window.
+ */
 export function chooseCuts(gray: Uint8Array, W: number, H: number): number[] {
   const n = Math.max(2, Math.round(H / (W * 1.5)));
   const act = rowActivity(gray, W, H);
+  const seams = [...seamRows(gray, W, H)];
+  const gutters = gutterRows(act);
   const span = H / n;
+  const wide = Math.floor(span * 0.35);
   const win = Math.floor(span * 0.2);
   const cuts: number[] = [];
   for (let k = 1; k < n; k++) {
     const nominal = Math.round(span * k);
-    const lo = Math.max((cuts[cuts.length - 1] ?? 0) + Math.round(span * 0.5), nominal - win);
-    const hi = Math.min(H - Math.round(span * 0.5), nominal + win);
-    let best = Math.min(Math.max(nominal, lo), hi);
+    const prev = cuts[cuts.length - 1] ?? 0;
+    const lo = Math.max(prev + Math.round(span * 0.5), nominal - wide);
+    const hi = Math.min(H - Math.round(span * 0.5), nominal + wide);
+    const nearest = (rows: number[]) => rows.filter((y) => y >= lo && y <= hi).sort((x, y) => Math.abs(x - nominal) - Math.abs(y - nominal))[0];
+    const hard = nearest(seams) ?? nearest(gutters);
+    if (hard !== undefined) {
+      cuts.push(hard);
+      continue;
+    }
+    // no seam or gutter in reach → the quietest row near the even split
+    const lo2 = Math.max(prev + Math.round(span * 0.5), nominal - win);
+    const hi2 = Math.min(H - Math.round(span * 0.5), nominal + win);
+    let best = Math.min(Math.max(nominal, lo2), hi2);
     let bestScore = Infinity;
-    for (let y = lo; y <= hi; y++) {
-      const score = act[y] + Math.abs(y - nominal) * 0.002; // quietest row; nearest to the even split on ties
+    for (let y = lo2; y <= hi2; y++) {
+      const score = act[y] + Math.abs(y - nominal) * 0.002;
       if (score < bestScore) {
         bestScore = score;
         best = y;
@@ -153,4 +208,61 @@ export async function assembleTiles(p: TilePlan, tileUrls: string[]): Promise<st
   }
   const png = await sharp(out, { raw: { width: p.w, height: p.h, channels: 3 } }).png({ compressionLevel: 6 }).toBuffer();
   return persistBuffer(png, "image/png");
+}
+
+/** a small blurred grayscale copy, for comparing "is this the same picture" */
+async function lowres(file: string | Buffer, w = 48): Promise<{ data: Uint8Array; w: number; h: number }> {
+  const sharp = (await import("sharp")).default;
+  const m = await sharp(file).metadata();
+  const h = Math.max(8, Math.round((w * (m.height ?? 1)) / (m.width ?? 1)));
+  const { data } = await sharp(file).removeAlpha().greyscale().resize(w, h, { fit: "fill", kernel: "lanczos3" }).blur(1).raw().toBuffer({ resolveWithObject: true });
+  return { data: new Uint8Array(data), w, h };
+}
+
+function pearson(a: Uint8Array, b: Uint8Array, w: number, h: number, shift: number): number {
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let y = 0; y < h; y++) {
+    const yb = y + shift;
+    if (yb < 0 || yb >= h) continue;
+    for (let x = 0; x < w; x++) {
+      const va = a[y * w + x];
+      const vb = b[yb * w + x];
+      n++; sa += va; sb += vb; saa += va * va; sbb += vb * vb; sab += va * vb;
+    }
+  }
+  if (n < 8) return 0;
+  const cov = sab / n - (sa / n) * (sb / n);
+  const va = saa / n - (sa / n) ** 2;
+  const vb = sbb / n - (sb / n) ** 2;
+  return cov / Math.sqrt(Math.max(1e-9, va * vb));
+}
+
+export interface Alignment {
+  /** similarity of the two layouts, same position (≈ 0.99 for a faithful translation) */
+  corr: number;
+  /** vertical offset (low-res rows) at which they match best */
+  shift: number;
+  ok: boolean;
+}
+
+/**
+ * Is the translated piece still the SAME picture — same framing, nothing cropped, zoomed, shifted or re-composed?
+ * Translating only changes lettering, so the coarse layout of the two must match. Calibrated on real Manus output:
+ * faithful ≈ 0.99, a 12 % zoom/crop ≈ 0.76, a 60 px vertical shift peaks at a non-zero offset.
+ */
+export async function tileAlignment(srcFile: string | Buffer, resFile: string | Buffer): Promise<Alignment> {
+  const a = await lowres(srcFile);
+  const b = await lowres(resFile);
+  const h = Math.min(a.h, b.h);
+  const at0 = pearson(a.data, b.data, a.w, h, 0);
+  let best = at0;
+  let shift = 0;
+  for (const sh of [-3, -2, -1, 1, 2, 3]) {
+    const c = pearson(a.data, b.data, a.w, h, sh);
+    if (c > best) {
+      best = c;
+      shift = sh;
+    }
+  }
+  return { corr: at0, shift, ok: at0 >= 0.9 && best - at0 < 0.05 };
 }

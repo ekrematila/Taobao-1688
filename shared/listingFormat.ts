@@ -142,7 +142,7 @@ function sameShotKey(url: string): string {
 
 export function descBodyImages(images: ProductImage[], max = 20): ProductImage[] {
   const roleOf = (im: ProductImage) => (im.role === "unused" || !im.role ? "description" : im.role);
-  const ordered = images.filter((im) => roleOf(im) === "description");
+  const ordered = images.filter((im) => roleOf(im) === "description" && im.compare !== "whole");
   const seen = new Set<string>();
   const out: ProductImage[] = [];
   for (const im of ordered) {

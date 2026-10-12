@@ -3,6 +3,8 @@
 // localStorage; api.ts reads it synchronously so each image job carries it automatically.
 
 export type ImageEngine = "manus" | "openai";
+/** a TALL picture: translated in full-size pieces (keeps product detail) · as one long picture · both (to compare) */
+export type TileMode = "tiles" | "whole" | "both";
 
 export interface ImageEngineChoice {
   engine: ImageEngine;
@@ -10,6 +12,7 @@ export interface ImageEngineChoice {
   model: string;
   /** low | medium | high | auto | xhigh | max */
   quality: string;
+  tileMode: TileMode;
 }
 
 const KEY = "imageEngine";
@@ -20,7 +23,7 @@ function read(): ImageEngineChoice | null {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw && (raw.engine === "manus" || raw.engine === "openai"))
-      return { engine: raw.engine, model: String(raw.model || ""), quality: String(raw.quality || "high") };
+      return { engine: raw.engine, model: String(raw.model || ""), quality: String(raw.quality || "high"), tileMode: raw.tileMode === "whole" || raw.tileMode === "both" ? raw.tileMode : "tiles" };
   } catch {
     /* private mode / corrupt value — fall back to the default */
   }
@@ -49,7 +52,8 @@ export function subscribeImageEngine(cb: () => void): () => void {
 }
 
 /** The extra fields an image job sends: nothing for Manus (unchanged requests), engine + model + quality for OpenAI. */
-export function imageEngineBody(): { engine?: "openai"; imageModel?: string; imageQuality?: string } {
+export function imageEngineBody(): { engine?: "openai"; imageModel?: string; imageQuality?: string; tileMode?: TileMode } {
   const c = getImageEngineChoice();
-  return c?.engine === "openai" ? { engine: "openai", imageModel: c.model || undefined, imageQuality: c.quality || undefined } : {};
+  const tile = c && c.tileMode !== "tiles" ? { tileMode: c.tileMode } : {};
+  return c?.engine === "openai" ? { engine: "openai", imageModel: c.model || undefined, imageQuality: c.quality || undefined, ...tile } : tile;
 }

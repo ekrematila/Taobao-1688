@@ -639,8 +639,40 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
     });
   }
 
+  /** the two versions of one tall picture ("both" mode): translated in pieces · translated as one long picture */
+  const [cmpOpen, setCmpOpen] = useState(false);
+  const cmpPair = useMemo(() => {
+    const list = draft.product?.images ?? [];
+    const i = list.findIndex((im, k) => im.compare === "tiles" && list[k + 1]?.compare === "whole");
+    return i >= 0 ? { tiles: list[i], whole: list[i + 1] } : null;
+  }, [draft.product?.images]);
+
+  /** keep one version (or both): the other copy is dropped, the flags cleared */
+  async function resolveCompare(keep: "tiles" | "whole" | "both") {
+    const fresh = await api.draft(draft.id);
+    const list: ProductImage[] = fresh.product?.images ?? [];
+    const i = list.findIndex((im, k) => im.compare === "tiles" && list[k + 1]?.compare === "whole");
+    if (i < 0) return setCmpOpen(false);
+    const tiles = list[i];
+    const whole = list[i + 1];
+    const clear = (im: ProductImage): ProductImage => {
+      const { compare: _c, ...rest } = im;
+      return rest;
+    };
+    const next = [...list];
+    if (keep === "both") next.splice(i, 2, clear(tiles), clear(whole));
+    else if (keep === "tiles") next.splice(i, 2, clear(tiles));
+    else next.splice(i, 2, clear({ ...tiles, url: whole.url })); // the long version takes the pieces version's place
+    await api.patchDraft(draft.id, { product: { ...fresh.product, images: next }, label: t("ws.cmpLabel") });
+    setCmpOpen(false);
+    onSaved();
+  }
+
   /** Toast the outcome of a translate-images job — errors (rate limit etc.) win over the OK line. */
   function reportTranslate(res: ImageTranslateJobResult) {
+    const warns = res.items.flatMap((i) => i.warnings ?? []);
+    if (warns.length) toast(t("ws.trWarn", { n: warns.length, msg: warns[0] }), "err");
+    if (res.items.some((i) => i.compareUrl)) setCmpOpen(true);
     const changed = res.items.filter((i) => i.changed).length;
     const errs = res.items.filter((i) => i.error);
     if (errs.length) {
@@ -1171,6 +1203,12 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
 
   return (
     <div className="grid ws-grid" style={{ alignItems: "start" }}>
+      {cmpPair && !cmpOpen && (
+        <div className="tiny" style={{ gridColumn: "1 / -1", background: "var(--warn-bg, #fff4e0)", color: "var(--warn, #8a5300)", padding: "6px 10px", borderRadius: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span>⚖ {t("ws.cmpPending")}</span>
+          <button className="btn sm" onClick={() => setCmpOpen(true)}>{t("ws.cmpOpen")}</button>
+        </div>
+      )}
       {editUrl && (
         <ImageEditor
           imageUrl={editUrl}
@@ -1204,6 +1242,38 @@ export default function VisualWorkspace({ draft, onSaved }: { draft: Draft; onSa
           onClose={() => setOcrUrls(null)}
           onApply={(map) => applyImageMap(map, "translate", t("ocr.label", { n: map.length }))}
         />
+      )}
+      {cmpOpen && cmpPair && (
+        <div className="modal-scrim" onClick={() => setCmpOpen(false)}>
+          <div className="modal" style={{ width: "min(1100px, 97vw)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="m-h">
+              <h3 style={{ fontSize: 14 }}>{t("ws.cmpTitle")}</h3>
+              <span className="sub">{t("ws.cmpSub")}</span>
+              <div className="grow" style={{ flex: 1 }} />
+              <button className="btn ghost sm" onClick={() => setCmpOpen(false)}>
+                {t("common.close")}
+              </button>
+            </div>
+            <div className="m-b" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, alignItems: "start", maxHeight: "68vh", overflow: "auto" }}>
+              {[
+                { key: "orig", label: t("ws.cmpOriginal"), url: cmpPair.tiles.translatedFrom || cmpPair.tiles.originalUrl || "" },
+                { key: "tiles", label: t("ws.cmpTiles"), url: cmpPair.tiles.url },
+                { key: "whole", label: t("ws.cmpWhole"), url: cmpPair.whole.url },
+              ].map((c) => (
+                <div key={c.key} className="col" style={{ gap: 6 }}>
+                  <b className="tiny">{c.label}</b>
+                  {c.key === "whole" && cmpPair.whole.compareBad && <span className="tiny" style={{ color: "var(--danger)" }}>⚠ {t("ws.cmpBad")}</span>}
+                  {c.url ? <img src={proxied(c.url.split("#dup-")[0])} alt="" style={{ width: "100%", height: "auto", border: "1px solid var(--line)", borderRadius: 6 }} /> : <div className="empty">—</div>}
+                </div>
+              ))}
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--line)", flexWrap: "wrap" }}>
+              <button className="btn" onClick={() => resolveCompare("both")}>{t("ws.cmpKeepBoth")}</button>
+              <button className="btn" onClick={() => resolveCompare("whole")}>{t("ws.cmpUseWhole")}</button>
+              <button className="btn primary" onClick={() => resolveCompare("tiles")}>{t("ws.cmpUseTiles")}</button>
+            </div>
+          </div>
+        </div>
       )}
       {stitchUrls && stitchUrls.length >= 1 && (
         <StitchPanel
