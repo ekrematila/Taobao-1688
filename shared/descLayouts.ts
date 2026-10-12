@@ -3,7 +3,7 @@
 
 import { cleanSpecs } from "./specs";
 import type { DescImageCrop } from "./types";
-import { ensureGlanceCss, injectPageBlocks, type PageBlocks } from "./pageBlocks";
+import { ensureGlanceCss, injectPageBlocks, relevantFeatIcons, type PageBlocks } from "./pageBlocks";
 import { applyPageSkin } from "./pageSkin";
 
 /** a description image with its optional non-destructive display crop. */
@@ -107,7 +107,7 @@ const deTr = (s: string) => s.replace(/İ/g, "I").replace(/ı/g, "i");
 
 /** the verified blocks go in, then the product's skin for the whole store page */
 function finishPage(html: string, meta?: DescMeta): string {
-  const withBlocks = injectPageBlocks(html, meta?.blocks);
+  const withBlocks = injectPageBlocks(relevantFeatIcons(html), meta?.blocks);
   return meta?.skin === false ? withBlocks : applyPageSkin(withBlocks);
 }
 
@@ -298,6 +298,7 @@ const SYNC_ACCENT_FN = `
 const FIND_ATC_FN = `
   function findAtc(){
     var list = [
+      '#product-add-to-cart',
       'form[action*="/cart/add"] button[name="add"]',
       'form[action*="/cart/add"] [type="submit"]',
       'button[name="add"]',
@@ -311,6 +312,8 @@ const FIND_ATC_FN = `
     function bad(el){
       if(!el) return true;
       if(el.closest && el.closest('.shopify-payment-button')) return true;
+      if(el.offsetParent === null) return true;
+      for(var q = el; q && q !== document.body; q = q.parentElement){ if(getComputedStyle(q).position === 'fixed') return true; }
       var t = (el.textContent || '').trim().toLowerCase();
       return t.indexOf('shop pay') !== -1 || t.indexOf('buy now') !== -1 || t.indexOf('buy with') !== -1;
     }
@@ -359,7 +362,7 @@ const FIND_ATC_FN = `
  * `window.__bmInit` never gets set at all.
  */
 const BM_CTA_ONCLICK =
-  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){var r=a.getBoundingClientRect(),y0=window.pageYOffset,dy=r.top+r.height/2-window.innerHeight/2,dur=Math.min(2600,Math.max(1100,Math.abs(dy)*0.6)),t0=null,ez=function(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},stp=function(ts){if(t0===null)t0=ts;var p=Math.min(1,(ts-t0)/dur);window.scrollTo(0,y0+dy*ez(p));if(p<1){requestAnimationFrame(stp);}else{a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);if(!a.disabled&&!window.__bmAdding){window.__bmAdding=1;setTimeout(function(){try{a.click();}catch(e){}setTimeout(function(){window.__bmAdding=0;},3000);},700);}}};requestAnimationFrame(stp);}return false;})();`;
+  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;if(el.offsetParent===null)return true;for(var q=el;q&&q!==document.body;q=q.parentElement){if(getComputedStyle(q).position==='fixed')return true;}var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['#product-add-to-cart','form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){var r=a.getBoundingClientRect(),y0=window.pageYOffset,dy=r.top+r.height/2-window.innerHeight/2,dur=Math.min(2600,Math.max(1100,Math.abs(dy)*0.6)),t0=null,ez=function(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},stp=function(ts){if(t0===null)t0=ts;var p=Math.min(1,(ts-t0)/dur);window.scrollTo(0,y0+dy*ez(p));if(p<1){requestAnimationFrame(stp);}else{a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);}};requestAnimationFrame(stp);}return false;})();`;
 const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow").replace(/__bmInit/g, "__pdInit").replace(/__bmAdding/g, "__pdAdding");
 
 /** Force the CTA hook's onclick to the canonical, known-valid string — replaces
@@ -403,8 +406,6 @@ ${FIND_ATC_FN}
     el.classList.remove('bm-atc-glow'); void el.offsetWidth; el.classList.add('bm-atc-glow');
     setTimeout(function(){ el.classList.remove('bm-atc-glow'); }, 2600);
   }
-  /* The in-page button REALLY adds to the cart: once the page has settled on the theme's own Add to Cart and the glow
-     has started, press that button (so the selected variant + quantity are used). Guarded against double adds. */
   /* Slow, eased scroll to the theme's Add to Cart (native smooth scrolling is quick and abrupt on a long page). */
   function slowScroll(el, done){
     var r = el.getBoundingClientRect(), y0 = window.pageYOffset, dy = r.top + r.height / 2 - window.innerHeight / 2;
@@ -412,11 +413,6 @@ ${FIND_ATC_FN}
     function ez(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
     function stp(ts){ if(t0 === null) t0 = ts; var p = Math.min(1, (ts - t0) / dur); window.scrollTo(0, y0 + dy * ez(p)); if(p < 1) requestAnimationFrame(stp); else if(done) done(); }
     requestAnimationFrame(stp);
-  }
-  function addNow(el){
-    if(!el || el.disabled || window.__bmAdding) return;
-    window.__bmAdding = 1;
-    setTimeout(function(){ try{ el.click(); }catch(e){} setTimeout(function(){ window.__bmAdding = 0; }, 3000); }, 600);
   }
   /* These descriptions can be long, so the real Add-to-Cart button can be a
      long smooth-scroll away -- the old 1600ms/2000ms safety caps could fire
@@ -530,7 +526,7 @@ ${FIND_ATC_FN}
     e.preventDefault();
     var atc = findAtc();
     if(!atc) return;
-    slowScroll(atc, function(){ glow(atc); addNow(atc); });
+    slowScroll(atc, function(){ glow(atc); });
   });
 })();
 </script>`;
@@ -669,7 +665,6 @@ ${FIND_ATC_FN}
     slowScroll(atc, function(){
       atc.classList.remove('pd-atc-glow'); void atc.offsetWidth; atc.classList.add('pd-atc-glow');
       setTimeout(function(){ atc.classList.remove('pd-atc-glow'); }, 2600);
-      if(!atc.disabled && !window.__pdAdding){ window.__pdAdding = 1; setTimeout(function(){ try{ atc.click(); }catch(e){} setTimeout(function(){ window.__pdAdding = 0; }, 3000); }, 600); }
     });
   });
 })();
@@ -804,6 +799,17 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm-zoomtag,.bm-lightbox,[data-bm-lightbox]{display:none!important}` +
   `.bm-media img,.bm-media .bm-stage,.pd-media img{cursor:default!important}` +
   `.bm-media img,.pd-media img,.bm-media img:hover,.pd-media img:hover{transform:none!important;filter:none!important;transition:none!important}` +
+  // our own call-out / chip / verified-block areas: centred both ways, whatever the model's CSS (or the theme's heading margin) says
+  `.bm .bm-cta{display:flex!important;flex-direction:column;align-items:center;text-align:center}` +
+  `.bm .bm-cta p{margin-left:auto!important;margin-right:auto!important;text-align:center}` +
+  `.bm .bm-trust,.bm .bm-badges{justify-content:center!important;text-align:center}` +
+  `.bm [data-ps]{padding-top:18px!important;padding-bottom:18px!important;text-align:center}` +
+  `.bm [data-ps]>:first-child,.bm [data-ps] h3,.bm [data-ps] h4{margin-top:0!important;padding-top:0!important}` +
+  `.bm [data-ps]>:last-child{margin-bottom:0!important}` +
+  // "At a glance": every fact is its own bordered cell, the label sits over a thin line — easy to scan
+  `.bm .bm-glance ul{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;gap:10px!important;margin:0!important;padding:0!important;list-style:none!important}` +
+  `.bm .bm-glance li{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:5px!important;margin:0!important;padding:10px 12px!important;border:1px solid var(--line2,#d8d8e0)!important;border-radius:10px!important;background:rgba(255,255,255,.65)!important;font-size:14px!important;line-height:1.35!important;font-weight:600}` +
+  `.bm .bm-glance li b{width:100%!important;padding-bottom:5px!important;border-bottom:1px dashed var(--line2,#d8d8e0)!important;font-size:10.5px!important;font-weight:700!important;letter-spacing:.1em!important;text-transform:uppercase!important;color:var(--soft,#71717a)!important}` +
   // stacked pictures read as ONE continuous strip: no gap between them, and only the strip's outer corners are rounded
   // (the first picture's top and the last picture's bottom) — never each picture on its own, whatever the model's CSS says
   `.bm .bm-media{display:block!important;gap:0!important;row-gap:0!important;font-size:0!important;line-height:0!important;border-radius:var(--r,14px)!important;overflow:hidden!important}` +
@@ -881,12 +887,7 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-acc>.bm-c1{display:block!important}` +
   `.bm .bm-acc>.bm-grid{display:grid!important}` +
   // our own call-out / chip areas are always centred, whatever the model's CSS says
-  `.bm .bm-cta{display:flex!important;flex-direction:column;align-items:center;text-align:center}` +
-  `.bm .bm-cta p{margin-left:auto;margin-right:auto;text-align:center}` +
-  `.bm .bm-trust,.bm .bm-badges{justify-content:center!important;text-align:center}` +
-  `.bm [data-ps]{padding-top:16px!important;padding-bottom:16px!important}` +
-  `.bm [data-ps]>:first-child,.bm [data-ps] h3,.bm [data-ps] h4{margin-top:0!important;padding-top:0!important}` +
-  `.bm [data-ps]>:last-child{margin-bottom:0!important}` +
+
   // The images column is much taller than the text column on a page with several (tall) description pictures — the
   // right side used to be empty below the text. The text column now follows the page (sticky, its own gentle
   // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.

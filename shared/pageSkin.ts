@@ -228,6 +228,10 @@ export function buildPageSkinCss(html: string): string {
     rule([".ka-reviews__summary-stars svg", ".ka-review__stars svg"], `fill:var(--sk-acc2)!important;color:var(--sk-acc2)!important`),
     // the "Why shop with us" section
     rule(["trust-badges-katrustbadges"], `background:linear-gradient(180deg,var(--sk-deep),var(--sk-deep2))!important;border:1px solid rgba(var(--sk-acc-rgb),.25)!important`),
+    // 5 cards in a 3-column grid left the last row hanging on the left — a centred wrap instead (3 / 2 per row, 2 / 2 / 1 on phones)
+    rule(["trust-badges-katrustbadges .kt-g"], `display:flex!important;flex-wrap:wrap!important;justify-content:center!important;gap:14px!important`),
+    rule(["trust-badges-katrustbadges .kt-g>*"], `flex:0 0 calc((100% - 28px)/3)!important;max-width:calc((100% - 28px)/3)!important;box-sizing:border-box`),
+    `@media (max-width:749px){trust-badges-katrustbadges .kt-g>*{flex-basis:calc((100% - 14px)/2)!important;max-width:calc((100% - 14px)/2)!important}}`,
     rule([".kt-ht"], `color:${toHex(headOnDeep)}!important;${fh ? `font-family:${fh}!important;` : ""}letter-spacing:.2px`),
     rule([".kt-s"], `background:rgba(255,255,255,.06)!important;border-color:rgba(var(--sk-acc-rgb),.35)!important;border-radius:16px!important`),
     rule([".kt-s *"], `color:${toHex(linkOnDeep)}!important`),

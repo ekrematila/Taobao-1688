@@ -164,3 +164,14 @@ test("description pictures: nothing opens, no 'Tap to zoom', no zoom or brightne
   // the runtime no longer opens anything
   assert.doesNotMatch(out, /data-bm-zoom\]|bm-lightbox\.is-open/);
 });
+
+test("highlight icons that are flat symbols become emoji that match the highlight; real emoji are kept", async () => {
+  const { relevantFeatIcons } = await import("../shared/pageBlocks.ts");
+  const html = `<style>.bm{--deco:'💜 🖤 💀'}</style><ul class="bm-feat"><li><span class="ico">♡</span><span class="tx"><b>Sweet Meets Mischievous</b></span></li><li><span class="ico">◇</span><span class="tx"><b>Translucent Sides</b></span></li><li><span class="ico">▧</span><span class="tx"><b>Five-Sided Dye-Sublimation</b></span></li><li><span class="ico">🍮</span><span class="tx"><b>Pudding</b></span></li></ul>`;
+  const out = relevantFeatIcons(html);
+  assert.match(out, /<span class="ico">💜<\/span>[\s\S]*Sweet Meets/, "no keyword → the product's own first deco emoji");
+  assert.match(out, /<span class="ico">💎<\/span>[\s\S]*Translucent/);
+  assert.match(out, /<span class="ico">🎨<\/span>[\s\S]*Dye-Sublimation/);
+  assert.match(out, /<span class="ico">🍮<\/span>/, "a real emoji is left alone");
+  assert.doesNotMatch(out, /[♡◇▧]/);
+});

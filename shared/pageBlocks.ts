@@ -279,10 +279,37 @@ export const FONT_RULE = [
   "Sen `font-family`'yi ve mağaza teması kurallarını ayrıca YAZMA — sistem ekler; renk, rozet, emoji ve metin tonu aynı havaya uysun.",
 ].join("\n");
 
+/** a highlight icon that is a plain geometric symbol (♡ ◇ ▧ ≋ …) instead of an emoji */
+const PLAIN_ICON = /^[\s←-⯿•·*+~=#<>|\-]{1,3}$/u;
+const ICON_KEYWORDS: [RegExp, string][] = [
+  [/dye|sublim|print|legend|artwork|graphic|pattern|design|stripe/i, "🎨"],
+  [/transluc|see-through|clear|jelly|crystal|shine|glow/i, "💎"],
+  [/pbt|abs\b|material|durab|plastic|thick|build|quality/i, "🧱"],
+  [/profile|sculpt|shape|row|height|ergonom/i, "📐"],
+  [/compat|\bfit\b|layout|switch|\bmx\b|keyboard|size/i, "⌨️"],
+  [/language|options|\bkit\b|contents|includes|\bset\b/i, "📦"],
+];
+
+/**
+ * Highlight icons must be RELEVANT emoji, not flat symbols: a symbol the model picked (♡ ◇ ▧ ≋) is swapped for an emoji
+ * that matches the highlight's own words, falling back to the product's own `--deco` characters.
+ */
+export function relevantFeatIcons(html: string): string {
+  if (!/class=["']ico["']/.test(html)) return html;
+  const deco = (/--deco\s*:\s*['"]([^'"]*)['"]/.exec(html)?.[1] ?? "").split(/\s+/).filter(Boolean);
+  let n = 0;
+  return html.replace(/(<li\b[^>]*>\s*<span class=["']ico["']>)([^<]*)(<\/span>[\s\S]*?<b>([^<]*)<\/b>)/g, (m, a, icon, rest, title) => {
+    if (!PLAIN_ICON.test(String(icon))) return m; // already an emoji (or something deliberate)
+    const hit = ICON_KEYWORDS.find(([re]) => re.test(String(title)))?.[1];
+    const pick = hit ?? deco[n++ % Math.max(1, deco.length)] ?? "✨";
+    return `${a}${pick}${rest}`;
+  });
+}
+
 /** Every line of the page must be about THIS product; emoji sparse. */
 export const RELEVANCE_RULE = [
   "ÜRÜNE ÖZGÜ — HER SATIR BU ÜRÜNÜN: başlık, madde, SSS, rozet, CTA cümlesi ve alt notlar yalnızca bu ürünün gerçek özelliğini, temasını, içeriğini veya kullanımını anlatsın. Başka ürüne de yazılabilecek genel dolgu cümleleri ('Elevate your setup', 'Bring joy to your desk' gibi) YAZMA; CTA cümlesi bile ürünün temasından/karakterinden gelsin (kısa, abartısız).",
-  "EMOJİ AZ: bölüm başlıklarında EN FAZLA 1 emoji; paragraf, SSS ve madde metinlerinde emoji YOK; sayfada toplam ≤ 8 emoji; hepsi ürünle alakalı. `--fall` 3–4 karakter.",
+  "EMOJİ: Highlights (`bm-feat`) satırlarının İKONU, o maddenin konusuyla İLGİLİ TEK bir emoji olsun (örn. mor/lavanta → 💜, puding/yarı saydam → 🍮, dye-sublimation baskı → 🎨, PBT malzeme → 🧱, uyumluluk → ⌨️, karakter/tema → ürünün gerçek karakteri/objesi). Düz geometrik semboller (♡ ◇ ▧ ≋ ✦ ●) KULLANMA. Bölüm başlıklarında EN FAZLA 1 emoji; paragraf, SSS ve madde METİNLERİNDE emoji YOK; sayfada toplam ≤ 12 emoji; hepsi ürünle alakalı.",
 ].join("\n");
 
 /** Etsy (plain-text) listings: the same honesty rule, shorter. */
