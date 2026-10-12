@@ -472,3 +472,15 @@ test("the styled HTML description is always at least 35,000 characters (page and
     }
   }
 });
+
+test("no falling / floating characters survive, whoever wrote them (model CSS, own elements, old pages)", () => {
+  const model = STACKED_DESC_EXAMPLE
+    .replace("</style>", "@keyframes petalFall{0%{transform:translateY(-10vh)}100%{transform:translateY(110vh)}}.bm-fall{position:fixed;animation:petalFall 12s linear infinite}</style>")
+    .replace('<div class="bm-hero"', '<span class="bm-fall">🌸</span><div class="bm-hero"');
+  for (const out of [renderDescriptionHtml("stacked-plain", model, imgs), renderImportBody("stacked-plain", model, imgs)]) {
+    assert.ok(!/petalFall/.test(out), "falling keyframes removed");
+    assert.ok(!/class="bm-fall"/.test(out), "falling element removed");
+    assert.ok(!/@keyframes bmFloat/.test(out) && !/animation:\s*bmFloat/.test(out), "floating hero decor removed");
+    assert.ok(/bmFaqIn/.test(out), "the FAQ animation is untouched");
+  }
+});

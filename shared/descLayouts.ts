@@ -4,7 +4,7 @@
 import { cleanSpecs } from "./specs";
 import type { DescImageCrop } from "./types";
 import { ensureGlanceCss, injectPageBlocks, relevantFeatIcons, type PageBlocks } from "./pageBlocks";
-import { applyPageSkin } from "./pageSkin";
+import { applyPageSkin, stripFallingEffects } from "./pageSkin";
 
 /** a description image with its optional non-destructive display crop. */
 export interface DescImg {
@@ -121,7 +121,7 @@ export function ensureMinHtml(html: string, min = HTML_DESC_MIN_CHARS): string {
 
 /** the verified blocks go in, then the product's skin for the whole store page */
 function finishPage(html: string, meta?: DescMeta): string {
-  const withBlocks = injectPageBlocks(relevantFeatIcons(html), meta?.blocks);
+  const withBlocks = injectPageBlocks(relevantFeatIcons(stripFallingEffects(html)), meta?.blocks);
   return meta?.skin === false ? withBlocks : applyPageSkin(withBlocks);
 }
 

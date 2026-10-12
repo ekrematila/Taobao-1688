@@ -278,6 +278,28 @@ export function buildPageSkinCss(html: string): string {
   return `<style data-ps-skin="1">${parts.join("\n")}</style>`;
 }
 
+const MOTION_NAME = /fall|drift|snow|petal|rain|confetti|float|sway|drop|sparkle|twinkle|bounce|rise-?up/i;
+
+/**
+ * No falling / drifting / floating characters, ever (operator rule) — whoever wrote them: the model's own page CSS
+ * (`--fall` was once part of the prompt), an element it placed, or an old stored page.
+ * Removes the keyframes + the `animation` declarations that use them, and any decorative element named like one.
+ */
+export function stripFallingEffects(html: string): string {
+  let out = html.replace(/<style data-ps-skin="1">[\s\S]*?<\/style>/g, (m) => (/skFall/.test(m) ? "" : m));
+  out = out.replace(/@(?:-webkit-)?keyframes\s+([\w-]+)\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, (m, name: string) =>
+    MOTION_NAME.test(name) && !/^skGlow$|^bmAtcGlow$/.test(name) ? "" : m,
+  );
+  out = out.replace(/animation(?:-name)?\s*:\s*([^;}"]*)/g, (m, v: string) =>
+    MOTION_NAME.test(v) && !/skGlow|bmAtcGlow/.test(v) ? "animation:none" : m,
+  );
+  out = out.replace(
+    /<(span|div|i|b|em|p)\b[^>]*\bclass\s*=\s*["'](?:[^"']*[\s_-])?(?:fall|falling|snow|snowflakes?|petals?|confetti|raindrops?|drift|drifting)(?:[\s_-][^"']*)?["'][^>]*>(?:(?!<(?:div|p)\b)[\s\S])*?<\/\1>/gi,
+    "",
+  );
+  return out;
+}
+
 /** the skin <style> goes in once, right after the page's own styles */
 export function applyPageSkin(html: string): string {
   // a page saved earlier may carry an OLD skin (e.g. the drifting characters that are gone now) — always rebuild it
