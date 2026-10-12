@@ -359,7 +359,7 @@ const FIND_ATC_FN = `
  * `window.__bmInit` never gets set at all.
  */
 const BM_CTA_ONCLICK =
-  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){a.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);},650);if(!a.disabled&&!window.__bmAdding){window.__bmAdding=1;setTimeout(function(){try{a.click();}catch(e){}setTimeout(function(){window.__bmAdding=0;},3000);},1250);}}return false;})();`;
+  `(function(){function bad(el){if(!el)return true;if(el.closest&&el.closest('.shopify-payment-button'))return true;var x=(el.textContent||'').toLowerCase();return x.indexOf('shop pay')>-1||x.indexOf('buy now')>-1||x.indexOf('buy with')>-1;}if(window.__bmInit)return false;var L=['form[action*=cart] button[name=add]','form[action*=cart] [type=submit]','button[name=add]','#AddToCart','#ProductSubmitButton','.product-form__submit','.product-form__cart-submit','.btn--add-to-cart','.add-to-cart'],a=null,i,n;for(i=0;i<L.length&&!a;i++){n=document.querySelectorAll(L[i]);for(var j=0;j<n.length;j++){if(!bad(n[j])){a=n[j];break;}}}if(!a){n=document.querySelectorAll('button,[type=submit],a');for(i=0;i<n.length;i++){if(bad(n[i]))continue;var y=(n[i].textContent||'').toLowerCase();if(y.indexOf('add to cart')>-1||y.indexOf('add to bag')>-1){a=n[i];break;}}}if(a){var r=a.getBoundingClientRect(),y0=window.pageYOffset,dy=r.top+r.height/2-window.innerHeight/2,dur=Math.min(2600,Math.max(1100,Math.abs(dy)*0.6)),t0=null,ez=function(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},stp=function(ts){if(t0===null)t0=ts;var p=Math.min(1,(ts-t0)/dur);window.scrollTo(0,y0+dy*ez(p));if(p<1){requestAnimationFrame(stp);}else{a.classList.remove('bm-atc-glow');void a.offsetWidth;a.classList.add('bm-atc-glow');setTimeout(function(){a.classList.remove('bm-atc-glow');},2600);if(!a.disabled&&!window.__bmAdding){window.__bmAdding=1;setTimeout(function(){try{a.click();}catch(e){}setTimeout(function(){window.__bmAdding=0;},3000);},700);}}};requestAnimationFrame(stp);}return false;})();`;
 const PD_CTA_ONCLICK = BM_CTA_ONCLICK.replace(/bm-atc-glow/g, "pd-atc-glow").replace(/__bmInit/g, "__pdInit").replace(/__bmAdding/g, "__pdAdding");
 
 /** Force the CTA hook's onclick to the canonical, known-valid string — replaces
@@ -405,6 +405,14 @@ ${FIND_ATC_FN}
   }
   /* The in-page button REALLY adds to the cart: once the page has settled on the theme's own Add to Cart and the glow
      has started, press that button (so the selected variant + quantity are used). Guarded against double adds. */
+  /* Slow, eased scroll to the theme's Add to Cart (native smooth scrolling is quick and abrupt on a long page). */
+  function slowScroll(el, done){
+    var r = el.getBoundingClientRect(), y0 = window.pageYOffset, dy = r.top + r.height / 2 - window.innerHeight / 2;
+    var dur = Math.min(2600, Math.max(1100, Math.abs(dy) * 0.6)), t0 = null;
+    function ez(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+    function stp(ts){ if(t0 === null) t0 = ts; var p = Math.min(1, (ts - t0) / dur); window.scrollTo(0, y0 + dy * ez(p)); if(p < 1) requestAnimationFrame(stp); else if(done) done(); }
+    requestAnimationFrame(stp);
+  }
   function addNow(el){
     if(!el || el.disabled || window.__bmAdding) return;
     window.__bmAdding = 1;
@@ -522,8 +530,7 @@ ${FIND_ATC_FN}
     e.preventDefault();
     var atc = findAtc();
     if(!atc) return;
-    atc.scrollIntoView({behavior:'smooth', block:'center'});
-    afterScrollSettles(function(){ glow(atc); addNow(atc); });
+    slowScroll(atc, function(){ glow(atc); addNow(atc); });
   });
 })();
 </script>`;
@@ -651,8 +658,15 @@ ${FIND_ATC_FN}
     e.preventDefault();
     var atc = findAtc();
     if(!atc) return;
-    atc.scrollIntoView({behavior:'smooth', block:'center'});
-    afterScrollSettles(function(){
+/* Slow, eased scroll to the theme's Add to Cart (native smooth scrolling is quick and abrupt on a long page). */
+    function slowScroll(el, done){
+      var r = el.getBoundingClientRect(), y0 = window.pageYOffset, dy = r.top + r.height / 2 - window.innerHeight / 2;
+      var dur = Math.min(2600, Math.max(1100, Math.abs(dy) * 0.6)), t0 = null;
+      function ez(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+      function stp(ts){ if(t0 === null) t0 = ts; var p = Math.min(1, (ts - t0) / dur); window.scrollTo(0, y0 + dy * ez(p)); if(p < 1) requestAnimationFrame(stp); else if(done) done(); }
+      requestAnimationFrame(stp);
+    }
+    slowScroll(atc, function(){
       atc.classList.remove('pd-atc-glow'); void atc.offsetWidth; atc.classList.add('pd-atc-glow');
       setTimeout(function(){ atc.classList.remove('pd-atc-glow'); }, 2600);
       if(!atc.disabled && !window.__pdAdding){ window.__pdAdding = 1; setTimeout(function(){ try{ atc.click(); }catch(e){} setTimeout(function(){ window.__pdAdding = 0; }, 3000); }, 600); }
@@ -865,10 +879,13 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm .bm-cta{display:flex!important;flex-direction:column;align-items:center;text-align:center}` +
   `.bm .bm-cta p{margin-left:auto;margin-right:auto;text-align:center}` +
   `.bm .bm-trust,.bm .bm-badges{justify-content:center!important;text-align:center}` +
+  `.bm [data-ps]{padding-top:16px!important;padding-bottom:16px!important}` +
+  `.bm [data-ps]>:first-child,.bm [data-ps] h3,.bm [data-ps] h4{margin-top:0!important;padding-top:0!important}` +
+  `.bm [data-ps]>:last-child{margin-bottom:0!important}` +
   // The images column is much taller than the text column on a page with several (tall) description pictures — the
   // right side used to be empty below the text. The text column now follows the page (sticky, its own gentle
   // scroll when it is taller than the screen), only when there are enough pictures to make the left side long.
-  `.bm .bm-grid:has(.bm-media>img:nth-child(4))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(4))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(120,120,140,.35) transparent}` +
+  `.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-c2,.bm .bm-grid:has(.bm-media>img:nth-child(2))>.bm-acc-desc{position:sticky!important;top:96px;align-self:start!important;max-height:calc(100vh - 120px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(120,120,140,.35) transparent}` +
   // Same guarantee for the NEW per-section "Description"/"Images" tabs
   // (direct children of .bm-grid, each wrapping just .bm-media or .bm-c2) —
   // a missing `open` there would otherwise hide half the description

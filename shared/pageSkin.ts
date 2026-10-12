@@ -264,7 +264,8 @@ export function buildPageSkinCss(html: string): string {
   // scattered, translucent, product-related characters drifting down in a few slow layers (never a regular row).
   // Each layer is an SVG tile with a handful of characters at seeded random spots / sizes / tilts; tiles of different
   // sizes loop out of phase, and the whole layer is moved with a transform (cheap), so it never looks like a pattern.
-  if (k.fall.length) {
+  // (switched off: the drifting characters were too much — the product-themed decoration stays in the footer / button / leaf)
+  if (false as boolean) {
     const L1 = [
       scatterTile(k.fall, 420, 400, 1, 11, 15, 24),
       scatterTile(k.fall, 560, 600, 2, 23, 13, 22),

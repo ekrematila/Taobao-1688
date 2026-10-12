@@ -47,14 +47,13 @@ test("readable by construction: button text and footer text always contrast with
   }
 });
 
-test("falling characters only when the model asked for them; without characters there is no strip", () => {
+test("no drifting / falling characters are drawn on the page, even when the model asks for them", () => {
   const plain = buildPageSkinCss(PAGE());
   assert.doesNotMatch(plain, /body:has\(\.bm\)::before/);
   assert.doesNotMatch(plain, /footer\.footer::before/);
   const fall = buildPageSkinCss(PAGE("--fall:'♡ ✿';"));
-  assert.match(fall, /body:has\(\.bm\)::before\{content:"";position:fixed/);
-  assert.match(fall, /data:image\/svg\+xml/, "characters are scattered inside SVG tiles, not a text row");
-  assert.match(fall, /@keyframes skFall2/);
+  assert.doesNotMatch(fall, /body:has\(\.bm\)::before\{content:"";position:fixed/);
+  assert.doesNotMatch(fall, /data:image\/svg\+xml/);
 });
 
 test("model-supplied characters cannot break out of the stylesheet", () => {
