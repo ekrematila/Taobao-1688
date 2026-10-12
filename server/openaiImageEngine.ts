@@ -65,7 +65,8 @@ async function run(
     images.push(await imageToBase64(u));
   }
   const dims = imageDimensions(Buffer.from(images[sizeFrom].data, "base64"));
-  const size = dims ? pickImageSize(model, dims.w, dims.h) : "auto";
+  // ask for the source's own resolution (up to the model's 3840 px cap) — a big merged strip must not come back as a 1536 px thumbnail
+  const size = dims ? pickImageSize(model, dims.w, dims.h, Math.min(3840, Math.max(1536, dims.w, dims.h))) : "auto";
   o.ctx?.throwIfCancelled();
   let r;
   try {

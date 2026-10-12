@@ -108,3 +108,49 @@ export function persistDataUrl(dataUrl: string): string {
   if (!m) throw new Error("Geçersiz data URL");
   return persist(Buffer.from(m[2], "base64"), m[1]);
 }
+
+/**
+ * Give an AI result the SAME pixel size as the picture it was made from, at full quality.
+ * Image models answer at their own size (a multiple of 16, a capped long edge…), so a translated
+ * picture came back smaller or slightly off. When the aspect ratios agree (within 4%) the result is
+ * resampled to exactly `src` w×h (Lanczos, lossless PNG / near-lossless JPEG); when they don't, only the
+ * WIDTH is matched and the AI's own proportions are kept — never a stretched picture.
+ * Returns the (possibly new) `/api/media/...` url; unchanged when sharp is unavailable or the size
+ * already matches.
+ */
+export async function matchSourceSize(mediaUrl: string, src: { w: number; h: number }): Promise<string> {
+  if (!mediaUrl.startsWith("/api/media/") || !src.w || !src.h) return mediaUrl;
+  const file = mediaPath(mediaUrl.slice("/api/media/".length));
+  if (!existsSync(file)) return mediaUrl;
+  try {
+    const sharp = (await import("sharp")).default;
+    const meta = await sharp(file).metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (!w || !h || (w === src.w && h === src.h)) return mediaUrl;
+    const sameShape = Math.abs(w / h / (src.w / src.h) - 1) <= 0.04;
+    const outW = src.w;
+    const outH = sameShape ? src.h : Math.max(1, Math.round((h * src.w) / w));
+    const png = meta.format === "png";
+    const pipe = sharp(file).resize(outW, outH, { fit: "fill", kernel: "lanczos3" });
+    const buf = png ? await pipe.png({ compressionLevel: 6 }).toBuffer() : await pipe.jpeg({ quality: 95, chromaSubsampling: "4:4:4" }).toBuffer();
+    return persist(buf, png ? "image/png" : "image/jpeg");
+  } catch {
+    return mediaUrl; // sharp missing / unreadable → leave the AI's own result
+  }
+}
+
+/** Pixel size of a locally stored `/api/media/...` picture, read from its header (null for anything else). */
+export async function localImageSize(url: string): Promise<{ w: number; h: number } | null> {
+  const clean = String(url).split("#dup-")[0];
+  if (!clean.startsWith("/api/media/")) return null;
+  const file = mediaPath(clean.slice("/api/media/".length));
+  if (!existsSync(file)) return null;
+  try {
+    const sharp = (await import("sharp")).default;
+    const m = await sharp(file).metadata();
+    return m.width && m.height ? { w: m.width, h: m.height } : null;
+  } catch {
+    return null;
+  }
+}

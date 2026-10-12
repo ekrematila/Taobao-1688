@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, proxied } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
-import { stitchImages, type StitchDir, type StitchFit } from "../lib/stitch";
+import { canvasFits, stitchImages, stitchPlan, type StitchDir, type StitchFit } from "../lib/stitch";
+import { loadImage } from "../lib/image";
 import { coverCrop, padRects, splitRegions, type Rect } from "../lib/splitRegions";
 
 type Mode = "merge" | "split";
@@ -89,8 +90,43 @@ export default function StitchPanel({
   const [aiBusy, setAiBusy] = useState(false);
   const nextId = useRef(1);
   const imgRef = useRef<HTMLImageElement>(null);
+  const [selId, setSelId] = useState<number | null>(null); // the box Delete removes
+  const [drawing, setDrawing] = useState<Rect | null>(null); // a box being drawn on empty image area
+  const drawRef = useRef<null | { x0: number; y0: number; r: Rect | null }>(null);
+  // size of the merged picture at full resolution (and whether any source had to be scaled)
+  const [sizeInfo, setSizeInfo] = useState<{ width: number; height: number; scaled: boolean } | null>(null);
 
   const sig = useMemo(() => `${dir}|${fit}|${order.join("~")}`, [dir, fit, order]);
+
+  // the merged picture's exact size, straight from the sources' real pixel sizes
+  useEffect(() => {
+    let dead = false;
+    Promise.all(order.map((u) => loadImage(u.split("#dup-")[0])))
+      .then((imgs) => {
+        if (dead) return;
+        const plan = stitchPlan(imgs.map((im) => ({ w: im.naturalWidth || im.width, h: im.naturalHeight || im.height })), dir, fit);
+        setSizeInfo({ width: plan.width, height: plan.height, scaled: plan.scaled });
+      })
+      .catch(() => !dead && setSizeInfo(null));
+    return () => {
+      dead = true;
+    };
+  }, [sig]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Delete / Backspace removes the selected box
+  useEffect(() => {
+    if (mode !== "split" || selId == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        removePiece(selId);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, selId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- merge preview (plain stitch) ----------
   useEffect(() => {
@@ -115,6 +151,7 @@ export default function StitchPanel({
   // ---------- split: render the analysis canvas, then detect ----------
   const detect = (a: Analysis, s = sens, m = minPiece, sm = seams) => {
     const found = splitRegions(a.pixels, { sensitivity: s, minPiece: m / 100, seams: sm });
+    setSelId(null);
     setPieces(found.map((p) => ({ id: nextId.current++, x: p.x, y: p.y, w: p.w, h: p.h, keep: !p.suspect, suspect: p.suspect })));
   };
 
@@ -176,10 +213,53 @@ export default function StitchPanel({
     e.stopPropagation();
     const p = pieces.find((x) => x.id === id);
     if (!p) return;
+    setSelId(id);
     drag.current = { id, edge, sx: e.clientX, sy: e.clientY, r0: { x: p.x, y: p.y, w: p.w, h: p.h }, moved: false };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
+  /** pointer position in the analysis canvas' pixels */
+  const toCanvas = (e: React.PointerEvent) => {
+    const img = imgRef.current;
+    if (!img || !analysis) return null;
+    const rb = img.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(analysis.canvas.width, ((e.clientX - rb.left) * analysis.canvas.width) / rb.width)),
+      y: Math.max(0, Math.min(analysis.canvas.height, ((e.clientY - rb.top) * analysis.canvas.height) / rb.height)),
+    };
+  };
+  const rectOf = (x0: number, y0: number, x1: number, y1: number): Rect => ({ x: Math.round(Math.min(x0, x1)), y: Math.round(Math.min(y0, y1)), w: Math.round(Math.abs(x1 - x0)), h: Math.round(Math.abs(y1 - y0)) });
+  /** dragging on empty image area draws a new box anywhere (boxes may overlap) */
+  const startDraw = (e: React.PointerEvent) => {
+    const p0 = toCanvas(e);
+    if (!p0) return;
+    drawRef.current = { x0: p0.x, y0: p0.y, r: null };
+    setSelId(null);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const endDraw = () => {
+    const d = drawRef.current;
+    drawRef.current = null;
+    const r = d?.r ?? null; // the ref, not state: the last move and the release can land in one frame
+    setDrawing(null);
+    if (!d || !r || r.w < 24 || r.h < 24) return; // a click, not a box
+    const id = nextId.current++;
+    setPieces((ps) => [...ps, { id, ...r, keep: true, suspect: false }]);
+    setSelId(id);
+  };
+  const removePiece = (id: number) => {
+    setPieces((ps) => ps.filter((x) => x.id !== id));
+    setSelId((cur) => (cur === id ? null : cur));
+  };
   const onDrag = (e: React.PointerEvent) => {
+    if (drawRef.current) {
+      const p1 = toCanvas(e);
+      if (p1) {
+        const r = rectOf(drawRef.current.x0, drawRef.current.y0, p1.x, p1.y);
+        drawRef.current.r = r;
+        setDrawing(r);
+      }
+      return;
+    }
     const d = drag.current;
     const img = imgRef.current;
     if (!d || !img || !analysis) return;
@@ -223,7 +303,9 @@ export default function StitchPanel({
     const H = analysis.canvas.height;
     const w = Math.round(W * 0.6);
     const h = Math.round(Math.min(H * 0.3, w * 1.2));
-    setPieces((ps) => [...ps, { id: nextId.current++, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h, keep: true, suspect: false }]);
+    const id = nextId.current++;
+    setPieces((ps) => [...ps, { id, x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h, keep: true, suspect: false }]);
+    setSelId(id);
   };
 
   // ---------- AI: which boxes are real product photos? ----------
@@ -412,6 +494,16 @@ export default function StitchPanel({
                   ))}
                 </div>
                 {mode === "merge" && <p className="tiny muted" style={{ margin: 0 }}>{t("stitch.hint")}</p>}
+                {sizeInfo && (
+                  <div className="tiny" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <b>{t("stitch.outSize", { w: sizeInfo.width, h: sizeInfo.height })}</b>
+                    <span className="muted">{sizeInfo.scaled ? t("stitch.scaled") : t("stitch.noScale")}</span>
+                    {(Math.max(sizeInfo.width, sizeInfo.height) / Math.min(sizeInfo.width, sizeInfo.height) > 3 || Math.max(sizeInfo.width, sizeInfo.height) > 3840 || sizeInfo.width * sizeInfo.height > 8_294_400) && (
+                      <span style={{ color: "var(--warn, #8a5300)" }}>⚠ {t("stitch.aiLimit")}</span>
+                    )}
+                    {!canvasFits(sizeInfo.width, sizeInfo.height) && <span style={{ color: "var(--danger)" }}>⛔ {t("stitch.tooBig")}</span>}
+                  </div>
+                )}
               </>
             )}
 
@@ -457,6 +549,12 @@ export default function StitchPanel({
                   <button className="btn ghost sm" onClick={addBox} disabled={!analysis || busy}>
                     {t("stitch.addBox")}
                   </button>
+                  <button className="btn ghost sm" onClick={() => selId != null && removePiece(selId)} disabled={selId == null || busy} title={t("stitch.delBoxTip")}>
+                    ✕ {t("stitch.delBox")}
+                  </button>
+                  <button className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={() => { setPieces([]); setSelId(null); }} disabled={!pieces.length || busy}>
+                    {t("stitch.delAll")}
+                  </button>
                   <button className="btn sm" onClick={aiPick} disabled={!analysis || !pieces.length || busy || aiBusy}>
                     {aiBusy ? <span className="spin" /> : t("stitch.aiPick")}
                   </button>
@@ -464,18 +562,32 @@ export default function StitchPanel({
 
                 <div className="stitch-list" style={{ maxHeight: "26vh" }}>
                   {pieces.map((p, i) => (
-                    <label key={p.id} className="stitch-row" style={{ cursor: "pointer", opacity: p.keep ? 1 : 0.5 }}>
+                    <label key={p.id} className="stitch-row" style={{ cursor: "pointer", opacity: p.keep ? 1 : 0.5, outline: p.id === selId ? "2px solid #2563eb" : undefined }} onClick={() => setSelId(p.id)}>
                       <input type="checkbox" style={{ width: 14 }} checked={p.keep} onChange={() => setPieces((ps) => ps.map((x) => (x.id === p.id ? { ...x, keep: !x.keep } : x)))} />
                       {analysis && <PieceThumb canvas={analysis.canvas} rect={p} />}
                       <span className="tiny" style={{ lineHeight: 1.3 }}>
                         <b>{i + 1}</b> · {p.w}×{p.h}
                         {p.kind ? <><br /><span className="muted">{t(`stitch.kind.${p.kind}` as any)}</span></> : p.suspect ? <><br /><span className="muted">⚠ {t("stitch.suspect")}</span></> : null}
                       </span>
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        title={t("stitch.delBox")}
+                        style={{ marginLeft: "auto", padding: "0 6px" }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removePiece(p.id);
+                        }}
+                      >
+                        ✕
+                      </button>
                     </label>
                   ))}
                   {analysis && !pieces.length && <p className="tiny muted" style={{ margin: 0 }}>{t("stitch.noPieces")}</p>}
                 </div>
                 <p className="tiny muted" style={{ margin: 0 }}>{t("stitch.splitHint")}</p>
+                <p className="tiny muted" style={{ margin: 0 }}>{t("stitch.drawHint")}</p>
               </>
             )}
           </div>
@@ -491,7 +603,7 @@ export default function StitchPanel({
                 </div>
               )
             ) : analysis ? (
-              <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", opacity: rendering ? 0.5 : 1, touchAction: "none" }} onPointerMove={onDrag}>
+              <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", opacity: rendering ? 0.5 : 1, touchAction: "none", cursor: "crosshair" }} onPointerDown={startDraw} onPointerMove={onDrag} onPointerUp={endDraw}>
                 <img ref={imgRef} src={analysis.url} alt="" draggable={false} style={{ display: "block", maxWidth: "100%", height: "auto" }} />
                 {pieces.map((p, i) => (
                   <div
@@ -504,7 +616,7 @@ export default function StitchPanel({
                       top: `${(p.y / aH) * 100}%`,
                       width: `${(p.w / aW) * 100}%`,
                       height: `${(p.h / aH) * 100}%`,
-                      outline: p.keep ? "2px solid #17935a" : "2px dashed #9aa0aa",
+                      outline: p.id === selId ? "3px solid #2563eb" : p.keep ? "2px solid #17935a" : "2px dashed #9aa0aa",
                       background: p.keep ? "rgba(23,147,90,.10)" : "rgba(0,0,0,.28)",
                       cursor: "move",
                       boxSizing: "border-box",
@@ -518,11 +630,38 @@ export default function StitchPanel({
                     >
                       {i + 1}
                     </span>
+                    <button
+                      type="button"
+                      title={t("stitch.delBox")}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePiece(p.id);
+                      }}
+                      style={{ position: "absolute", right: 2, top: 2, width: 20, height: 20, borderRadius: 10, border: 0, background: "rgba(220,38,38,.92)", color: "#fff", font: "700 12px/20px var(--sans)", cursor: "pointer", padding: 0, zIndex: 3 }}
+                    >
+                      ✕
+                    </button>
                     {handles.map(([edge, style]) => (
                       <div key={edge} onPointerDown={(e) => startDrag(e, p.id, edge)} onPointerUp={() => endDrag(p.id)} style={{ position: "absolute", ...style }} />
                     ))}
                   </div>
                 ))}
+                {drawing && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: `${(drawing.x / aW) * 100}%`,
+                      top: `${(drawing.y / aH) * 100}%`,
+                      width: `${(drawing.w / aW) * 100}%`,
+                      height: `${(drawing.h / aH) * 100}%`,
+                      outline: "2px dashed #2563eb",
+                      background: "rgba(37,99,235,.12)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="empty">
@@ -545,7 +684,7 @@ export default function StitchPanel({
             {t("common.cancel")}
           </button>
           {mode === "merge" ? (
-            <button className="btn primary" onClick={applyMerge} disabled={busy || rendering || order.length < 2}>
+            <button className="btn primary" onClick={applyMerge} disabled={busy || rendering || order.length < 2 || (!!sizeInfo && !canvasFits(sizeInfo.width, sizeInfo.height))}>
               {busy ? <span className="spin" /> : t("stitch.apply", { n: order.length })}
             </button>
           ) : (

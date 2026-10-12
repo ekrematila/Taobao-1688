@@ -108,8 +108,10 @@ import {
   researchCategoryManus,
   verifyManus,
   fetchFileBase64,
+  imageToBase64,
   ManusError,
 } from "./manus.ts";
+import { imageDimensions } from "@shared/openaiImages.ts";
 import { startJob, getJob, listJobs, cancelJob, Cancelled } from "./jobs.ts";
 import {
   listBlogs,
@@ -123,7 +125,7 @@ import {
 import { generateBlog, researchBlogSeo, productStyleHint } from "./blog.ts";
 import { renderBlogHtml } from "@shared/blogPresets.ts";
 import type { BlogConfig, BlogRecord } from "@shared/types.ts";
-import { persistFromUrl, persistFileFromUrl, persistDataUrl, mediaPath, normaliseShortestEdge } from "./imagestore.ts";
+import { persistFromUrl, persistFileFromUrl, persistDataUrl, mediaPath, normaliseShortestEdge, matchSourceSize, localImageSize } from "./imagestore.ts";
 import { existsSync as fsExists } from "node:fs";
 import { readStoreProfiles, saveStoreProfiles } from "./storeProfiles.ts";
 import { htmlToText } from "@shared/pageBlocks.ts";
@@ -1186,15 +1188,27 @@ router.post(
       // (48h-expiring) Manus URL, then swap it into its gallery slot in place
       // under the per-draft lock. Runs per image so the app reflects each one
       // the moment it's ready, not only when the whole batch ends.
+      const sourceSize = async (u: string) => {
+        try {
+          const local = await localImageSize(u); // a big saved merge can be over the 19 MB base64 cap — read just its header
+          if (local) return local;
+          const b = await imageToBase64(u);
+          return imageDimensions(Buffer.from(b.data, "base64"));
+        } catch {
+          return null;
+        }
+      };
       const applyOne = async (it: any) => {
         if (!it?.resultUrl) return;
         let persisted = it.resultUrl as string;
         try {
           // OpenAI results are already stored under /api/media; Manus ones are 48h-expiring URLs
           if (!it.local) persisted = await persistFromUrl(it.resultUrl, manusFileAuthHeaders());
-          // operator rule: a translated image's SHORTEST side is always 800–1000 px,
-          // high quality — no other size constraint.
-          persisted = await normaliseShortestEdge(persisted);
+          // the translated picture comes back at EXACTLY the source's size and quality (so a merged strip can be
+          // translated and then cut by boxes); only when the source size is unknown does the old rule apply:
+          // shortest side 800–1000 px, high quality.
+          const sd = await sourceSize(it.sourceUrl);
+          persisted = sd ? await matchSourceSize(persisted, sd) : await normaliseShortestEdge(persisted);
         } catch {
           /* fall back to the ephemeral url */
         }

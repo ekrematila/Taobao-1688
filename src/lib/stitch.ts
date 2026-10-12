@@ -11,6 +11,31 @@ export interface StitchOpts {
   maxEdge?: number;
 }
 
+export interface StitchPlan {
+  /** size of the merged picture (px) at full resolution */
+  width: number;
+  height: number;
+  /** per-piece size along the stacking axis after the cross-axis match */
+  along: number[];
+  /** some source had to be scaled to the common width/height (a source already at that size is never touched) */
+  scaled: boolean;
+}
+
+/** Pure layout: where each piece goes and how big the merged picture is — no drawing. */
+export function stitchPlan(dims: { w: number; h: number }[], dir: StitchDir = "v", fit: StitchFit = "max"): StitchPlan {
+  const crossOf = (d: { w: number; h: number }) => (dir === "v" ? d.w : d.h);
+  const crosses = dims.map(crossOf);
+  const cross = fit === "min" ? Math.min(...crosses) : fit === "first" ? crosses[0] : Math.max(...crosses);
+  const along = dims.map((d) => Math.max(1, Math.round((dir === "v" ? d.h : d.w) * (cross / crossOf(d)))));
+  const total = along.reduce((s, n) => s + n, 0);
+  return { width: dir === "v" ? cross : total, height: dir === "v" ? total : cross, along, scaled: crosses.some((c) => c !== cross) };
+}
+
+/** a browser canvas can't be arbitrarily large (Chrome ≈ 65 535 px a side, ≈ 268 MP; Safari far less) */
+export const CANVAS_MAX_SIDE = 32_000;
+export const CANVAS_MAX_AREA = 150_000_000;
+export const canvasFits = (w: number, h: number) => w <= CANVAS_MAX_SIDE && h <= CANVAS_MAX_SIDE && w * h <= CANVAS_MAX_AREA;
+
 /**
  * Stitch N images into ONE, edge-to-edge with NO gap. Vertical stacks top→bottom
  * (Taobao description strips); horizontal places left→right. Every piece is
@@ -25,17 +50,10 @@ export async function stitchImages(urls: string[], opts: StitchOpts = {}): Promi
   const imgs = await Promise.all(urls.map((u) => loadImage(u.split("#dup-")[0])));
   const dims = imgs.map((im) => ({ w: im.naturalWidth || im.width, h: im.naturalHeight || im.height }));
 
-  const crossOf = (d: { w: number; h: number }) => (dir === "v" ? d.w : d.h);
-  const crosses = dims.map(crossOf);
-  const cross =
-    fit === "min" ? Math.min(...crosses) : fit === "first" ? crosses[0] : Math.max(...crosses);
-
-  // per-piece size along the stacking axis, after scaling the cross-axis to `cross`
-  const along = dims.map((d) => {
-    const k = cross / crossOf(d);
-    return Math.max(1, Math.round((dir === "v" ? d.h : d.w) * k));
-  });
-  const totalAlong = along.reduce((s, n) => s + n, 0);
+  const plan = stitchPlan(dims, dir, fit);
+  const along = plan.along;
+  const cross = dir === "v" ? plan.width : plan.height;
+  const totalAlong = dir === "v" ? plan.height : plan.width;
 
   // optional downscale so the long edge fits maxEdge
   const longEdge = Math.max(cross, totalAlong);
@@ -46,9 +64,12 @@ export async function stitchImages(urls: string[], opts: StitchOpts = {}): Promi
   for (const a of along) offs.push(offs[offs.length - 1] + Math.max(1, Math.round(a * sc)));
   const crossPx = Math.max(1, Math.round(cross * sc));
 
+  const cw = dir === "v" ? crossPx : offs[offs.length - 1];
+  const ch = dir === "v" ? offs[offs.length - 1] : crossPx;
+  if (!canvasFits(cw, ch)) throw new Error(`Birleşik görsel ${cw}×${ch} px — tarayıcı sınırını aşıyor. Daha az görsel birleştir.`);
   const c = document.createElement("canvas");
-  c.width = dir === "v" ? crossPx : offs[offs.length - 1];
-  c.height = dir === "v" ? offs[offs.length - 1] : crossPx;
+  c.width = cw;
+  c.height = ch;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
