@@ -392,6 +392,9 @@ const BM_SCRIPT = `<script>
   if(window.__bmInit) return; window.__bmInit = 1;
 ${SYNC_ACCENT_FN}
   syncAccentColor();
+  /* A <details name="…"> group is exclusive NATIVELY: opening one closes the others at once, bypassing the slide animation (the open
+     answer above the clicked one vanished in a single frame and the whole page lurched). The script owns single-open, so drop the name. */
+  try{var dn=document.querySelectorAll('details.bm-faq-item[name], details.pd-faq-item[name]');for(var di=0;di<dn.length;di++)dn[di].removeAttribute('name');}catch(e){}
   /* Defense-in-depth: the desktop CSS guarantee already forces the info
      panel visible regardless of [open], but on MOBILE that panel relies on
      the model actually having written the open attribute on <details
@@ -616,6 +619,9 @@ const PD_SCRIPT = `<script>
   if(window.__pdInit) return; window.__pdInit = 1;
 ${SYNC_ACCENT_FN}
   syncAccentColor();
+  /* A <details name="…"> group is exclusive NATIVELY: opening one closes the others at once, bypassing the slide animation (the open
+     answer above the clicked one vanished in a single frame and the whole page lurched). The script owns single-open, so drop the name. */
+  try{var dn=document.querySelectorAll('details.bm-faq-item[name], details.pd-faq-item[name]');for(var di=0;di<dn.length;di++)dn[di].removeAttribute('name');}catch(e){}
 ${FIND_ATC_FN}
   /* These descriptions can be long, so the real Add-to-Cart button can be a
      long smooth-scroll away -- the old 1600ms/2000ms safety caps could fire
