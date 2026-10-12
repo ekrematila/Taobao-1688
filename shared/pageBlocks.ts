@@ -88,6 +88,8 @@ export interface PageBlocks {
 
 export interface LayoutDef {
   label: string;
+  /** what this standard layout is, in a few words (key count, what it has / lacks) */
+  note: string;
   /** the fewest keys a set needs to cover this layout */
   minKeys: number;
   /** only listed for big kits (130+ pieces: they carry the extra bottom-row / split pieces) */
@@ -97,28 +99,33 @@ export interface LayoutDef {
 }
 
 export const LAYOUTS: LayoutDef[] = [
-  { label: "40%", minKeys: 47, extended: true, examples: ["OLKB Planck", "Vortex Core"] },
-  { label: "60%", minKeys: 61, examples: ["Anne Pro 2", "Ducky One 3 Mini", "Royal Kludge RK61"] },
-  { label: "65%", minKeys: 68, examples: ["Keychron K6", "Ducky One 3 SF", "Royal Kludge RK68"] },
-  { label: "Alice", minKeys: 68, extended: true, examples: ["Keychron Q8"] },
-  { label: "75%", minKeys: 82, examples: ["GMMK Pro", "Keychron Q1 Pro", "NuPhy Halo75"] },
-  { label: "TKL", minKeys: 87, examples: ["Ducky One 3 TKL", "Leopold FC750R", "Keychron C3 Pro"] },
-  { label: "96%", minKeys: 98, examples: ["Keychron Q5", "Royal Kludge RK96", "Keychron K4"] },
-  { label: "100%", minKeys: 104, examples: ["Keychron K10", "Ducky One 3 Full-Size", "Leopold FC900R"] },
-  { label: "Numpad", minKeys: 104, examples: ["Keychron Q0 Plus"] },
+  { label: "40%", note: "47 keys · compact, no number row", minKeys: 47, extended: true, examples: ["OLKB Planck", "Vortex Core"] },
+  { label: "60%", note: "61 keys · no arrows, no F-row", minKeys: 61, examples: ["Anne Pro 2", "Ducky One 3 Mini", "Royal Kludge RK61"] },
+  { label: "65%", note: "67–68 keys · arrows, no F-row", minKeys: 68, examples: ["Keychron K6", "Ducky One 3 SF", "Royal Kludge RK68"] },
+  { label: "Alice", note: "65–68 keys · ergonomic split layout", minKeys: 68, extended: true, examples: ["Keychron Q8"] },
+  { label: "75%", note: "82–84 keys · F-row and arrows, compact", minKeys: 82, examples: ["GMMK Pro", "Keychron Q1 Pro", "NuPhy Halo75"] },
+  { label: "TKL", note: "87 keys · tenkeyless, no numpad", minKeys: 87, examples: ["Ducky One 3 TKL", "Leopold FC750R", "Keychron C3 Pro"] },
+  { label: "96%", note: "98 keys · compact full-size with numpad", minKeys: 98, examples: ["Keychron Q5", "Royal Kludge RK96", "Keychron K4"] },
+  { label: "100%", note: "104–108 keys · full-size with numpad", minKeys: 104, examples: ["Keychron K10", "Ducky One 3 Full-Size", "Leopold FC900R"] },
+  { label: "Numpad", note: "21 keys · standalone numpad", minKeys: 104, examples: ["Keychron Q0 Plus"] },
 ];
 const KEY_COUNT_CHIPS = [61, 64, 68, 75, 84, 87, 98, 104, 108];
 export const BIG_KIT_KEYS = 130;
 
 /** how many keys the set has: the product's own key-count spec, else "140 keys" in the title */
-export function keycapCountOf(p: Pick<NormalisedProduct, "title" | "titleTranslated" | "props">): number | null {
+export function keycapCountOf(p: Pick<NormalisedProduct, "title" | "titleTranslated" | "props"> & { variants?: { name?: string; nameTranslated?: string }[] }): number | null {
+  // what the variants actually sell: "Cherry English 142K", "104 keys", "120+键"
+  const sold = (p.variants || [])
+    .flatMap((v) => [...`${v.nameTranslated || ""} ${v.name || ""}`.matchAll(/(?<![0-9])(\d{2,3})\s*\+?\s*(?:k\b|keys?\b|key ?caps?|pcs|pieces|键|颗)/gi)].map((m) => parseInt(m[1], 10)))
+    .filter((n) => n >= 30 && n <= 250);
+  if (sold.length) return Math.max(...sold);
   for (const [k, v] of Object.entries(p.props || {})) {
     if (/颗数|键数|键位数|key ?count|keys|数量/i.test(k)) {
       const n = parseInt(String(v).replace(/[^0-9]/g, ""), 10);
       if (n >= 30 && n <= 250) return n;
     }
   }
-  const m = `${p.titleTranslated || ""} ${p.title}`.match(/(?<![0-9])(1[0-9]{2}|[3-9][0-9])\s*(?:keys?|key ?caps?|pcs|pieces|键|颗)/i);
+  const m = `${p.titleTranslated || ""} ${p.title}`.match(/(?<![0-9])(1[0-9]{2}|[3-9][0-9])\s*\+?\s*(?:keys?|key ?caps?|pcs|pieces|键|颗)/i);
   return m ? parseInt(m[1], 10) : null;
 }
 
@@ -134,7 +141,7 @@ export function layoutsSectionHtml(keys: number | null | undefined, opts: { cros
   const chips = list.map((l) => `<span>${escH(l.label)}</span>`).join("");
   const counts = KEY_COUNT_CHIPS.filter((n) => n <= keys).map((n) => `<span>${n} keys</span>`).join("");
   const rows = list
-    .map((l) => `<div class="bm-eg"><b>${escH(l.label)}</b><span>${l.examples.map(escH).join(" · ")}</span></div>`)
+    .map((l) => `<div class="bm-eg"><b>${escH(l.label)}</b><span>${escH(l.note)}<br>${l.examples.map(escH).join(" · ")}</span></div>`)
     .join("");
   return (
     `<div data-ps="layouts"><h3>Compatible Layouts</h3>` +
@@ -204,6 +211,8 @@ export function buildPageBlocks(args: {
  * carries a block of that kind (data-ps="…") is left alone.
  */
 export function injectPageBlocks(html: string, blocksIn?: Partial<PageBlocks> | null): string {
+  // "Pictured: 75%" style chips are never shown (the layouts section lists the standards instead)
+  html = html.replace(/<span\b[^>]*>\s*Pictured\b[^<]*<\/span>\s*/gi, "");
   if (!blocksIn) return html;
   const blocks = blocksIn;
   if (blocks.layouts) html = placeLayouts(html, blocks.layouts);
@@ -264,7 +273,7 @@ export const BREVITY_RULE = [
   "- `bm-lede`: EN FAZLA 2 kısa cümle. `bm-trivia` (fun fact) HİÇ YAZMA. `bm-compare` karşılaştırma tablosunu (ve başlığını) HİÇ YAZMA.",
   "- Highlights: 4–5 madde; her madde = kalın başlık (≤4 kelime) + TEK kısa satır (≤12 kelime).",
   "- Specifications: 8–12 satır, her değer kısa; açıklama cümlesi yok.",
-  "- Compatible Layouts (sadece keycap/klavye): boyut çipleri + tuş sayısı çipleri + `bm-compat-eg` içinde HER satır yalnız `<b>60%</b><span>Model A · Model B · Model C</span>` (SADECE model adları, CÜMLE YOK); `bm-layouts-note` EN FAZLA 2 kısa cümle (spacebar/shift detay paragrafı YOK).",
+  "- Compatible Layouts (sadece keycap/klavye; ASLA 'Pictured: …' çipi yazma — standart düzenleri listele): boyut çipleri + tuş sayısı çipleri + `bm-compat-eg` içinde HER satır yalnız `<b>60%</b><span>Model A · Model B · Model C</span>` (SADECE model adları, CÜMLE YOK); `bm-layouts-note` EN FAZLA 2 kısa cümle (spacebar/shift detay paragrafı YOK).",
   "- SSS: 4–5 soru; her cevap EN FAZLA 2 kısa cümle (~25 kelime). Kargo/iade sorusu YOK.",
   "- `bm-note` tek kısa satır; CTA tek cümle.",
   "- Bölüm sayısı ve uzunluk için operatörün bandı yalnızca ÜST sınırdır: bandın altında kalmak SERBEST ve TERCİH EDİLİR; bandı doldurmak için asla metin ekleme.",

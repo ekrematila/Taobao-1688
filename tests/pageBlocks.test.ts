@@ -175,3 +175,15 @@ test("highlight icons that are flat symbols become emoji that match the highligh
   assert.match(out, /<span class="ico">🍮<\/span>/, "a real emoji is left alone");
   assert.doesNotMatch(out, /[♡◇▧]/);
 });
+
+test("the key count is read from what the variants sell (142K, 120+键) and 'Pictured:' chips never show", async () => {
+  const { keycapCountOf, injectPageBlocks, layoutsSectionHtml } = await import("../shared/pageBlocks.ts");
+  const base = { title: "库洛米四面侧透布丁键帽", titleTranslated: undefined, props: { "颜色分类": "【OEM高度】库洛米（120+键）,【原厂高度】绫波丽（250+键）" } } as any;
+  assert.equal(keycapCountOf({ ...base, variants: [{ name: "x", nameTranslated: "Cherry English 142K" }, { name: "y", nameTranslated: "Cherry Korean 142K" }] }), 142, "variant names win");
+  assert.equal(keycapCountOf({ title: "键帽套装 120+键", props: {} } as any), 120, "'120+键' is read");
+  const html = `<div class="bm"><h3>Compatible Layouts</h3><div class="bm-layouts"><span>Pictured: 75%</span><span>Pictured: ANSI layout</span><span>Cherry variants: 142 keycaps</span></div></div>`;
+  const out = injectPageBlocks(html, { layouts: layoutsSectionHtml(142) } as any);
+  assert.doesNotMatch(out, /Pictured/);
+  const sizes = (layoutsSectionHtml(142).match(/<b>(\d+%|TKL|Alice|Numpad)/g) || []).length;
+  assert.ok(sizes >= 8, `at least 8 standard layouts for a 142-key set (got ${sizes})`);
+});

@@ -845,6 +845,10 @@ const FAQ_CTA_GUARANTEE = fmtStyle(
   `.bm [data-ps]{padding-top:18px!important;padding-bottom:18px!important;text-align:center}` +
   `.bm [data-ps]>:first-child,.bm [data-ps] h3,.bm [data-ps] h4{margin-top:0!important;padding-top:0!important}` +
   `.bm [data-ps]>:last-child{margin-bottom:0!important}` +
+  // buttons / chips of the verified blocks and the layouts section react to the pointer
+  `.bm [data-ps] a,.bm .bm-layouts span,.bm [data-ps] figure img{transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1),background-color .25s ease,border-color .25s ease,color .25s ease!important}` +
+  `.bm [data-ps] a:hover,.bm .bm-layouts span:hover{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,121,85,143),.32)!important;background:var(--lav,#f3eef8)!important;border-color:var(--gold,var(--acc,#8a5cc4))!important;color:var(--gold,var(--head,#2b2150))!important}` +
+  `.bm [data-ps] figure:hover img{transform:translateY(-2px)!important;box-shadow:0 8px 16px -6px rgba(var(--acc-rgb,121,85,143),.32)!important;border-color:var(--gold,var(--acc,#8a5cc4))!important}` +
   // "At a glance": every fact is its own bordered cell, the label sits over a thin line — easy to scan
   `.bm .bm-glance ul{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;gap:10px!important;margin:0!important;padding:0!important;list-style:none!important}` +
   `.bm .bm-glance li{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:5px!important;margin:0!important;padding:10px 12px!important;border:1px solid var(--line2,#d8d8e0)!important;border-radius:10px!important;background:rgba(255,255,255,.65)!important;font-size:14px!important;line-height:1.35!important;font-weight:600}` +

@@ -87,7 +87,7 @@ export function pageBlocksFor(
     profile,
     listingTitle: title,
     isKeycapSet,
-    keyCount: isKeycapSet ? keycapCountOf(product) : null,
+    keyCount: isKeycapSet ? keycapCountOf(product) : null, // product.variants are read too ("142K")
     crossStem: Object.entries(product.props || {}).some(([k, v]) => /适配轴体|轴体类型|switch/i.test(k) && /十字|cross|MX/i.test(String(v))),
     variantImageUrl: (v) => {
       if (!v.imageUrl) return null;
