@@ -446,27 +446,33 @@ ${FIND_ATC_FN}
      fires, the open/close attribute never finishes updating, and the item
      gets stuck — it looks like it "won't open again" on the next click. The
      timeout guarantees the state always finishes settling either way. */
-  function slideClose(item, b, cls, after){
+  /* Accordion slide. Measured in border-box terms and with the padding animated too: the old version set the content-box
+     height to the border-box scrollHeight (12px too tall → a visible jump when it snapped back to auto) and left the
+     bottom padding behind on close (another jump). A gentle ease-in-out so neither direction looks like a snap. */
+  function slideClose(item, b, cls){
     var done = false;
-    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.height = ''; b.style.opacity = ''; b.style.transition = ''; b.style.overflow = ''; if(after) after(); }
-    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
-    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1), opacity .24s ease'; b.style.height = '0px'; b.style.opacity = '0';
+    var cs = getComputedStyle(b), full = b.scrollHeight;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.cssText = b.style.cssText.replace(/(box-sizing|height|opacity|transition|overflow|padding-top|padding-bottom)\s*:[^;]*;?/g, ''); }
+    b.style.transition = 'none'; b.style.boxSizing = 'border-box'; b.style.overflow = 'hidden'; b.style.height = full + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .42s cubic-bezier(.4,0,.2,1), padding .42s cubic-bezier(.4,0,.2,1), opacity .3s ease';
+    b.style.height = '0px'; b.style.paddingTop = '0px'; b.style.paddingBottom = '0px'; b.style.opacity = '0';
     b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
-    setTimeout(finish, 480);
+    setTimeout(finish, 580);
   }
-  /* A closed <details> keeps its content un-rendered, so a transition started in the same frame as [open] never runs
-     (the answer snapped open, or showed half-cut). Open it, hold it at height 0 for a moment so the browser has really
-     laid it out, THEN animate to the measured height. Only this element's own height transition may finish it. */
+  /* A closed <details> keeps its content un-rendered, so a transition started in the same frame as [open] never runs.
+     Open it, measure, hold it at height 0 for a moment so the browser has really laid it out, THEN animate to the measured
+     height. Only this element's own height transition may finish it. */
   function slideOpen(item, b, cls){
     item.setAttribute('open', ''); if(cls) item.classList.add(cls);
-    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.opacity = '0'; void b.offsetHeight;
+    var cs = getComputedStyle(b), pt = cs.paddingTop, pb = cs.paddingBottom, full = b.scrollHeight;
+    b.style.transition = 'none'; b.style.boxSizing = 'border-box'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.paddingTop = '0px'; b.style.paddingBottom = '0px'; b.style.opacity = '0'; void b.offsetHeight;
     setTimeout(function(){
       var done = false;
-      function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; b.style.opacity = ''; b.style.transition = ''; }
-      b.style.transition = 'height .38s cubic-bezier(.25,.8,.3,1), opacity .3s ease';
-      b.style.height = b.scrollHeight + 'px'; b.style.opacity = '1';
+      function finish(){ if(done) return; done = true; b.style.cssText = b.style.cssText.replace(/(box-sizing|height|opacity|transition|overflow|padding-top|padding-bottom)\s*:[^;]*;?/g, ''); }
+      b.style.transition = 'height .46s cubic-bezier(.4,0,.2,1), padding .46s cubic-bezier(.4,0,.2,1), opacity .36s ease';
+      b.style.height = full + 'px'; b.style.paddingTop = pt; b.style.paddingBottom = pb; b.style.opacity = '1';
       b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
-      setTimeout(finish, 540);
+      setTimeout(finish, 620);
       /* inside the sticky text panel the answer can open below the visible part: glide it into view */
       try{ var pn = item.closest('.bm-c2,.bm-acc-desc'); if(pn && pn.scrollHeight > pn.clientHeight + 4){ setTimeout(function(){ item.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 200); } }catch(e){}
     }, 40);
@@ -634,25 +640,33 @@ ${FIND_ATC_FN}
     }, 90);
     setTimeout(function(){ clearInterval(iv); fire(); }, 4000);
   }
+  /* Accordion slide. Measured in border-box terms and with the padding animated too: the old version set the content-box
+     height to the border-box scrollHeight (12px too tall → a visible jump when it snapped back to auto) and left the
+     bottom padding behind on close (another jump). A gentle ease-in-out so neither direction looks like a snap. */
   function slideClose(item, b, cls){
     var done = false;
-    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.height = ''; b.style.opacity = ''; b.style.transition = ''; b.style.overflow = ''; }
-    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = b.scrollHeight + 'px'; void b.offsetHeight;
-    b.style.transition = 'height .34s cubic-bezier(.25,.8,.3,1), opacity .24s ease'; b.style.height = '0px'; b.style.opacity = '0';
+    var cs = getComputedStyle(b), full = b.scrollHeight;
+    function finish(){ if(done) return; done = true; item.removeAttribute('open'); if(cls) item.classList.remove(cls); b.style.cssText = b.style.cssText.replace(/(box-sizing|height|opacity|transition|overflow|padding-top|padding-bottom)\s*:[^;]*;?/g, ''); }
+    b.style.transition = 'none'; b.style.boxSizing = 'border-box'; b.style.overflow = 'hidden'; b.style.height = full + 'px'; void b.offsetHeight;
+    b.style.transition = 'height .42s cubic-bezier(.4,0,.2,1), padding .42s cubic-bezier(.4,0,.2,1), opacity .3s ease';
+    b.style.height = '0px'; b.style.paddingTop = '0px'; b.style.paddingBottom = '0px'; b.style.opacity = '0';
     b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
-    setTimeout(finish, 480);
+    setTimeout(finish, 580);
   }
-  /* see the .bm script: a closed <details> has no layout, so open it, hold at 0, then animate to the measured height */
+  /* A closed <details> keeps its content un-rendered, so a transition started in the same frame as [open] never runs.
+     Open it, measure, hold it at height 0 for a moment so the browser has really laid it out, THEN animate to the measured
+     height. Only this element's own height transition may finish it. */
   function slideOpen(item, b, cls){
     item.setAttribute('open', ''); if(cls) item.classList.add(cls);
-    b.style.transition = 'none'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.opacity = '0'; void b.offsetHeight;
+    var cs = getComputedStyle(b), pt = cs.paddingTop, pb = cs.paddingBottom, full = b.scrollHeight;
+    b.style.transition = 'none'; b.style.boxSizing = 'border-box'; b.style.overflow = 'hidden'; b.style.height = '0px'; b.style.paddingTop = '0px'; b.style.paddingBottom = '0px'; b.style.opacity = '0'; void b.offsetHeight;
     setTimeout(function(){
       var done = false;
-      function finish(){ if(done) return; done = true; b.style.height = 'auto'; b.style.overflow = ''; b.style.opacity = ''; b.style.transition = ''; }
-      b.style.transition = 'height .38s cubic-bezier(.25,.8,.3,1), opacity .3s ease';
-      b.style.height = b.scrollHeight + 'px'; b.style.opacity = '1';
+      function finish(){ if(done) return; done = true; b.style.cssText = b.style.cssText.replace(/(box-sizing|height|opacity|transition|overflow|padding-top|padding-bottom)\s*:[^;]*;?/g, ''); }
+      b.style.transition = 'height .46s cubic-bezier(.4,0,.2,1), padding .46s cubic-bezier(.4,0,.2,1), opacity .36s ease';
+      b.style.height = full + 'px'; b.style.paddingTop = pt; b.style.paddingBottom = pb; b.style.opacity = '1';
       b.addEventListener('transitionend', function te(e){ if(e.target !== b || e.propertyName !== 'height') return; b.removeEventListener('transitionend', te); finish(); });
-      setTimeout(finish, 540);
+      setTimeout(finish, 620);
     }, 40);
   }
   function closeFaq(item){

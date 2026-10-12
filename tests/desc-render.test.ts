@@ -249,8 +249,8 @@ test("FAQ open/close has a timeout fallback so it can never get stuck (transitio
     // stuck open/closed forever if the transition never actually ran — every
     // open/close path needs a setTimeout fallback that finishes the state
     // change regardless of whether the CSS transition fired.
-    assert.ok(/setTimeout\(finish,\s*480\)/.test(js), "closing has a timeout fallback");
-    assert.ok(/setTimeout\(finish,\s*540\)/.test(js), "opening has a timeout fallback");
+    assert.ok(/setTimeout\(finish,\s*580\)/.test(js), "closing has a timeout fallback");
+    assert.ok(/setTimeout\(finish,\s*620\)/.test(js), "opening has a timeout fallback");
     assert.ok(/e\.target !== b \|\| e\.propertyName !== 'height'/.test(js), "only the answer's own height transition may finish it (a bubbling child transition used to cut the animation short)");
   }
 });
