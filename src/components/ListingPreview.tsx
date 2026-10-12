@@ -3,7 +3,7 @@ import { proxied, type Draft } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { importBodyHtml, importBodyHtmlPreview, plainText, ETSY_MAX_PHOTOS } from "../lib/export";
-import { fancyEtsyHeaders } from "@shared/listingFormat.ts";
+import { fancyEtsyHeaders, outputVariants } from "@shared/listingFormat.ts";
 import type { GeneratedListing } from "@shared/types.ts";
 
 function f(l: GeneratedListing | null, key: string) {
@@ -40,15 +40,11 @@ export default function ListingPreview({ draft }: { draft: Draft }) {
 
   const title = f(l, "title") || p?.titleTranslated || p?.title || "—";
   // operator-edited product variants win over the generation-time snapshot
-  const vlist = (p?.variants?.length ? p.variants : l?.variants) ?? [];
+  // …and they are shown exactly as they would leave the app (channel price rule, no invented "was" price)
+  const vlist = outputVariants(p ?? { variants: [] }, l ?? null);
   const priced = vlist.find((v) => v.price != null);
   const price = priced?.price ?? p?.priceOriginal ?? null;
-  const compareAt =
-    priced?.compareAtPrice != null
-      ? priced.compareAtPrice
-      : price != null
-        ? Math.round(price * 1.35 * 100) / 100
-        : null;
+  const compareAt = priced?.compareAtPrice != null ? priced.compareAtPrice : null;
 
   const axes: Record<string, Set<string>> = {};
   for (const v of vlist) {

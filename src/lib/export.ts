@@ -337,7 +337,9 @@ export async function etsyZip(p: NormalisedProduct, l: GeneratedListing): Promis
     .filter(isEtsyTag)
     .slice(0, 50);
 
-  const vlist = outputVariants(p, l);
+  const vlist = outputVariants(p, { ...l, channel: "etsy" });
+  const prices = [...new Set(vlist.map((v) => v.price).filter((n): n is number => n != null))];
+  const onePrice = prices.length === 1 ? prices[0] : null;
 
   // ---- images: two folders ----
   // "title and description" = ALL listing photos (gallery + description strips),
@@ -451,11 +453,12 @@ export async function etsyZip(p: NormalisedProduct, l: GeneratedListing): Promis
             "",
             `===========  VARIATIONS (${vlist.length})  ===========`,
             "",
+            // Etsy sells every variation at ONE price (ending .99)
+            ...(onePrice != null ? [`Price (all variations): $${onePrice.toFixed(2)}`, ""] : []),
             ...vlist.map((v, i) => {
-              const pr = v.price != null ? `$${v.price}` : "—";
-              const cmp = v.compareAtPrice != null ? `  (was $${v.compareAtPrice})` : "";
+              const pr = onePrice != null ? "" : `  —  ${v.price != null ? `$${v.price}` : "—"}`;
               const sku = v.sku ? `  · SKU ${v.sku}` : "";
-              return `${i + 1}. ${v.nameTranslated || v.name}  —  ${pr}${cmp}${sku}`;
+              return `${i + 1}. ${v.nameTranslated || v.name}${pr}${sku}`;
             }),
           ]
         : []),

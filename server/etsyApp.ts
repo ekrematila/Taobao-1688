@@ -13,7 +13,7 @@
 // it instead of the operator's actual, capped `tags` selection.
 
 import { env } from "./env.ts";
-import { syncVariantImages } from "@shared/listingFormat.ts";
+import { outputVariants, syncVariantImages } from "@shared/listingFormat.ts";
 import { getSetting, setSetting } from "./db.ts";
 import { cleanTag } from "@shared/listingFormat.ts";
 import type { GeneratedListing, NormalisedProduct } from "@shared/types.ts";
@@ -190,7 +190,12 @@ export async function pushToEtsyApp(
     res = await fetch(`${base}${PATH}/product${opts.dryRun ? "?dryRun=1" : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Product-Studio-Key": key },
-      body: JSON.stringify({ product: withAbsoluteMedia(product), listing: withCleanEtsyFields(listing), shopId }),
+      body: JSON.stringify({
+        // variants leave exactly as the Etsy rules want them: one price ending in .99, names ≤ 20 chars and unique
+        product: withAbsoluteMedia({ ...product, variants: outputVariants(product, { ...listing, channel: "etsy" }) }),
+        listing: withCleanEtsyFields(listing),
+        shopId,
+      }),
       signal: AbortSignal.timeout(30000),
     });
   } catch {

@@ -22,7 +22,6 @@ import {
   suggestProductType,
   checkTrademarks,
   checkListingConsistency,
-  nameVariantsForChannel,
   translateVariants,
   generateAltTexts,
   classifyProductImages,
@@ -85,6 +84,7 @@ import {
   resolveAttributes,
 } from "./taxonomy.ts";
 import { freeTranslate } from "./translate.ts";
+import { autoFillVariants } from "./variantAuto.ts";
 import { localAdvice, localCategoryResearch, localListing } from "./localContent.ts";
 import { allExamples } from "./examples.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote } from "@shared/keycaps.ts";
@@ -983,35 +983,31 @@ router.get(
 router.post(
   "/api/ai/name-variants",
   wrap(async (req, res) => {
-    const { draftId, channel, targetLanguage, model, mode } = req.body ?? {};
+    const { draftId, channel, targetLanguage, model, mode, prices, etsyBase, keepNames } = req.body ?? {};
     const draft = getDraft(draftId);
     if (!draft?.product) return res.status(400).json({ error: "Ürün yok." });
-    const cap = channel === "etsy" ? 20 : 40;
+    const ch = channel === "etsy" ? "etsy" : "shopify";
+    const withPrices = prices === true;
     const jobId = startJob("name-variants", async (ctx) => {
-      ctx.plan(["Varyant adları kısaltılıyor"]);
-      ctx.step("Varyant adları kısaltılıyor");
-      let variants;
-      if (mode === "free") {
-        const src = draft.product!.variants.map((v) => v.nameTranslated || v.name);
-        const { results } = await freeTranslate(src, (targetLanguage || "en").slice(0, 2), "zh");
-        variants = draft.product!.variants.map((v, i) => ({
-          ...v,
-          nameTranslated: stripCJK(applyKeycapGlossary(results[i] || v.name)).replace(/\s+/g, " ").trim().slice(0, cap),
-        }));
-      } else {
-        variants = (
-          await nameVariantsForChannel(draft.product!.variants, channel === "etsy" ? "etsy" : "shopify", targetLanguage || "en", {
-            model,
-            signal: ctx.signal,
-            draftId: draft.id,
-          })
-        ).variants;
-      }
+      const step = withPrices ? "Varyantlar algılanıyor, adlandırılıyor ve fiyatlanıyor" : "Varyant adları kısaltılıyor";
+      ctx.plan([step]);
+      ctx.step(step);
+      const r = await autoFillVariants(draft.product!, {
+        channel: ch,
+        targetLanguage: targetLanguage || "en",
+        mode: mode === "ai" ? "ai" : "free",
+        prices: withPrices,
+        keepNames: keepNames === true,
+        etsyBase: etsyBase === "max" ? "max" : "min",
+        model,
+        signal: ctx.signal,
+        draftId: draft.id,
+      });
       await withDraftLock(draft.id, async () => {
         const fresh = getDraft(draft.id)!;
-        patchDraft(draft.id, { product: { ...fresh.product!, variants } }, "Varyant adları güncellendi");
+        patchDraft(draft.id, { product: { ...fresh.product!, variants: r.variants } }, withPrices ? "Varyantlar otomatik dolduruldu" : "Varyant adları güncellendi");
       });
-      return { variants };
+      return r;
     });
     res.json({ jobId });
   }),

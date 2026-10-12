@@ -219,7 +219,7 @@ export function categoryResearchJob(
   return runJob(() => post("/ai/category-research", body), onProgress);
 }
 export function nameVariantsJob(
-  body: { draftId: string; channel: string; targetLanguage?: string; model?: string; mode?: "ai" | "free" },
+  body: { draftId: string; channel: string; targetLanguage?: string; model?: string; mode?: "ai" | "free"; prices?: boolean; keepNames?: boolean; etsyBase?: "min" | "max" },
   onProgress: Progress,
 ) {
   return runJob(() => post("/ai/name-variants", body), onProgress);

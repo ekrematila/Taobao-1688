@@ -4,6 +4,8 @@
 import { DESC_STYLES, TITLE_VOCAB } from "./models.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, detectProfiles, LAYOUT_COMPAT, profilePhrase } from "./keycaps.ts";
 import { cleanSpecs } from "./specs.ts";
+import { shortenVariantName, uniqueNames } from "./variantNames.ts";
+import { pricedForChannel } from "./variantPricing.ts";
 import { buildPageBlocks, keycapCountOf, productText, type PageBlocks } from "./pageBlocks.ts";
 import { pickStoreProfile, type StoreProfile } from "./storeProfiles.ts";
 import { ETSY_TAG_VOCAB, ETSY_SEARCH_ADJ } from "./exampleData.ts";
@@ -161,20 +163,24 @@ export function descBodyImages(images: ProductImage[], max = 20): ProductImage[]
  */
 export function outputVariants(
   product: Pick<NormalisedProduct, "variants">,
-  listing?: Pick<GeneratedListing, "variants"> | null,
+  listing?: Pick<GeneratedListing, "variants" | "channel"> | null,
 ): ProductVariant[] {
-  const src = product.variants?.length ? product.variants : listing?.variants ?? [];
-  return src.map((v, i) => {
-    const clean = (s?: string) => stripCJK(applyKeycapGlossary(String(s ?? ""))).replace(/\s{2,}/g, " ").trim();
-    const nameTranslated = clean(v.nameTranslated) || clean(v.name);
-    return {
-      ...v,
-      name: clean(v.name) || nameTranslated || `Variant ${i + 1}`,
-      nameTranslated: nameTranslated || `Variant ${i + 1}`,
-      price: v.price ?? null,
-      compareAtPrice: v.compareAtPrice ?? null,
-    };
-  });
+  const channel = listing?.channel;
+  const raw = product.variants?.length ? product.variants : listing?.variants ?? [];
+  // prices leave the app the way the channel requires (re-priced from the yuan source if they were set for the other channel)
+  const src = channel ? pricedForChannel(raw, channel) : raw;
+  const cap = channel === "etsy" ? 20 : channel === "shopify" ? 40 : 0;
+  const clean = (s?: string) => stripCJK(applyKeycapGlossary(String(s ?? ""))).replace(/\s{2,}/g, " ").trim();
+  const names = src.map((v, i) => clean(v.nameTranslated) || clean(v.name) || `Variant ${i + 1}`);
+  // a marketplace option value has a length cap and must be unique
+  const fitted = cap ? uniqueNames(names.map((n) => shortenVariantName(n, cap) || n), cap) : names;
+  return src.map((v, i) => ({
+    ...v,
+    name: clean(v.name) || fitted[i],
+    nameTranslated: fitted[i],
+    price: v.price ?? null,
+    compareAtPrice: channel === "etsy" ? null : v.compareAtPrice ?? null,
+  }));
 }
 
 /**

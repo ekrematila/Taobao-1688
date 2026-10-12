@@ -93,6 +93,10 @@ export interface ProductVariant {
   price: number | null;
   /** "compare at" / was-price shown struck-through (Shopify compare_at_price). */
   compareAtPrice?: number | null;
+  /** the source (Taobao/1688) price in CNY — the base every channel price is computed from, kept so re-pricing never compounds */
+  priceCny?: number | null;
+  /** which rule last set `price`: the channel's auto rule, or "manual" (typed by hand — never overwritten by a channel switch) */
+  pricedFor?: "etsy" | "shopify" | "manual";
   sku?: string;
   /** the product image bound to this variant (auto-picked, operator can change). */
   imageUrl?: string;

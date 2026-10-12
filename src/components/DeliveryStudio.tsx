@@ -18,6 +18,8 @@ import { DEFAULT_PRODUCT_TYPES, DESC_STYLES, HTML_BUDGETS, HTML_LENGTH_BANDS, HT
 import { DEFAULT_FIELD_EXAMPLES, STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { DESC_LAYOUTS, isSelfContainedLayout, renderDescriptionHtml } from "@shared/descLayouts.ts";
 import { descBodyImages, publicImageUrl } from "@shared/listingFormat.ts";
+import { applyAutoPrices, snapPrice, unpricedCount } from "@shared/variantPricing.ts";
+import { ruleBasedVariantName } from "@shared/variantNames.ts";
 import { cleanSpecs } from "@shared/specs.ts";
 import { detectKeyboardLayout, detectProfiles, profilePhrase } from "@shared/keycaps.ts";
 import { defaultHsCode, estimateWeightKg } from "@shared/weight.ts";
@@ -120,6 +122,12 @@ export default function DeliveryStudio({
   const [hsCode, setHsCode] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [perVariantCustoms, setPerVariantCustoms] = useState(false);
+  // variants: auto-fill after a generation, Etsy single-price base, an undo stack and the last result note
+  const [autoVariants, setAutoVariants] = useState<"off" | "free" | "ai">("free");
+  const [etsyBase, setEtsyBase] = useState<"min" | "max">("min");
+  const [variantUndo, setVariantUndo] = useState<{ label: string; variants: ProductVariant[] }[]>([]);
+  const [variantNote, setVariantNote] = useState("");
+  const [priceWarn, setPriceWarn] = useState<{ n: number; resolve: (a: "fix" | "asis" | "cancel") => void } | null>(null);
   const [weightNote, setWeightNote] = useState("");
   const [hsNote, setHsNote] = useState("");
   const [hsBusy, setHsBusy] = useState(false);
@@ -236,7 +244,11 @@ export default function DeliveryStudio({
       setDescStyle(dc.descStyle ?? "product");
       setStoreProfileId(typeof dc.storeProfileId === "string" ? dc.storeProfileId : "");
       setPerVariantCustoms(!!dc.perVariantCustoms);
+      setAutoVariants(dc.autoVariants === "off" || dc.autoVariants === "ai" ? dc.autoVariants : "free");
+      setEtsyBase(dc.etsyBase === "max" ? "max" : "min");
     }
+    setVariantUndo([]);
+    setVariantNote("");
     setApplyAdvice(!!s.useAdvice);
     setApplyResearch(!!s.useCategoryResearch);
     setResearch(s.categoryResearch || "");
@@ -277,13 +289,13 @@ export default function DeliveryStudio({
         .patchDraft(draft.id, {
           imageState: {
             ...((draft.imageState as any) ?? {}),
-            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms },
+            delivery: { productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms, autoVariants, etsyBase },
           },
         })
         .catch(() => {});
     }, 600);
     return () => clearTimeout(id);
-  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms]);
+  }, [productType, targetLang, layout, globalRules, productNote, fieldCfg, brand, htmlBudget, htmlBand, htmlUnit, descModel, genEffort, genThinking, descProvider, descManusProfile, descEffort, descThinking, descStyle, storeProfileId, perVariantCustoms, autoVariants, etsyBase]);
 
   // persist shipping & customs onto draft.product (debounced, silent, fresh-merged)
   useEffect(() => {
@@ -382,6 +394,11 @@ export default function DeliveryStudio({
       await r.promise;
       toast(t("delivery.generated"), "ok");
       onSaved();
+      // the variants come next: detect / name / price them from the product (only what is still missing)
+      if (autoVariants !== "off" && draft.product && variantsNeedWork(draft.product.variants, channel)) {
+        setJob(null);
+        await runAutoVariants(autoVariants, true, true);
+      }
     } catch (e) {
       if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
     } finally {
@@ -468,26 +485,86 @@ export default function DeliveryStudio({
     onSaved();
   }
 
-  async function runNameVariants(mode: "ai" | "free") {
+  /** a variant list that still lacks names or the channel's prices */
+  function variantsNeedWork(vs: ProductVariant[], ch: ChannelId): boolean {
+    return vs.length === 0 || vs.some((v) => !v.nameTranslated?.trim()) || unpricedCount(vs, ch) > 0;
+  }
+  const pushUndo = (label: string, variants: ProductVariant[] = draft.product?.variants ?? []) =>
+    setVariantUndo((u) => [...u.slice(-19), { label, variants }]);
+
+  /** Detect (from the product's own option attributes) + name + price the variants. `prices:false` = names only.
+   *  `keep` = after a generation: keep the names that are already there. Every run can be undone. */
+  async function runAutoVariants(mode: "ai" | "free", prices = true, keep = false) {
+    pushUndo(prices ? t("delivery.variantsAutoLabel") : t("delivery.variantsLabel"));
     setBusy("variants");
-    const r = nameVariantsJob({ draftId: draft.id, channel, targetLanguage: targetLang, model, mode }, setJob);
+    const r = nameVariantsJob({ draftId: draft.id, channel, targetLanguage: targetLang, model, mode, prices, keepNames: keep, etsyBase }, setJob);
     jobRef.current = r as RunningJob<unknown>;
     try {
-      await r.promise;
+      const out = (await r.promise) as {
+        detected?: number;
+        glossary?: number;
+        translated?: number;
+        priceInfo?: { min: number | null; max: number | null; differs: boolean };
+      };
       onSaved();
-      toast(t("delivery.variantsDone"), "ok");
+      const bits: string[] = [];
+      if (out?.detected) bits.push(t("delivery.variantsDetected", { n: out.detected }));
+      if (mode === "free" && (out?.glossary || out?.translated)) bits.push(t("delivery.variantsNamesFrom", { g: out.glossary ?? 0, m: out.translated ?? 0 }));
+      if (prices && channel === "etsy" && out?.priceInfo?.differs) bits.push(t("delivery.variantPriceRange", { min: out.priceInfo.min ?? "", max: out.priceInfo.max ?? "" }));
+      setVariantNote(bits.join(" · "));
+      toast(t("delivery.variantsAutoDone"), "ok");
     } catch (e) {
+      setVariantUndo((u) => u.slice(0, -1)); // nothing changed — drop the undo entry
       if (!(e instanceof JobCancelled)) toast((e as Error).message, "err");
     } finally {
       setBusy("");
       setJob(null);
     }
   }
-  async function saveVariants(variants: ProductVariant[]) {
+  async function runNameVariants(mode: "ai" | "free") {
+    await runAutoVariants(mode, false);
+  }
+
+  /** price every variant from its yuan price by the channel's rule (no AI, instant) */
+  async function applyPrices(): Promise<void> {
+    const p = draft.product;
+    if (!p) return;
+    const r = applyAutoPrices(p.variants, channel, { etsyBase, fallbackCny: p.priceOriginal });
+    await saveVariants(r.variants, t("delivery.variantsPricesLabel"));
+    const range = channel === "etsy" && r.info.differs ? t("delivery.variantPriceRange", { min: r.info.min ?? "", max: r.info.max ?? "" }) : "";
+    setVariantNote(range);
+    toast(t("delivery.variantsPricesDone"), "ok");
+  }
+
+  async function saveVariants(variants: ProductVariant[], label?: string) {
     if (!draft.product) return;
-    await api.patchDraft(draft.id, { product: { ...draft.product, variants }, label: t("delivery.variantsLabel") });
+    if (JSON.stringify(variants) !== JSON.stringify(draft.product.variants)) pushUndo(label || t("delivery.variantsLabel"));
+    await api.patchDraft(draft.id, { product: { ...draft.product, variants }, label: label || t("delivery.variantsLabel") });
     onSaved();
   }
+
+  /** put the variants back the way they were before the last variant action */
+  async function undoVariants() {
+    const last = variantUndo[variantUndo.length - 1];
+    if (!last || !draft.product) return;
+    setVariantUndo((u) => u.slice(0, -1));
+    await api.patchDraft(draft.id, { product: { ...draft.product, variants: last.variants }, label: t("delivery.variantsUndone", { label: last.label }) });
+    setVariantNote("");
+    onSaved();
+    toast(t("delivery.variantsUndone", { label: last.label }), "ok");
+  }
+
+  /** before a listing leaves the app: variants still holding the raw yuan price would go out as dollars */
+  async function priceGateOk(ch: ChannelId): Promise<boolean> {
+    const vs = draft.product?.variants ?? [];
+    const n = unpricedCount(vs, ch);
+    if (!vs.length || n === 0) return true;
+    const a = await new Promise<"fix" | "asis" | "cancel">((resolve) => setPriceWarn({ n, resolve }));
+    if (a === "cancel") return false;
+    if (a === "fix") await applyPrices();
+    return true;
+  }
+
   /** Fill Category + Origin (CN) + HS code + Weight from the ACTUAL product —
    *  never a constant. Category resolves against the full bundled Shopify
    *  taxonomy (server-side, ~14.6k paths) instead of the small local list; HS
@@ -666,6 +743,7 @@ export default function DeliveryStudio({
   }
 
   async function push() {
+    if (!(await priceGateOk("shopify"))) return;
     if (!(await trademarkGateOk())) return;
     if (!(await imageGateOk("shopify"))) return;
     if (!(await consistencyGateOk())) return;
@@ -689,6 +767,7 @@ export default function DeliveryStudio({
       toast(t("delivery.etsyShopRequired"), "err");
       return;
     }
+    if (!(await priceGateOk("etsy"))) return;
     if (!(await trademarkGateOk())) return;
     if (!(await imageGateOk("etsy"))) return;
     if (!(await consistencyGateOk())) return;
@@ -1124,7 +1203,16 @@ export default function DeliveryStudio({
               customs={perVariantCustoms}
               productWeightKg={weightKg}
               onNameAll={runNameVariants}
+              onAuto={runAutoVariants}
+              onPrices={applyPrices}
               onChange={saveVariants}
+              onUndo={undoVariants}
+              undoLabel={variantUndo[variantUndo.length - 1]?.label}
+              autoMode={autoVariants}
+              onAutoMode={setAutoVariants}
+              etsyBase={etsyBase}
+              onEtsyBase={setEtsyBase}
+              note={variantNote}
             />
           )}
 
@@ -1741,6 +1829,53 @@ export default function DeliveryStudio({
         </div>
       )}
 
+      {priceWarn && (
+        <div
+          className="modal-scrim"
+          onClick={() => {
+            priceWarn.resolve("cancel");
+            setPriceWarn(null);
+          }}
+        >
+          <div className="modal sm" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("delivery.priceWarnTitle")}</h3>
+            <p className="sub">{t("delivery.priceWarnBody", { n: priceWarn.n })}</p>
+            <p className="tiny muted" style={{ margin: "6px 0 0" }}>
+              {channel === "etsy" ? t("delivery.variantRuleEtsy") : t("delivery.variantRuleShopify")}
+            </p>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12, flexWrap: "wrap" }}>
+              <button
+                className="btn"
+                onClick={() => {
+                  priceWarn.resolve("cancel");
+                  setPriceWarn(null);
+                }}
+              >
+                {t("delivery.priceWarnBack")}
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  priceWarn.resolve("asis");
+                  setPriceWarn(null);
+                }}
+              >
+                {t("delivery.priceWarnAsis")}
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  priceWarn.resolve("fix");
+                  setPriceWarn(null);
+                }}
+              >
+                {t("delivery.priceWarnFix")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {trademarkWarn && (
         <div
           className="modal-scrim"
@@ -2118,7 +2253,16 @@ function VariantEditor({
   customs,
   productWeightKg,
   onNameAll,
+  onAuto,
+  onPrices,
   onChange,
+  onUndo,
+  undoLabel,
+  autoMode,
+  onAutoMode,
+  etsyBase,
+  onEtsyBase,
+  note,
 }: {
   variants: ProductVariant[];
   images: { url: string; role?: string; alt?: string }[];
@@ -2131,8 +2275,20 @@ function VariantEditor({
   customs?: boolean;
   /** product-level weight (kg, as string) shown as the placeholder for per-variant weight */
   productWeightKg?: string;
+  /** names only (free glossary / AI) */
   onNameAll: (mode: "ai" | "free") => void;
+  /** detect + name + price in one go (free glossary / AI) */
+  onAuto: (mode: "ai" | "free") => void;
+  /** price every variant from its yuan price by the channel's rule */
+  onPrices: () => void;
   onChange: (variants: ProductVariant[]) => void;
+  onUndo: () => void;
+  undoLabel?: string;
+  autoMode: "off" | "free" | "ai";
+  onAutoMode: (m: "off" | "free" | "ai") => void;
+  etsyBase: "min" | "max";
+  onEtsyBase: (b: "min" | "max") => void;
+  note?: string;
 }) {
   const { t } = useI18n();
   const pics = useMemo(
@@ -2155,6 +2311,16 @@ function VariantEditor({
     setRows(next);
     onChange(next);
   };
+  /** save only when something really changed (a click in and out of a field must not create a revision) */
+  const commitIfChanged = (next: ProductVariant[]) => (JSON.stringify(next) !== sig ? commit(next) : setRows(next));
+  const etsy = channel === "etsy";
+  const dirtyPrice = useRef<Set<number>>(new Set());
+  const unpriced = unpricedCount(rows, channel);
+  const srcPrices = rows.map((v) => v.priceCny).filter((n): n is number => n != null && n > 0);
+  const srcMin = srcPrices.length ? Math.min(...srcPrices) : null;
+  const srcMax = srcPrices.length ? Math.max(...srcPrices) : null;
+  const allSame = rows.length > 0 && rows.every((v) => v.price === rows[0].price);
+  const onePrice = allSame ? rows[0].price : null;
   const toggleSel = (i: number, shift: boolean) => {
     setSel((s) => {
       const n = new Set(s);
@@ -2186,6 +2352,15 @@ function VariantEditor({
     setRows(next);
     return next;
   };
+  /** a hand-typed Shopify price ends the way the channel requires (.90); marks the variant as hand-priced */
+  const commitPrice = (i: number) => {
+    if (!dirtyPrice.current.delete(i)) return; // nothing was typed in this row
+    commitIfChanged(
+      rows.map((v, j) =>
+        j === i ? { ...v, price: snapPrice(v.price, "shopify"), compareAtPrice: snapPrice(v.compareAtPrice, "shopify"), pricedFor: "manual" as const } : v,
+      ),
+    );
+  };
   const num = (s: string): number | null => {
     const n = parseFloat(s.replace(",", "."));
     return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
@@ -2212,6 +2387,33 @@ function VariantEditor({
           {sel.size > 0 && <span className="tiny" style={{ color: "var(--brand)" }}> · {t("delivery.variantSelN", { n: sel.size })}</span>}
         </h3>
         <div className="grow" style={{ flex: 1 }} />
+        <button className="btn sm" title={t("delivery.variantsAutoTip", { n: cap })} onClick={() => onAuto("free")} disabled={busy}>
+          {naming ? <span className="spin" /> : t("delivery.variantsAuto")}
+        </button>
+        <button className="btn sm" title={t("delivery.variantsAutoTip", { n: cap })} onClick={() => onAuto("ai")} disabled={busy}>
+          {t("delivery.variantsAutoAi")}
+        </button>
+        {!!rows.length && (
+          <>
+            <button className="btn ghost sm" title={t("delivery.variantsPricesTip")} onClick={onPrices} disabled={busy}>
+              {t("delivery.variantsPrices")}
+            </button>
+            <button className="btn ghost sm" onClick={() => onNameAll("free")} disabled={busy}>
+              {t("delivery.variantsFree", { n: cap })}
+            </button>
+            <button className="btn ghost sm" onClick={() => onNameAll("ai")} disabled={busy}>
+              {t("delivery.variantsAi", { n: cap })}
+            </button>
+          </>
+        )}
+        <button
+          className="btn ghost sm"
+          title={undoLabel ? t("delivery.variantsUndoTip", { label: undoLabel }) : undefined}
+          onClick={onUndo}
+          disabled={busy || !undoLabel}
+        >
+          ↶ {t("delivery.variantsUndo")}
+        </button>
         {!!rows.length && (
           <>
             <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -2235,12 +2437,6 @@ function VariantEditor({
             <button className="btn ghost sm" style={{ color: "var(--danger)" }} disabled={busy} onClick={() => setConfirmClear(true)}>
               {t("delivery.variantDelAll")}
             </button>
-            <button className="btn ghost sm" onClick={() => onNameAll("free")} disabled={busy}>
-              {naming ? <span className="spin" /> : t("delivery.variantsFree", { n: cap })}
-            </button>
-            <button className="btn ghost sm" onClick={() => onNameAll("ai")} disabled={busy}>
-              {t("delivery.variantsAi", { n: cap })}
-            </button>
           </>
         )}
       </div>
@@ -2261,6 +2457,53 @@ function VariantEditor({
         </div>
       )}
       <div className="card-b col" style={{ gap: 10 }}>
+        {!!rows.length && unpriced > 0 && (
+          <div className="tiny" style={{ background: "var(--warn-bg, #fff4e0)", color: "var(--warn, #8a5300)", padding: "6px 8px", borderRadius: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span>⚠ {t("delivery.variantUnpriced", { n: unpriced })}</span>
+            <button className="btn sm" onClick={onPrices} disabled={busy}>{t("delivery.variantsPrices")}</button>
+          </div>
+        )}
+        {etsy && !!rows.length && (
+          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <b style={{ color: "var(--ink)" }}>{t("delivery.variantOnePrice")}</b>
+              $
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={onePrice ?? ""}
+                placeholder="—"
+                onChange={(e) => {
+                  const val = e.target.value === "" ? null : num(e.target.value);
+                  setRows(rows.map((v) => ({ ...v, price: val })));
+                }}
+                onBlur={() => {
+                  if (rows[0]?.price == null || variants.every((v) => v.price === rows[0].price)) return;
+                  const snapped = snapPrice(rows[0].price, "etsy");
+                  commitIfChanged(rows.map((v) => ({ ...v, price: snapped, compareAtPrice: null, pricedFor: "manual" as const })));
+                }}
+                style={{ width: 96 }}
+              />
+            </label>
+            {srcMin != null && (
+              <span className="tiny muted">
+                {srcMax != null && srcMax !== srcMin ? t("delivery.variantPriceRange", { min: srcMin, max: srcMax }) : t("delivery.variantOnePriceHint", { from: srcMin })}
+              </span>
+            )}
+            {srcMin != null && srcMax != null && srcMax !== srcMin && (
+              <select
+                className="input sm"
+                value={etsyBase}
+                onChange={(e) => onEtsyBase(e.target.value === "max" ? "max" : "min")}
+                title={t("delivery.variantsPricesTip")}
+              >
+                <option value="min">{t("delivery.variantBaseMin")}</option>
+                <option value="max">{t("delivery.variantBaseMax")}</option>
+              </select>
+            )}
+          </div>
+        )}
         {rows.map((v, i) => {
           const nameVal = v.nameTranslated ?? "";
           const over = nameVal.length > cap;
@@ -2291,7 +2534,7 @@ function VariantEditor({
                 <div className="row" style={{ gap: 6, alignItems: "center" }}>
                   <input
                     value={nameVal}
-                    placeholder={noCn(v.name) || t("delivery.variantNamePh")}
+                    placeholder={ruleBasedVariantName(v.name).text || t("delivery.variantNamePh")}
                     maxLength={cap + 20}
                     onChange={(e) => patch(i, { nameTranslated: e.target.value })}
                     onBlur={(e) => {
@@ -2319,35 +2562,46 @@ function VariantEditor({
                       style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={v.name}
                     >
-                      {noCn(v.name) || "—"}
+                      {ruleBasedVariantName(v.name).text || noCn(v.name) || "—"}
                     </span>
                   )}
-                  <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {t("delivery.variantPrice")}
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={v.price ?? ""}
-                      onChange={(e) => patch(i, { price: e.target.value === "" ? null : num(e.target.value) })}
-                      onBlur={() => commit(rows)}
-                      style={{ width: 84 }}
-                    />
-                  </label>
-                  <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {t("delivery.variantCompareAt")}
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={v.compareAtPrice ?? ""}
-                      onChange={(e) =>
-                        patch(i, { compareAtPrice: e.target.value === "" ? null : num(e.target.value) })
-                      }
-                      onBlur={() => commit(rows)}
-                      style={{ width: 84 }}
-                    />
-                  </label>
+                  {v.priceCny != null && v.priceCny > 0 && (
+                    <span className="tiny muted mono" title={t("delivery.variantSrcPrice")}>¥{v.priceCny}</span>
+                  )}
+                  {!etsy && (
+                    <>
+                      <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        {t("delivery.variantPrice")}
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={v.price ?? ""}
+                          onChange={(e) => {
+                            dirtyPrice.current.add(i);
+                            patch(i, { price: e.target.value === "" ? null : num(e.target.value) });
+                          }}
+                          onBlur={() => commitPrice(i)}
+                          style={{ width: 84 }}
+                        />
+                      </label>
+                      <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        {t("delivery.variantCompareAt")}
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={v.compareAtPrice ?? ""}
+                          onChange={(e) => {
+                            dirtyPrice.current.add(i);
+                            patch(i, { compareAtPrice: e.target.value === "" ? null : num(e.target.value) });
+                          }}
+                          onBlur={() => commitPrice(i)}
+                          style={{ width: 84 }}
+                        />
+                      </label>
+                    </>
+                  )}
                 </div>
                 {customs && (
                   <div className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -2360,7 +2614,7 @@ function VariantEditor({
                         value={v.weightKg ?? ""}
                         placeholder={productWeightKg || "0.60"}
                         onChange={(e) => patch(i, { weightKg: e.target.value === "" ? null : num(e.target.value) })}
-                        onBlur={() => commit(rows)}
+                        onBlur={() => commitIfChanged(rows)}
                         style={{ width: 78 }}
                       />
                     </label>
@@ -2371,7 +2625,7 @@ function VariantEditor({
                         placeholder="8471.60"
                         inputMode="numeric"
                         onChange={(e) => patch(i, { hsCode: e.target.value.replace(/[^\d.]/g, "").slice(0, 10) })}
-                        onBlur={() => commit(rows)}
+                        onBlur={() => commitIfChanged(rows)}
                         style={{ width: 92 }}
                       />
                     </label>
@@ -2422,6 +2676,18 @@ function VariantEditor({
         <button className="btn ghost sm" onClick={addVariant} style={{ alignSelf: "flex-start" }}>
           + {t("delivery.variantAdd")}
         </button>
+        {note && <p className="tiny" style={{ margin: 0, color: "var(--brand)" }}>ℹ {note}</p>}
+        <p className="tiny muted" style={{ margin: 0 }}>
+          {etsy ? t("delivery.variantRuleEtsy") : t("delivery.variantRuleShopify")}
+        </p>
+        <label className="tiny muted" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {t("delivery.variantAutoAfter")}
+          <select className="input sm" value={autoMode} onChange={(e) => onAutoMode(e.target.value === "off" ? "off" : e.target.value === "ai" ? "ai" : "free")}>
+            <option value="off">{t("delivery.variantAutoOff")}</option>
+            <option value="free">{t("delivery.variantAutoFree")}</option>
+            <option value="ai">{t("delivery.variantAutoAi")}</option>
+          </select>
+        </label>
         <p className="tiny muted" style={{ margin: 0 }}>
           {channel === "shopify" ? t("delivery.variantHintShopify") : t("delivery.variantHintEtsy")}
         </p>

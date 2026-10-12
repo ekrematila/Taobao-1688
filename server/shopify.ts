@@ -209,7 +209,8 @@ export async function pushToShopify(
   };
 
   for (const im of product.images.filter((x) => x.role === "gallery" || x.role === "variant")) addUp(im);
-  for (const v of product.variants ?? []) if (v.imageUrl) addUp({ url: v.imageUrl, alt: v.nameTranslated || v.name || "" });
+  // each variant remembers its own upload, so its picture can be attached to the created Shopify variant below
+  const variantUp: (Up | null)[] = (product.variants ?? []).map((v) => (v.imageUrl ? addUp({ url: v.imageUrl, alt: v.nameTranslated || v.name || "" }) : null));
 
   // Shopify description is always visual — every "Açıklama görselleri" strip goes
   // into body_html (up to 20, best-first). Local edits included via attachment.
@@ -378,6 +379,22 @@ export async function pushToShopify(
         byUpload.set(u, { id: r.value.j.image.id, src: r.value.j.image.src });
       }
     });
+  }
+
+  // Attach each variant's own picture to the Shopify variant (the storefront then switches the photo with the option).
+  const madeVariants: any[] = json.product?.variants ?? [];
+  if (id && madeVariants.length === variantUp.length) {
+    await Promise.allSettled(
+      madeVariants.map((cv, i) => {
+        const img = variantUp[i] ? byUpload.get(variantUp[i]!) : undefined;
+        if (!img || !cv?.id) return Promise.resolve();
+        return fetch(`https://${domain}/admin/api/${env.shopifyApiVersion}/variants/${cv.id}.json`, {
+          method: "PUT",
+          headers: { "X-Shopify-Access-Token": shopToken, "Content-Type": "application/json" },
+          body: JSON.stringify({ variant: { id: cv.id, image_id: img.id } }),
+        });
+      }),
+    );
   }
 
   // Swap each body_html placeholder (alicdn / /api/media) for the permanent

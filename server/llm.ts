@@ -6,6 +6,7 @@ import { openaiConfigured, openaiListModels, openaiRespond, OpenAIHttpError, typ
 import { isSelfContainedLayout, cleanDescValue } from "@shared/descLayouts.ts";
 import { STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE } from "@shared/exampleData.ts";
 import { applyKeycapGlossary, detectKeyboardLayout, layoutNote, CHERRY_PROFILE_DIRECTIVE } from "@shared/keycaps.ts";
+import { finalizeNames, ruleBasedVariantName } from "@shared/variantNames.ts";
 import { cleanPropsRecord, cleanSpecs } from "@shared/specs.ts";
 import {
   buildTagCandidates,
@@ -2183,28 +2184,49 @@ export async function suggestAttributes(
 
 /* --------------------- variant names for a channel ------------------- */
 
-/** Concise, marketplace-ready variant names. Etsy option values ≤ 20 chars, Shopify ≤ 40. */
+/**
+ * Concise, marketplace-ready variant names. Etsy option values ≤ 20 chars, Shopify ≤ 40.
+ * The model sees the original label, a glossary draft and the product (so "基础" becomes
+ * "Base Kit" on a keycap set, not "Basic"); whatever it leaves empty falls back to the
+ * glossary draft, then "Option N" — a variant is never left unnamed.
+ */
 export async function nameVariantsForChannel(
   variants: ProductVariant[],
   channel: ChannelId,
   targetLanguage: string,
-  opts: { model?: string; signal?: AbortSignal; draftId?: string } = {},
+  opts: { model?: string; signal?: AbortSignal; draftId?: string; context?: string } = {},
 ): Promise<{ variants: ProductVariant[]; usage: LlmUsage; maxChars: number }> {
   const maxChars = channel === "etsy" ? 20 : 40;
   if (variants.length === 0) return { variants, usage: zeroUsage(), maxChars };
   const system = [
     "Ürün varyant adlarını bir pazaryeri için kısa ve net hale getiren asistansın.",
     `HER ad EN FAZLA ${maxChars} KARAKTER olacak (${channel}). Nişin doğru terimini kullan`,
-    '(örn. "原厂高度" → "Cherry Profile"). Gereksiz kelime yok, marka yok, ölçü birimi netse kalsın.',
+    '(örn. "原厂高度" → "Cherry Profile"; keycap setinde "基础" → "Base Kit", renkler → "Pink", "Mint Green"). Gereksiz kelime yok, marka yok, ölçü birimi netse kalsın.',
+    "Her varyantın adı BENZERSİZ olsun; Çince karakter bırakma; sadece verilen etikete dayan, yeni özellik uydurma.",
     `Çıktı dili: ${targetLanguage.toUpperCase()}. Sadece JSON dizi: [{ "i": 0, "t": "..." }].`,
   ].join("\n");
-  const user = variants.map((v, i) => `${i}: ${v.nameTranslated || v.name}`).join("\n");
+  const hint = (v: ProductVariant) => ruleBasedVariantName(v.name || v.nameTranslated || "").text;
+  const user = [
+    opts.context ? `ÜRÜN: ${opts.context}\n` : "",
+    ...variants.map((v, i) => {
+      const src = v.name || v.nameTranslated || "";
+      const h = hint(v);
+      return `${i}: ${src}${h && h !== src ? `  (taslak: ${h})` : ""}`;
+    }),
+  ].join("\n");
   const { text, usage } = await ask(system, user, "nameVariants", { maxTokens: 1800, model: opts.model, signal: opts.signal, draftId: opts.draftId });
-  const rows = extractJson(text) as { i: number; t: string }[];
-  const out = variants.map((v, i) => {
+  let rows: { i: number; t: string }[] = [];
+  try {
+    const parsed = extractJson(text);
+    rows = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    /* unreadable answer → every name falls back to the glossary draft */
+  }
+  const raw = variants.map((v, i) => {
     const hit = rows.find((r) => Number(r.i) === i);
-    const t = stripCJK(applyKeycapGlossary(hit ? String(hit.t).trim() : v.nameTranslated || v.name)).slice(0, maxChars);
-    return { ...v, nameTranslated: t };
+    const t = hit ? stripCJK(applyKeycapGlossary(String(hit.t ?? "").trim())) : "";
+    return t || hint(v);
   });
-  return { variants: out, usage, maxChars };
+  const names = finalizeNames(raw, maxChars);
+  return { variants: variants.map((v, i) => ({ ...v, nameTranslated: names[i] })), usage, maxChars };
 }
