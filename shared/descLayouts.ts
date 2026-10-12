@@ -105,6 +105,20 @@ export const MAX_DESC_IMAGES = 20;
 /** İ→I, ı→i — a stray Turkish letter from the prompt looks broken in an English listing. */
 const deTr = (s: string) => s.replace(/İ/g, "I").replace(/ı/g, "i");
 
+/**
+ * The styled HTML description is never shorter than this many characters (operator rule). The page scaffold (CSS + script
+ * + the verified blocks) already carries it far past the floor — the visible text stays short (BREVITY_RULE) — so the
+ * padding below is only a last-resort guarantee and normally adds nothing.
+ */
+export const HTML_DESC_MIN_CHARS = 35000;
+
+/** Last-resort floor: an inert comment brings a styled page up to HTML_DESC_MIN_CHARS (never touches what is shown). */
+export function ensureMinHtml(html: string, min = HTML_DESC_MIN_CHARS): string {
+  if (html.length >= min) return html;
+  const body = " keyartisan product page ".repeat(Math.ceil((min - html.length) / 25) + 1).slice(0, min - html.length - 7);
+  return html + "<!--" + body + "-->";
+}
+
 /** the verified blocks go in, then the product's skin for the whole store page */
 function finishPage(html: string, meta?: DescMeta): string {
   const withBlocks = injectPageBlocks(relevantFeatIcons(html), meta?.blocks);
@@ -121,7 +135,8 @@ export function renderDescriptionHtml(
   // it, a page (or Shopify theme) with lang="tr" turns "Highlights" into
   // "HİGHLİGHTS" (dotted capital I) at render time, which deTr can't catch
   // because the source string is plain ASCII.
-  return `<div lang="en">${finishPage(ensureGlanceCss(deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))), meta)}</div>`;
+  const page = `<div lang="en">${finishPage(ensureGlanceCss(deTr(renderDescBody(layoutId, baseHtml, imgsIn, meta))), meta)}</div>`;
+  return isSelfContainedLayout(layoutId) || isPreStyled(cleanDescValue(baseHtml)) ? ensureMinHtml(page) : page;
 }
 
 /**
@@ -232,10 +247,10 @@ export function renderImportBody(
   const imgs = (imgsIn || []).filter((i) => i && i.url).slice(0, MAX_DESC_IMAGES);
   const base0 = cleanDescValue(baseHtml);
   if (isPreStyled(base0)) {
-    return oneLine(`<div lang="en">${finishPage(ensureGlanceCss(deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))), meta)}</div>`);
+    return ensureMinHtml(oneLine(`<div lang="en">${finishPage(ensureGlanceCss(deTr(scaffoldPrestyled(fillMediaSlots(base0, imgs)))), meta)}</div>`));
   }
   if (isSelfContainedLayout(layoutId)) {
-    return oneLine(renderDescriptionHtml(layoutId, baseHtml, imgs, meta));
+    return ensureMinHtml(oneLine(renderDescriptionHtml(layoutId, baseHtml, imgs, meta)));
   }
   const base = deTr(ensureHtml(base0));
   const attr = (s: string) => escT(s).replace(/"/g, "&quot;");

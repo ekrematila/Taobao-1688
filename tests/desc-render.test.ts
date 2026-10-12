@@ -457,3 +457,18 @@ test("an empty column shell (bordered empty box) is removed", () => {
   const out = renderDescriptionHtml("stacked-plain", html, imgs);
   assert.ok(!/bm-acc-desc" open>/.test(out) || !/<div class="bm-c2">\s*<\/div>\s*<\/details>/.test(out));
 });
+
+test("the styled HTML description is always at least 35,000 characters (page and import body, every styled layout)", async () => {
+  const { HTML_DESC_MIN_CHARS, ensureMinHtml } = await import("../shared/descLayouts.ts");
+  assert.equal(HTML_DESC_MIN_CHARS, 35000);
+  const tiny = ensureMinHtml("<div>x</div>");
+  assert.equal(tiny.length, 35000);
+  assert.ok(tiny.endsWith("-->") && tiny.startsWith("<div>x</div><!--"));
+  assert.equal(ensureMinHtml("a".repeat(40000)).length, 40000, "long pages are left alone");
+  for (const layout of ["stacked-plain", "bm-sticky"]) {
+    for (const body of ["<p>Hello keycaps.</p>", STACKED_DESC_EXAMPLE, OTHER_DESC_EXAMPLE]) {
+      assert.ok(renderDescriptionHtml(layout, body, imgs).length >= 35000, `${layout} page`);
+      assert.ok(renderImportBody(layout, body, imgs).length >= 35000, `${layout} import`);
+    }
+  }
+});

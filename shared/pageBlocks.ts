@@ -276,6 +276,7 @@ export const BREVITY_RULE = [
   "- Compatible Layouts (sadece keycap/klavye; ASLA 'Pictured: …' çipi yazma — standart düzenleri listele): boyut çipleri + tuş sayısı çipleri + `bm-compat-eg` içinde HER satır yalnız `<b>60%</b><span>Model A · Model B · Model C</span>` (SADECE model adları, CÜMLE YOK); `bm-layouts-note` EN FAZLA 2 kısa cümle (spacebar/shift detay paragrafı YOK).",
   "- SSS: 4–5 soru; her cevap EN FAZLA 2 kısa cümle (~25 kelime). Kargo/iade sorusu YOK.",
   "- `bm-note` tek kısa satır; CTA tek cümle.",
+  "- HTML UZUNLUĞU: üretilen HTML açıklama EN AZ 35.000 karakter olur — bunu sistem şablon/CSS/komut dosyası ile kendisi sağlar; sen görünen metni uzatma, dolgu yazma. Yukarıdaki kısalık kuralları görünen METİN içindir.",
   "- Bölüm sayısı ve uzunluk için operatörün bandı yalnızca ÜST sınırdır: bandın altında kalmak SERBEST ve TERCİH EDİLİR; bandı doldurmak için asla metin ekleme.",
 ].join("\n");
 
